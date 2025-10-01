@@ -1,22 +1,18 @@
-import { PageHeader } from '@/components/erp/page-header';
-import { EmptyState } from '@/components/erp/empty-state';
-import { LucideIcon } from 'lucide-react';
-
 interface StubPageProps {
   title: string;
-  description: string;
-  icon: LucideIcon;
+  description?: string;
 }
 
-export function StubPage({ title, description, icon }: StubPageProps) {
+export default function StubPage({ title, description }: StubPageProps) {
   return (
-    <div>
-      <PageHeader title={title} description={description} />
-      <EmptyState
-        icon={icon}
-        title="Em desenvolvimento"
-        description="Este módulo estará disponível em breve."
-      />
+    <div className="flex flex-col items-center justify-center min-h-[60vh]">
+      <div className="text-center space-y-4">
+        <h1 className="text-4xl font-bold">{title}</h1>
+        {description && (
+          <p className="text-xl text-muted-foreground">{description}</p>
+        )}
+        <p className="text-muted-foreground">Esta página será implementada em breve.</p>
+      </div>
     </div>
   );
 }
