@@ -33,6 +33,9 @@ import EditarProfissional from './pages/erp/agenda/profissionais/[id]/editar';
 import ClientesIndex from './pages/erp/agenda/clientes/index';
 import NovoCliente from './pages/erp/agenda/clientes/novo';
 import EditarCliente from './pages/erp/agenda/clientes/[id]/editar';
+import AgendaIndex from './pages/erp/agenda/index';
+import NovoAgendamento from './pages/erp/agenda/novo';
+import AgendamentoDetalhe from './pages/erp/agenda/[id]';
 
 // Stock pages
 import StockPosition from "./pages/erp/estoque/index";
@@ -113,7 +116,9 @@ const App = () => (
           <Route path="estoque/etiquetas" element={<StockLabels />} />
           
           {/* Agenda Routes */}
-          <Route path="agenda" element={<StubPage title="Agenda" description="Agendamento de Serviços" />} />
+          <Route path="agenda" element={<AgendaIndex />} />
+          <Route path="agenda/novo" element={<NovoAgendamento />} />
+          <Route path="agenda/:id" element={<AgendamentoDetalhe />} />
           <Route path="agenda/servicos" element={<ServicosIndex />} />
           <Route path="agenda/servicos/novo" element={<NovoServico />} />
           <Route path="agenda/servicos/:id/editar" element={<EditarServico />} />
