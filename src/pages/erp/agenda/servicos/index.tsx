@@ -161,14 +161,14 @@ export default function ServicosIndex() {
         </div>
 
         <Select
-          value={filters.categoria}
-          onValueChange={(value) => setFilters({ categoria: value })}
+          value={filters.categoria || 'all'}
+          onValueChange={(value) => setFilters({ categoria: value === 'all' ? '' : value })}
         >
           <SelectTrigger className="w-full md:w-[200px]">
             <SelectValue placeholder="Categoria" />
           </SelectTrigger>
           <SelectContent className="bg-background z-50">
-            <SelectItem value="">Todas</SelectItem>
+            <SelectItem value="all">Todas</SelectItem>
             {allCategories.map((cat) => (
               <SelectItem key={cat} value={cat}>
                 {cat}
