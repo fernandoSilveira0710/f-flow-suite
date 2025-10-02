@@ -1,4 +1,4 @@
-﻿import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Injectable, NestMiddleware } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 
@@ -9,7 +9,7 @@ export class PrismaTenantMiddleware implements NestMiddleware {
   async use(req: Request, _res: Response, next: NextFunction) {
     const tenantId =
       (req.headers['x-tenant-id'] as string | undefined) ??
-      (req as any)?.user?.tenantId ??
+      (req as Request & { user?: { tenantId?: string } })?.user?.tenantId ??
       null;
 
     if (tenantId) {
