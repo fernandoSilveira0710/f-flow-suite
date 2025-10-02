@@ -73,6 +73,8 @@ import PaymentsIndex from "./pages/settings/payments/index";
 import NotificationsSettings from "./pages/settings/notifications";
 import ImportExportSettings from "./pages/settings/import-export";
 import NovoPagamento from "./pages/erp/configuracoes/pagamentos/novo";
+import ConfiguracoesRedirect from "./pages/erp/configuracoes/index";
+import ConfiguracoesAlias from "./pages/erp/configuracoes/[...alias]";
 
 import NotFound from "./pages/NotFound";
 
@@ -160,9 +162,9 @@ function App() {
           <Route path="banho-tosa" element={<GroomingIndex />} />
           <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
           
-          {/* Settings Routes */}
+          {/* Settings Routes (EN - canonical) */}
           <Route path="settings" element={<SettingsLayout />}>
-            <Route index element={<Navigate to="/settings/organization" replace />} />
+            <Route index element={<Navigate to="/erp/settings/organization" replace />} />
             <Route path="organization" element={<OrganizacaoPage />} />
             <Route path="users" element={<UsuariosPage />} />
             <Route path="roles" element={<PapeisPage />} />
@@ -178,6 +180,10 @@ function App() {
             <Route path="notifications" element={<NotificationsSettings />} />
             <Route path="import-export" element={<ImportExportSettings />} />
           </Route>
+
+          {/* PT-BR Aliases (redirect to EN canonical) */}
+          <Route path="configuracoes" element={<ConfiguracoesRedirect />} />
+          <Route path="configuracoes/*" element={<ConfiguracoesAlias />} />
         </Route>
 
             {/* 404 */}

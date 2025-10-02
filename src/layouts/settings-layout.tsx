@@ -35,33 +35,37 @@ export default function SettingsLayout() {
 
   const menuItems: MenuItem[] = [
     {
+      label: 'Geral',
+      type: 'separator' as const,
+    },
+    {
       label: 'Organização',
       icon: Building2,
-      path: '/settings/organization',
+      path: '/erp/settings/organization',
       requiresPlan: null,
     },
     {
       label: 'Usuários & Assentos',
       icon: Users,
-      path: '/settings/users',
+      path: '/erp/settings/users',
       requiresPlan: null,
     },
     {
       label: 'Papéis & Permissões',
       icon: Shield,
-      path: '/settings/roles',
+      path: '/erp/settings/roles',
       requiresPlan: null,
     },
     {
       label: 'Plano & Faturamento',
       icon: CreditCard,
-      path: '/settings/billing',
+      path: '/erp/settings/billing',
       requiresPlan: null,
     },
     {
       label: 'Licenças & Ativação',
       icon: KeyIcon,
-      path: '/settings/licenses',
+      path: '/erp/settings/licenses',
       requiresPlan: null,
     },
     {
@@ -71,25 +75,25 @@ export default function SettingsLayout() {
     {
       label: 'PDV',
       icon: ShoppingCart,
-      path: '/settings/pos',
+      path: '/erp/settings/pos',
       requiresPlan: null,
     },
     {
       label: 'Agenda',
       icon: Calendar,
-      path: '/settings/schedule',
+      path: '/erp/settings/schedule',
       requiresPlan: null,
     },
     {
       label: 'Banho & Tosa',
       icon: Scissors,
-      path: '/settings/grooming',
+      path: '/erp/settings/grooming',
       requiresPlan: 'pro',
     },
     {
       label: 'Estoque',
       icon: Package,
-      path: '/settings/inventory',
+      path: '/erp/settings/inventory',
       requiresPlan: null,
     },
     {
@@ -99,19 +103,19 @@ export default function SettingsLayout() {
     {
       label: 'Métodos de Pagamento',
       icon: Wallet,
-      path: '/settings/payments',
+      path: '/erp/settings/payments',
       requiresPlan: null,
     },
     {
       label: 'Notificações',
       icon: Bell,
-      path: '/settings/notifications',
+      path: '/erp/settings/notifications',
       requiresPlan: null,
     },
     {
       label: 'Importar/Exportar',
       icon: Upload,
-      path: '/settings/import-export',
+      path: '/erp/settings/import-export',
       requiresPlan: null,
     },
   ];
@@ -147,7 +151,7 @@ export default function SettingsLayout() {
               }
 
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
+              const isActive = location.pathname.startsWith(item.path);
               const needsUpgrade = isPlanRequired(item.requiresPlan);
 
               return (
