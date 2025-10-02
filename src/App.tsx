@@ -37,6 +37,7 @@ import AgendaIndex from './pages/erp/agenda/index';
 import NovoAgendamento from './pages/erp/agenda/novo';
 import AgendamentoDetalhe from './pages/erp/agenda/[id]';
 import GroomingIndex from './pages/erp/grooming/index';
+import GroomingCheckIn from './pages/erp/grooming/new';
 import GroomingServicesIndex from './pages/erp/grooming/services/index';
 import NovoGroomingService from './pages/erp/grooming/services/novo';
 import EditarGroomingService from './pages/erp/grooming/services/[id]/editar';
@@ -142,6 +143,7 @@ function App() {
           
           {/* Grooming Routes */}
           <Route path="grooming" element={<GroomingIndex />} />
+          <Route path="grooming/new" element={<GroomingCheckIn />} />
           <Route path="grooming/services" element={<GroomingServicesIndex />} />
           <Route path="grooming/services/novo" element={<NovoGroomingService />} />
           <Route path="grooming/services/:id/editar" element={<EditarGroomingService />} />
