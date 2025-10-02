@@ -81,6 +81,7 @@ import {
 } from '@/lib/pos-api';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { useBarcodeScanner } from '@/hooks/use-barcode-scanner';
+import { ProductImage } from '@/components/products/product-image';
 import { cn } from '@/lib/utils';
 
 export default function PdvPage() {
@@ -601,7 +602,17 @@ export default function PdvPage() {
                               )}
                               onClick={() => setSelectedItemIndex(index)}
                             >
-                              <TableCell className="font-medium">{item.nome}</TableCell>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  <ProductImage
+                                    imageUrl={item.imageUrl}
+                                    productName={item.nome}
+                                    size={32}
+                                    className="rounded"
+                                  />
+                                  {item.nome}
+                                </div>
+                              </TableCell>
                               <TableCell className="text-muted-foreground text-sm">{item.sku}</TableCell>
                               <TableCell className="text-center">
                                 <div className="flex items-center justify-center gap-1">
@@ -1170,8 +1181,18 @@ export default function PdvPage() {
                     onClick={() => handleAddProductFromSearch(product.id)}
                   >
                     <CardContent className="p-4">
-                      <h3 className="font-semibold">{product.nome}</h3>
-                      <p className="text-sm text-muted-foreground">{product.sku}</p>
+                      <div className="flex items-center gap-3 mb-2">
+                        <ProductImage
+                          imageUrl={product.imageUrl}
+                          productName={product.nome}
+                          size={48}
+                          className="rounded-md"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold truncate">{product.nome}</h3>
+                          <p className="text-sm text-muted-foreground">{product.sku}</p>
+                        </div>
+                      </div>
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-lg font-bold">R$ {product.preco.toFixed(2)}</p>
                         <Badge variant={product.estoque > 0 ? 'default' : 'destructive'}>

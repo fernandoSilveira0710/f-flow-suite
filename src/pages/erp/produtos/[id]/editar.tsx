@@ -17,6 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { mockAPI } from '@/lib/mock-data';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
+import { ImageUpload } from '@/components/products/image-upload';
 
 export default function ProdutoEditar() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +35,7 @@ export default function ProdutoEditar() {
     cost: product?.cost.toString() || '',
     stock: product?.stock.toString() || '',
     active: product?.active ?? true,
+    imageUrl: product?.imageUrl,
   });
 
   if (!product) {
@@ -63,6 +65,7 @@ export default function ProdutoEditar() {
       cost: parseFloat(formData.cost),
       stock: parseInt(formData.stock),
       active: formData.active,
+      imageUrl: formData.imageUrl,
     });
 
     toast({
@@ -91,6 +94,19 @@ export default function ProdutoEditar() {
 
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 max-w-4xl">
+          <Card>
+            <CardHeader>
+              <CardTitle>Imagem do Produto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ImageUpload
+                value={formData.imageUrl}
+                onChange={(imageUrl) => setFormData({ ...formData, imageUrl })}
+                productName={formData.name || product.name}
+              />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Informações Básicas</CardTitle>

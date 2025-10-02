@@ -14,6 +14,8 @@ export interface Product {
   cost: number;
   stock: number;
   active: boolean;
+  imageUrl?: string;
+  gallery?: string[];
   createdAt: string;
   updatedAt: string;
 }

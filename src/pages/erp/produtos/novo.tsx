@@ -17,6 +17,7 @@ import { mockAPI } from '@/lib/mock-data';
 import { toast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { ImageUpload } from '@/components/products/image-upload';
 
 export default function ProdutosNovo() {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ export default function ProdutosNovo() {
     cost: '',
     stock: '',
     active: true,
+    imageUrl: undefined as string | undefined,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -47,6 +49,7 @@ export default function ProdutosNovo() {
       cost: parseFloat(formData.cost),
       stock: parseInt(formData.stock),
       active: formData.active,
+      imageUrl: formData.imageUrl,
     });
 
     toast({
@@ -75,6 +78,19 @@ export default function ProdutosNovo() {
 
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 max-w-4xl">
+          <Card>
+            <CardHeader>
+              <CardTitle>Imagem do Produto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ImageUpload
+                value={formData.imageUrl}
+                onChange={(imageUrl) => setFormData({ ...formData, imageUrl })}
+                productName={formData.name || 'Novo Produto'}
+              />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Informações Básicas</CardTitle>

@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
+import { ProductImage } from '@/components/products/product-image';
 
 export default function ProdutosIndex() {
   const navigate = useNavigate();
@@ -98,9 +99,17 @@ export default function ProdutosIndex() {
               {filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
-                    <div>
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-sm text-muted-foreground">{product.description}</p>
+                    <div className="flex items-center gap-3">
+                      <ProductImage
+                        imageUrl={product.imageUrl}
+                        productName={product.name}
+                        size={40}
+                        className="rounded-md"
+                      />
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-sm text-muted-foreground">{product.description}</p>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-sm">{product.sku}</TableCell>

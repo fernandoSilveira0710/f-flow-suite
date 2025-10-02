@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { mockAPI } from '@/lib/mock-data';
-import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Barcode } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { ProductImage } from '@/components/products/product-image';
 
 export default function ProdutoDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -62,41 +63,50 @@ export default function ProdutoDetalhe() {
 
       <div className="grid gap-6 max-w-4xl">
         <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-6">
+              <ProductImage
+                imageUrl={product.imageUrl}
+                productName={product.name}
+                size={120}
+                className="rounded-xl"
+              />
+              <div className="flex-1 space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold">{product.name}</h2>
+                  <p className="text-muted-foreground">{product.description || 'Sem descrição'}</p>
+                </div>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <Badge variant={product.active ? 'default' : 'secondary'}>
+                    {product.active ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                  {product.barcode && (
+                    <Badge variant="outline" className="gap-1">
+                      <Barcode className="h-3 w-3" />
+                      Scan Ready
+                    </Badge>
+                  )}
+                  <Badge variant="secondary">{category?.name || 'Sem categoria'}</Badge>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader>
             <CardTitle>Informações do Produto</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Nome</p>
-                <p className="font-medium">{product.name}</p>
-              </div>
-
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Categoria</p>
-                <p className="font-medium">{category?.name || '-'}</p>
-              </div>
-
-              <div className="md:col-span-2">
-                <p className="text-sm text-muted-foreground mb-1">Descrição</p>
-                <p className="font-medium">{product.description || '-'}</p>
-              </div>
-
-              <div>
                 <p className="text-sm text-muted-foreground mb-1">SKU</p>
-                <p className="font-mono">{product.sku}</p>
+                <p className="font-mono font-medium">{product.sku}</p>
               </div>
 
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Código de Barras</p>
-                <p className="font-mono">{product.barcode || '-'}</p>
-              </div>
-
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Status</p>
-                <Badge variant={product.active ? 'default' : 'secondary'}>
-                  {product.active ? 'Ativo' : 'Inativo'}
-                </Badge>
+                <p className="font-mono font-medium">{product.barcode || '-'}</p>
               </div>
             </div>
           </CardContent>

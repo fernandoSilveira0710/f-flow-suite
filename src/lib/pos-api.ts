@@ -11,6 +11,7 @@ export interface Product {
   estoque: number;
   categoria?: string;
   barcode?: string;
+  imageUrl?: string;
 }
 
 export interface CartItem {
@@ -21,6 +22,7 @@ export interface CartItem {
   precoUnit: number;
   descontoItem: number;
   subtotal: number;
+  imageUrl?: string;
 }
 
 export interface Sale {
@@ -176,6 +178,7 @@ export const addToCart = async (productId: string, qtd: number = 1): Promise<Car
       precoUnit: product.preco,
       descontoItem: 0,
       subtotal: qtd * product.preco,
+      imageUrl: product.imageUrl,
     };
     updatedCart = [...cart, newItem];
   }
