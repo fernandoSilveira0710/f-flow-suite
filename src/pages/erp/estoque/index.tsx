@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react';
-import { Plus, Search, FileDown, Printer } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Plus, Search, FileDown, Printer, X } from 'lucide-react';
 import { PageHeader } from '@/components/erp/page-header';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useUrlFilters } from '@/hooks/use-url-filters';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Table,
   TableBody,
@@ -36,10 +38,23 @@ import { useNavigate } from 'react-router-dom';
 
 type MovementDialogType = 'ENTRADA' | 'SAIDA' | 'AJUSTE' | null;
 
+interface StockFilters {
+  filter: 'all' | 'below-min' | 'out-of-stock' | 'expire-soon';
+  days: number;
+  q: string;
+  category: string[];
+}
+
+const defaultFilters: StockFilters = {
+  filter: 'all',
+  days: 30,
+  q: '',
+  category: [],
+};
+
 export default function StockPositionPage() {
   const [products, setProducts] = useState<Product[]>(getProducts());
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'low' | 'out' | 'expiring'>('all');
+  const { filters, setFilters, clearFilters, activeFiltersCount } = useUrlFilters(defaultFilters);
   const [movementDialog, setMovementDialog] = useState<MovementDialogType>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState('');
@@ -57,8 +72,8 @@ export default function StockPositionPage() {
     let result = products;
 
     // Search filter
-    if (search) {
-      const lower = search.toLowerCase();
+    if (filters.q) {
+      const lower = filters.q.toLowerCase();
       result = result.filter(
         (p) =>
           p.nome.toLowerCase().includes(lower) ||
@@ -67,24 +82,29 @@ export default function StockPositionPage() {
       );
     }
 
+    // Category filter
+    if (filters.category.length > 0) {
+      result = result.filter((p) => p.categoria && filters.category.includes(p.categoria));
+    }
+
     // Status filter
-    if (filter === 'out') {
+    if (filters.filter === 'out-of-stock') {
       result = result.filter((p) => p.estoqueAtual <= 0);
-    } else if (filter === 'low') {
+    } else if (filters.filter === 'below-min') {
       result = result.filter(
         (p) => p.estoqueAtual > 0 && p.estoqueAtual < (p.estoqueMinimo || prefs.estoqueMinimoPadrao || 0)
       );
-    } else if (filter === 'expiring') {
+    } else if (filters.filter === 'expire-soon') {
       result = result.filter((p) => {
         if (!prefs.considerarValidade || !p.validade) return false;
         const validadeDate = new Date(p.validade);
         const diffDays = Math.ceil((validadeDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-        return diffDays > 0 && diffDays <= 30;
+        return diffDays > 0 && diffDays <= (filters.days || 30);
       });
     }
 
     return result;
-  }, [products, search, filter, prefs]);
+  }, [products, filters, prefs]);
 
   const openMovementDialog = (type: MovementDialogType, product: Product) => {
     setSelectedProduct(product);
@@ -168,22 +188,42 @@ export default function StockPositionPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nome, SKU ou código de barras... (Ctrl+K)"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={filters.q}
+            onChange={(e) => setFilters({ q: e.target.value })}
             className="pl-10"
           />
         </div>
-        <Select value={filter} onValueChange={(v: any) => setFilter(v)}>
+        <Select value={filters.filter} onValueChange={(v: any) => setFilters({ filter: v })}>
           <SelectTrigger className="w-full md:w-48">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="out">Sem estoque</SelectItem>
-            <SelectItem value="low">Abaixo do mínimo</SelectItem>
-            <SelectItem value="expiring">Validade próxima</SelectItem>
+            <SelectItem value="out-of-stock">Sem estoque</SelectItem>
+            <SelectItem value="below-min">Abaixo do mínimo</SelectItem>
+            <SelectItem value="expire-soon">Validade próxima ({filters.days}d)</SelectItem>
           </SelectContent>
         </Select>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={clearFilters}
+                disabled={activeFiltersCount === 0}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Limpar
+                {activeFiltersCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">{activeFiltersCount}</Badge>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Remover filtros aplicados</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
         <Button variant="outline" onClick={handleExportCSV}>
           <FileDown className="mr-2 h-4 w-4" />
           Exportar

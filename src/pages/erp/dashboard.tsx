@@ -49,7 +49,7 @@ export default function Dashboard() {
           label="Vendas Hoje"
           value={data?.todaySalesCount ?? 0}
           icon={ShoppingCart}
-          href="/erp/pdv/history?range=today"
+          href="/erp/vendas?range=today"
           tone="success"
           isLoading={isLoading}
         />
@@ -58,11 +58,9 @@ export default function Dashboard() {
           label="Vendas do Mês"
           value={data?.monthSalesCount ?? 0}
           icon={TrendingUp}
-          href="/erp/reports/sales?range=month"
+          href="/erp/vendas?range=month"
           tone="default"
           isLoading={isLoading}
-          disabled={!entitlements.reports}
-          disabledReason="Requer Reports"
         />
 
         <KpiTile
@@ -100,7 +98,7 @@ export default function Dashboard() {
           label="Produtos a Vencer"
           value={data?.expiringSoonCount ?? 0}
           icon={Calendar}
-          href="/erp/estoque?filter=expire-soon"
+          href="/erp/estoque?filter=expire-soon&days=30"
           tone="warning"
           isLoading={isLoading}
           disabled={!entitlements.stock}
@@ -113,7 +111,7 @@ export default function Dashboard() {
         title="Faturamento do Mês"
         total={data ? formatCurrency(data.monthSalesTotal) : 'R$ 0,00'}
         salesCount={data?.monthSalesCount ?? 0}
-        href={entitlements.reports ? "/erp/reports/sales?range=month" : "/erp/configuracoes/plano"}
+        href="/erp/vendas?range=month"
         series={data?.monthRevenueSeries}
         isLoading={isLoading}
       />

@@ -23,6 +23,7 @@ import PdvSession from "./pages/erp/pdv/session";
 import PdvCheckout from "./pages/erp/pdv/checkout";
 import PdvHistory from "./pages/erp/pdv/history";
 import StubPage from "./pages/erp/stub-page";
+import VendasIndex from "./pages/erp/vendas/index";
 
 // Stock pages
 import StockPosition from "./pages/erp/estoque/index";
@@ -84,6 +85,9 @@ const App = () => (
           <Route path="pdv/session" element={<PdvSession />} />
           <Route path="pdv/checkout" element={<PdvCheckout />} />
           <Route path="pdv/history" element={<PdvHistory />} />
+          
+          {/* Vendas */}
+          <Route path="vendas" element={<VendasIndex />} />
           
           {/* Stock Routes */}
           <Route path="estoque" element={<StockPosition />} />
