@@ -1,0 +1,110 @@
+﻿{
+  "info": {
+    "_postman_id": "f6d9b5b0-0000-0000-0000-000000000001",
+    "name": "F-Flow Hub API",
+    "description": "Coleção para validar o Hub (health check, ativação de licença e variáveis comuns).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{hub_url}}/health",
+          "host": [
+            "{{hub_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Retorna status ok', function () {",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('ok');",
+              "});",
+              "",
+              "pm.environment.set('last_healthcheck', new Date().toISOString());"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ativar Licença",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"deviceId\": \"{{device_id}}\"\n}"
+        },
+        "url": {
+          "raw": "{{hub_url}}/licenses/activate",
+          "host": [
+            "{{hub_url}}"
+          ],
+          "path": [
+            "licenses",
+            "activate"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "pm.test('Retorna token de licença', function () {",
+              "  pm.expect(json).to.have.property('licenseToken');",
+              "});",
+              "",
+              "if (json.licenseToken) {",
+              "  pm.environment.set('license_token', json.licenseToken);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "if (!pm.environment.get('tenant_id')) {",
+              "  throw new Error('Defina a variável de ambiente tenant_id antes de ativar a licença.');",
+              "}",
+              "if (!pm.environment.get('device_id')) {",
+              "  pm.environment.set('device_id', 'dev-01');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}

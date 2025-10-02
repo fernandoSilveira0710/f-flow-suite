@@ -9,23 +9,24 @@ datasource db {
 
 model Org {
   id        String   @id @default(uuid())
-  name      String
+  name      String   @unique
   createdAt DateTime @default(now())
   tenants   Tenant[]
 }
 
 model Tenant {
-  id        String   @id @default(uuid())
-  orgId     String
-  org       Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  slug      String   @unique
-  planId    String?
-  createdAt DateTime @default(now())
-  users     User[]
-  licenses  License[]
-  devices   Device[]
-  outbox    OutboxEvent[]
-  inbox     InboxCommand[]
+  id              String           @id @default(uuid())
+  orgId           String
+  org             Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  slug            String           @unique
+  planId          String?
+  createdAt       DateTime         @default(now())
+  users           User[]
+  licenses        License[]
+  devices         Device[]
+  outbox          OutboxEvent[]
+  inbox           InboxCommand[]
+  paymentMethods  PaymentMethod[]
 }
 
 model User {
@@ -42,12 +43,13 @@ model User {
 
 model License {
   id        String   @id @default(uuid())
-  tenantId  String
+  tenantId  String   @unique
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   planKey   String
   status    String
   maxSeats  Int      @default(1)
-  expiresAt DateTime
+  expiry    DateTime
+  graceDays Int      @default(7)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -60,6 +62,30 @@ model Device {
   fingerprint String   @unique
   activatedAt DateTime @default(now())
   revokedAt   DateTime?
+}
+
+model Entitlement {
+  id      String @id @default(uuid())
+  planKey String
+  key     String
+  value   Json
+
+  @@unique([planKey, key], name: "planKey_key")
+}
+
+model PaymentMethod {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code      String
+  label     String
+  active    Boolean  @default(true)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([code, tenantId], name: "code_tenantId")
+  @@index([tenantId, position])
 }
 
 model OutboxEvent {
