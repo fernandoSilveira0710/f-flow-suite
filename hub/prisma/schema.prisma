@@ -1,0 +1,87 @@
+﻿generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Org {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  tenants   Tenant[]
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  orgId     String
+  org       Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  slug      String   @unique
+  planId    String?
+  createdAt DateTime @default(now())
+  users     User[]
+  licenses  License[]
+  devices   Device[]
+  outbox    OutboxEvent[]
+  inbox     InboxCommand[]
+}
+
+model User {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email       String
+  displayName String
+  role        String   @default("operator")
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, email])
+}
+
+model License {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planKey   String
+  status    String
+  maxSeats  Int      @default(1)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Device {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  fingerprint String   @unique
+  activatedAt DateTime @default(now())
+  revokedAt   DateTime?
+}
+
+model OutboxEvent {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  aggregate  String
+  type       String
+  payload    Json
+  occurredAt DateTime @default(now())
+  sentAt     DateTime?
+
+  @@index([tenantId, sentAt])
+}
+
+model InboxCommand {
+  id        String   @id
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type      String
+  payload   Json
+  appliedAt DateTime?
+
+  @@index([tenantId, appliedAt])
+}

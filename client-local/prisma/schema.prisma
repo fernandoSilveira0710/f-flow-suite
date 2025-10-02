@@ -1,0 +1,65 @@
+﻿generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Sale {
+  id        String    @id @default(uuid())
+  code      String    @unique
+  operator  String
+  payment   String
+  status    String    @default("paid")
+  total     Decimal   @default(0)
+  createdAt DateTime  @default(now())
+  items     SaleItem[]
+}
+
+model SaleItem {
+  id        String   @id @default(uuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String
+  qty       Int
+  unitPrice Decimal
+  subtotal  Decimal
+}
+
+model Inventory {
+  productId String  @id
+  qty       Int     @default(0)
+  updatedAt DateTime @default(now())
+}
+
+model OutboxEvent {
+  id         String   @id @default(uuid())
+  aggregate  String
+  type       String
+  payload    Json
+  occurredAt DateTime @default(now())
+  sentAt     DateTime?
+}
+
+model InboxCommand {
+  id        String  @id
+  type      String
+  payload   Json
+  appliedAt DateTime?
+}
+
+model SyncState {
+  id             Int      @id @default(1)
+  lastCommandSeq Int?
+  lastEventId    String?
+  updatedAt      DateTime @default(now())
+}
+
+model PaymentMethodLocal {
+  code     String @id
+  label    String
+  active   Boolean @default(true)
+  position Int     @default(0)
+}
