@@ -47,6 +47,8 @@ import NotificacoesPage from "./pages/erp/configuracoes/notificacoes";
 import AuditoriaPage from "./pages/erp/configuracoes/auditoria";
 import ImportarExportarPage from "./pages/erp/configuracoes/importar-exportar";
 import DangerPage from "./pages/erp/configuracoes/danger";
+import PagamentosSettings from "./pages/erp/configuracoes/pagamentos";
+import NovoPagamento from "./pages/erp/configuracoes/pagamentos/novo";
 
 import NotFound from "./pages/NotFound";
 
@@ -116,6 +118,9 @@ const App = () => (
             <Route path="pet" element={<PreferenciasPage />} />
             <Route path="estoque" element={<PreferenciasPage />} />
             <Route path="notificacoes" element={<NotificacoesPage />} />
+            <Route path="pagamentos" element={<PagamentosSettings />} />
+            <Route path="pagamentos/novo" element={<NovoPagamento />} />
+            <Route path="pagamentos/:id/editar" element={<NovoPagamento />} />
             <Route path="auditoria" element={<AuditoriaPage />} />
             <Route path="importar-exportar" element={<ImportarExportarPage />} />
             <Route path="danger" element={<DangerPage />} />
