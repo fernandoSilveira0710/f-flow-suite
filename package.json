@@ -8,7 +8,13 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:up": "docker compose up -d",
+    "dev:down": "docker compose down -v",
+    "check:all": "npm run check:hub && npm run check:client && npm run check:web",
+    "check:hub": "cd hub && npm run lint && npm run typecheck",
+    "check:client": "cd client-local && npm run lint && npm run typecheck",
+    "check:web": "npm run lint && npx tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

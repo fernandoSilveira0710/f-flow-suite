@@ -1,9 +1,75 @@
-﻿# F-Flow Suite
+# F-Flow Suite
 
 Monorepo que abriga:
 - **Web App** (React/Vite/TypeScript) com site institucional e ERP mockado.
 - **Hub API** (NestJS + Postgres) para licenças, entitlements, multi-tenant e sincronização.
 - **Cliente Local** (NestJS + SQLite) que roda on-premise com POS, estoque, grooming e agente de sync.
+
+## 🚀 Etapa 1 — Como testar
+
+### Pré-requisitos
+- Node.js 18+
+- Docker e Docker Compose
+- PostgreSQL (via Docker)
+
+### Setup rápido (1 comando)
+```bash
+# Instalar dependências em todos os pacotes
+npm install
+cd hub && npm install && cd ../client-local && npm install && cd ..
+
+# Subir PostgreSQL + Adminer
+npm run dev:up
+
+# Verificar se tudo está funcionando
+npm run check:all
+```
+
+### Serviços disponíveis
+Após o setup, você terá:
+- **Frontend**: http://localhost:8081 (ou porta disponível)
+- **Hub API**: http://localhost:3000
+- **Client-local API**: http://localhost:3010
+- **Adminer**: http://localhost:8080 (PostgreSQL UI)
+- **PostgreSQL**: localhost:5432
+
+### Scripts principais
+| Script | Descrição |
+| ------ | --------- |
+| `npm run dev:up` | Sobe PostgreSQL + Adminer via Docker |
+| `npm run dev:down` | Para e remove containers Docker |
+| `npm run check:all` | Executa lint + typecheck em todos os pacotes |
+| `npm run check:hub` | Lint + typecheck apenas no Hub |
+| `npm run check:client` | Lint + typecheck apenas no Client-local |
+| `npm run check:web` | Lint + typecheck apenas no Frontend |
+
+### Teste de saúde
+```bash
+# Verificar se o Hub está funcionando
+curl http://localhost:3000/health
+
+# Verificar se o Client-local está funcionando  
+curl http://localhost:3010/pos/sales -X POST -H "Content-Type: application/json" -d "{}"
+```
+
+### Configuração de ambiente
+Copie os arquivos `.env.example` para `.env` em cada pacote:
+```bash
+cp hub/.env.example hub/.env
+cp client-local/.env.example client-local/.env
+```
+
+### Flags de desenvolvimento
+- `DEV_COMPOSE_ENABLED=true` - Habilita Docker Compose para desenvolvimento
+
+### Rollback
+Para reverter o ambiente de desenvolvimento:
+```bash
+npm run dev:down
+rm hub/.env client-local/.env
+```
+
+---
 
 ## Estrutura do Repositório
 ```
