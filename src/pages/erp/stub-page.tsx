@@ -1,3 +1,4 @@
+// Stub page component for modules under development
 interface StubPageProps {
   title: string;
   description?: string;
