@@ -23,7 +23,10 @@ import PdvSession from "./pages/erp/pdv/session";
 import PdvCheckout from "./pages/erp/pdv/checkout";
 import PdvHistory from "./pages/erp/pdv/history";
 import StubPage from "./pages/erp/stub-page";
-import VendasIndex from "./pages/erp/vendas/index";
+import VendasIndex from './pages/erp/vendas/index';
+import ServicosIndex from './pages/erp/agenda/servicos/index';
+import NovoServico from './pages/erp/agenda/servicos/novo';
+import EditarServico from './pages/erp/agenda/servicos/[id]/editar';
 
 // Stock pages
 import StockPosition from "./pages/erp/estoque/index";
@@ -102,7 +105,13 @@ const App = () => (
           <Route path="estoque/alertas" element={<StockAlerts />} />
           <Route path="estoque/preferencias" element={<StockSettings />} />
           <Route path="estoque/etiquetas" element={<StockLabels />} />
+          
+          {/* Agenda Routes */}
           <Route path="agenda" element={<StubPage title="Agenda" description="Agendamento de Serviços" />} />
+          <Route path="agenda/servicos" element={<ServicosIndex />} />
+          <Route path="agenda/servicos/novo" element={<NovoServico />} />
+          <Route path="agenda/servicos/:id/editar" element={<EditarServico />} />
+          
           <Route path="banho-tosa" element={<StubPage title="Banho & Tosa" description="Gestão de Pet Shop" />} />
           <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
           

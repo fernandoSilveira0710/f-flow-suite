@@ -1,0 +1,399 @@
+/**
+ * Schedule (Agenda) Mock API
+ * Persistência via localStorage
+ */
+
+// Types
+export interface Customer {
+  id: string;
+  nome: string;
+  documento?: string;
+  email?: string;
+  telefone?: string;
+  notas?: string;
+  tags?: string[];
+  pets?: Array<{
+    id: string;
+    nome: string;
+    especie?: string;
+    raca?: string;
+    observacoes?: string;
+  }>;
+  ativo: boolean;
+}
+
+export interface Service {
+  id: string;
+  nome: string;
+  descricao?: string;
+  categoria?: string;
+  duracaoMin: number;
+  precoBase: number;
+  bufferAntesMin?: number;
+  bufferDepoisMin?: number;
+  exigeRecursoUnico?: boolean;
+  usaEstoque?: Array<{ sku: string; qtd: number }>;
+  cor?: string;
+  ativo: boolean;
+}
+
+export type StaffType = 'PROFISSIONAL' | 'RECURSO';
+
+export interface Staff {
+  id: string;
+  nome: string;
+  tipo: StaffType;
+  funcoes?: string[]; // serviceIds que atende
+  cores?: { agenda?: string };
+  jornadaPadrao?: Array<{
+    weekday: number; // 0-6
+    start: string;   // HH:mm
+    end: string;
+  }>;
+  intervalosFixos?: Array<{
+    weekday: number;
+    start: string;
+    end: string;
+  }>;
+  folgas?: Array<{
+    dateISO: string;
+    motivo?: string;
+  }>;
+  capacidadeSimultanea?: number;
+  ativo: boolean;
+}
+
+export type AppointmentStatus = 
+  | 'AGENDADO' 
+  | 'CONFIRMADO' 
+  | 'CHECKIN' 
+  | 'CONCLUIDO' 
+  | 'CANCELADO' 
+  | 'NO_SHOW';
+
+export interface Appointment {
+  id: string;
+  customerId: string;
+  customerNome: string;
+  customerContato?: string;
+  petId?: string;
+  serviceId: string;
+  serviceNome: string;
+  staffIds: string[];
+  resourceIds?: string[];
+  startISO: string;
+  endISO: string;
+  status: AppointmentStatus;
+  origem?: 'WEB' | 'APP' | 'INTERNO';
+  notas?: string;
+  pagamento?: {
+    metodo?: 'PIX' | 'DEBIT' | 'CREDIT' | 'CASH' | 'OTHER';
+    sinal?: number;
+  };
+  vendaId?: string;
+  createdBy?: string;
+  updatedBy?: string;
+}
+
+export interface SchedulePrefs {
+  intervaloGradeMin: 15 | 30;
+  politicaCancelamento?: {
+    horasAntecedencia: number;
+    cobrarPercent?: number;
+  };
+  permitirOverbooking?: boolean;
+  confirmarAuto?: boolean;
+  notificacoes?: {
+    email?: boolean;
+    sms?: boolean;
+    whatsapp?: boolean;
+    lembreteMinAntes?: number;
+  };
+  abertura?: string;
+  fechamento?: string;
+  timezone?: string;
+}
+
+// Storage keys
+const KEYS = {
+  SERVICES: '2f.schedule.services',
+  STAFF: '2f.schedule.staff',
+  CUSTOMERS: '2f.schedule.customers',
+  APPOINTMENTS: '2f.schedule.appointments',
+  PREFS: '2f.schedule.prefs',
+  NOTIFICATIONS: '2f.schedule.notifications',
+};
+
+// Helpers
+function uuid(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+function getStorage<T>(key: string, defaultValue: T): T {
+  if (typeof window === 'undefined') return defaultValue;
+  const item = localStorage.getItem(key);
+  return item ? JSON.parse(item) : defaultValue;
+}
+
+function setStorage<T>(key: string, value: T): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+// Initialize mock data
+function initMockData() {
+  const services = getStorage<Service[]>(KEYS.SERVICES, []);
+  if (services.length === 0) {
+    const mockServices: Service[] = [
+      {
+        id: uuid(),
+        nome: 'Banho & Tosa Completo',
+        descricao: 'Banho, tosa higiênica, corte de unhas e limpeza de ouvidos',
+        categoria: 'Higiene',
+        duracaoMin: 90,
+        precoBase: 80.0,
+        bufferAntesMin: 15,
+        bufferDepoisMin: 15,
+        cor: '#3B82F6',
+        ativo: true,
+      },
+      {
+        id: uuid(),
+        nome: 'Banho Simples',
+        categoria: 'Higiene',
+        duracaoMin: 45,
+        precoBase: 40.0,
+        bufferDepoisMin: 10,
+        cor: '#22C55E',
+        ativo: true,
+      },
+      {
+        id: uuid(),
+        nome: 'Tosa Higiênica',
+        categoria: 'Tosa',
+        duracaoMin: 30,
+        precoBase: 35.0,
+        cor: '#F59E0B',
+        ativo: true,
+      },
+    ];
+    setStorage(KEYS.SERVICES, mockServices);
+  }
+
+  const prefs = getStorage<SchedulePrefs | null>(KEYS.PREFS, null);
+  if (!prefs) {
+    const defaultPrefs: SchedulePrefs = {
+      intervaloGradeMin: 30,
+      confirmarAuto: true,
+      permitirOverbooking: false,
+      abertura: '08:00',
+      fechamento: '18:00',
+      timezone: 'America/Sao_Paulo',
+      politicaCancelamento: {
+        horasAntecedencia: 24,
+        cobrarPercent: 50,
+      },
+      notificacoes: {
+        email: true,
+        sms: false,
+        whatsapp: false,
+        lembreteMinAntes: 60,
+      },
+    };
+    setStorage(KEYS.PREFS, defaultPrefs);
+  }
+}
+
+initMockData();
+
+// ============= SERVICES API =============
+
+export function getServices(): Service[] {
+  return getStorage<Service[]>(KEYS.SERVICES, []);
+}
+
+export function getServiceById(id: string): Service | null {
+  const services = getServices();
+  return services.find(s => s.id === id) || null;
+}
+
+export function createService(data: Omit<Service, 'id'>): Service {
+  const services = getServices();
+  const newService: Service = {
+    ...data,
+    id: uuid(),
+  };
+  services.push(newService);
+  setStorage(KEYS.SERVICES, services);
+  return newService;
+}
+
+export function updateService(id: string, updates: Partial<Service>): Service | null {
+  const services = getServices();
+  const index = services.findIndex(s => s.id === id);
+  if (index === -1) return null;
+
+  services[index] = { ...services[index], ...updates };
+  setStorage(KEYS.SERVICES, services);
+  return services[index];
+}
+
+export function deleteService(id: string): boolean {
+  const services = getServices();
+  const filtered = services.filter(s => s.id !== id);
+  if (filtered.length === services.length) return false;
+  setStorage(KEYS.SERVICES, filtered);
+  return true;
+}
+
+export function duplicateService(id: string): Service | null {
+  const original = getServiceById(id);
+  if (!original) return null;
+
+  const duplicate = createService({
+    ...original,
+    nome: `${original.nome} (cópia)`,
+  });
+  return duplicate;
+}
+
+// ============= STAFF API =============
+
+export function getStaff(): Staff[] {
+  return getStorage<Staff[]>(KEYS.STAFF, []);
+}
+
+export function getStaffById(id: string): Staff | null {
+  const staff = getStaff();
+  return staff.find(s => s.id === id) || null;
+}
+
+export function createStaff(data: Omit<Staff, 'id'>): Staff {
+  const staff = getStaff();
+  const newStaff: Staff = {
+    ...data,
+    id: uuid(),
+  };
+  staff.push(newStaff);
+  setStorage(KEYS.STAFF, staff);
+  return newStaff;
+}
+
+export function updateStaff(id: string, updates: Partial<Staff>): Staff | null {
+  const staff = getStaff();
+  const index = staff.findIndex(s => s.id === id);
+  if (index === -1) return null;
+
+  staff[index] = { ...staff[index], ...updates };
+  setStorage(KEYS.STAFF, staff);
+  return staff[index];
+}
+
+export function deleteStaff(id: string): boolean {
+  const staff = getStaff();
+  const filtered = staff.filter(s => s.id !== id);
+  if (filtered.length === staff.length) return false;
+  setStorage(KEYS.STAFF, filtered);
+  return true;
+}
+
+// ============= CUSTOMERS API =============
+
+export function getCustomers(): Customer[] {
+  return getStorage<Customer[]>(KEYS.CUSTOMERS, []);
+}
+
+export function getCustomerById(id: string): Customer | null {
+  const customers = getCustomers();
+  return customers.find(c => c.id === id) || null;
+}
+
+export function createCustomer(data: Omit<Customer, 'id'>): Customer {
+  const customers = getCustomers();
+  const newCustomer: Customer = {
+    ...data,
+    id: uuid(),
+  };
+  customers.push(newCustomer);
+  setStorage(KEYS.CUSTOMERS, customers);
+  return newCustomer;
+}
+
+export function updateCustomer(id: string, updates: Partial<Customer>): Customer | null {
+  const customers = getCustomers();
+  const index = customers.findIndex(c => c.id === id);
+  if (index === -1) return null;
+
+  customers[index] = { ...customers[index], ...updates };
+  setStorage(KEYS.CUSTOMERS, customers);
+  return customers[index];
+}
+
+export function deleteCustomer(id: string): boolean {
+  const customers = getCustomers();
+  const filtered = customers.filter(c => c.id !== id);
+  if (filtered.length === customers.length) return false;
+  setStorage(KEYS.CUSTOMERS, filtered);
+  return true;
+}
+
+// ============= APPOINTMENTS API =============
+
+export function getAppointments(): Appointment[] {
+  return getStorage<Appointment[]>(KEYS.APPOINTMENTS, []);
+}
+
+export function getAppointmentById(id: string): Appointment | null {
+  const appointments = getAppointments();
+  return appointments.find(a => a.id === id) || null;
+}
+
+export function createAppointment(data: Omit<Appointment, 'id'>): Appointment {
+  const appointments = getAppointments();
+  const newAppointment: Appointment = {
+    ...data,
+    id: uuid(),
+  };
+  appointments.push(newAppointment);
+  setStorage(KEYS.APPOINTMENTS, appointments);
+  return newAppointment;
+}
+
+export function updateAppointment(id: string, updates: Partial<Appointment>): Appointment | null {
+  const appointments = getAppointments();
+  const index = appointments.findIndex(a => a.id === id);
+  if (index === -1) return null;
+
+  appointments[index] = { ...appointments[index], ...updates };
+  setStorage(KEYS.APPOINTMENTS, appointments);
+  return appointments[index];
+}
+
+export function deleteAppointment(id: string): boolean {
+  const appointments = getAppointments();
+  const filtered = appointments.filter(a => a.id !== id);
+  if (filtered.length === appointments.length) return false;
+  setStorage(KEYS.APPOINTMENTS, filtered);
+  return true;
+}
+
+// ============= PREFERENCES API =============
+
+export function getSchedulePrefs(): SchedulePrefs {
+  return getStorage<SchedulePrefs>(KEYS.PREFS, {
+    intervaloGradeMin: 30,
+    confirmarAuto: true,
+    permitirOverbooking: false,
+    abertura: '08:00',
+    fechamento: '18:00',
+    timezone: 'America/Sao_Paulo',
+  });
+}
+
+export function saveSchedulePrefs(prefs: SchedulePrefs): void {
+  setStorage(KEYS.PREFS, prefs);
+}
