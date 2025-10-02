@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar as CalendarIcon, Clock, User, Briefcase, DollarSign } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Calendar as CalendarIcon, User, Briefcase, DollarSign, Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { format, addMinutes, setHours, setMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -12,15 +12,24 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { getCustomers, getServices, getStaff, createAppointment, getSchedulePrefs } from '@/lib/schedule-api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export default function NovoAgendamento() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const customers = getCustomers().filter(c => c.ativo);
   const services = getServices().filter(s => s.ativo);
-  const staff = getStaff().filter(s => s.ativo);
+  const allStaff = getStaff().filter(s => s.ativo);
   const prefs = getSchedulePrefs();
 
   const [customerId, setCustomerId] = useState('');
@@ -33,15 +42,37 @@ export default function NovoAgendamento() {
   const [sinal, setSinal] = useState('');
   const [metodoPagamento, setMetodoPagamento] = useState<string>('');
 
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const [serviceOpen, setServiceOpen] = useState(false);
+
+  // Pre-fill from URL
+  useEffect(() => {
+    const customerIdFromUrl = searchParams.get('customerId');
+    if (customerIdFromUrl && customers.some(c => c.id === customerIdFromUrl)) {
+      setCustomerId(customerIdFromUrl);
+    }
+  }, [searchParams, customers]);
+
   const selectedCustomer = customers.find(c => c.id === customerId);
   const selectedService = services.find(s => s.id === serviceId);
+
+  // Filter staff by service requirements
+  const filteredStaff = useMemo(() => {
+    if (!selectedService || !selectedService.staffHabilitadoIds || selectedService.staffHabilitadoIds.length === 0) {
+      return allStaff;
+    }
+    return allStaff.filter(s => selectedService.staffHabilitadoIds!.includes(s.id));
+  }, [selectedService, allStaff]);
 
   // Calcular horário de término
   const endTime = useMemo(() => {
     if (!selectedService || !startTime) return '';
     const [hours, minutes] = startTime.split(':').map(Number);
     const start = setMinutes(setHours(new Date(), hours), minutes);
-    const end = addMinutes(start, selectedService.duracaoMin);
+    const totalMin = selectedService.duracaoMin + (selectedService.bufferAntesMin || 0) + (selectedService.bufferDepoisMin || 0);
+    const end = addMinutes(start, totalMin);
     return format(end, 'HH:mm');
   }, [selectedService, startTime]);
 
@@ -92,6 +123,28 @@ export default function NovoAgendamento() {
     navigate('/erp/agenda');
   };
 
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch) return customers;
+    const lower = customerSearch.toLowerCase();
+    return customers.filter(
+      c =>
+        c.nome.toLowerCase().includes(lower) ||
+        c.telefone?.toLowerCase().includes(lower) ||
+        c.email?.toLowerCase().includes(lower) ||
+        c.documento?.toLowerCase().includes(lower)
+    );
+  }, [customers, customerSearch]);
+
+  const filteredServices = useMemo(() => {
+    if (!serviceSearch) return services;
+    const lower = serviceSearch.toLowerCase();
+    return services.filter(
+      s =>
+        s.nome.toLowerCase().includes(lower) ||
+        s.categoria?.toLowerCase().includes(lower)
+    );
+  }, [services, serviceSearch]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -121,21 +174,80 @@ export default function NovoAgendamento() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="customer">
+                <Label>
                   Cliente <span className="text-destructive">*</span>
                 </Label>
-                <Select value={customerId} onValueChange={setCustomerId}>
-                  <SelectTrigger id="customer">
-                    <SelectValue placeholder="Selecione o cliente" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background z-50">
-                    {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome} {c.telefone && `- ${c.telefone}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={customerOpen}
+                      className="w-full justify-between"
+                    >
+                      {customerId
+                        ? customers.find(c => c.id === customerId)?.nome
+                        : 'Selecione o cliente...'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0 bg-background z-50" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Buscar cliente..."
+                        value={customerSearch}
+                        onValueChange={setCustomerSearch}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="p-4 text-center">
+                            <p className="text-sm text-muted-foreground mb-3">
+                              Nenhum cliente encontrado
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setCustomerOpen(false);
+                                navigate('/erp/agenda/clientes/novo');
+                              }}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Novo Cliente
+                            </Button>
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {filteredCustomers.map(customer => (
+                            <CommandItem
+                              key={customer.id}
+                              value={customer.id}
+                              onSelect={() => {
+                                setCustomerId(customer.id);
+                                setCustomerOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  customerId === customer.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span>{customer.nome}</span>
+                                {customer.telefone && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {customer.telefone}
+                                  </span>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {selectedCustomer?.pets && selectedCustomer.pets.length > 0 && (
@@ -180,21 +292,88 @@ export default function NovoAgendamento() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="service">
+              <Label>
                 Serviço <span className="text-destructive">*</span>
               </Label>
-              <Select value={serviceId} onValueChange={setServiceId}>
-                <SelectTrigger id="service">
-                  <SelectValue placeholder="Selecione o serviço" />
-                </SelectTrigger>
-                <SelectContent className="bg-background z-50">
-                  {services.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.nome} - {s.duracaoMin}min - R$ {s.precoBase.toFixed(2)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={serviceOpen} onOpenChange={setServiceOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={serviceOpen}
+                    className="w-full justify-between"
+                  >
+                    {serviceId
+                      ? services.find(s => s.id === serviceId)?.nome
+                      : 'Selecione o serviço...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0 bg-background z-50" align="start">
+                  <Command>
+                    <CommandInput
+                      placeholder="Buscar serviço..."
+                      value={serviceSearch}
+                      onValueChange={setServiceSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>
+                        <div className="p-4 text-center">
+                          <p className="text-sm text-muted-foreground mb-3">
+                            Nenhum serviço encontrado
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setServiceOpen(false);
+                              navigate('/erp/agenda/servicos/novo');
+                            }}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Novo Serviço
+                          </Button>
+                        </div>
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {filteredServices.map(service => (
+                          <CommandItem
+                            key={service.id}
+                            value={service.id}
+                            onSelect={() => {
+                              setServiceId(service.id);
+                              setServiceOpen(false);
+                              // Clear staff selection when service changes
+                              setStaffIds([]);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                'mr-2 h-4 w-4',
+                                serviceId === service.id ? 'opacity-100' : 'opacity-0'
+                              )}
+                            />
+                            <div className="flex flex-col flex-1">
+                              <div className="flex items-center gap-2">
+                                {service.cor && (
+                                  <div
+                                    className="h-3 w-3 rounded-full"
+                                    style={{ backgroundColor: service.cor }}
+                                  />
+                                )}
+                                <span>{service.nome}</span>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {service.duracaoMin}min - R$ {service.precoBase.toFixed(2)}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {selectedService && (
@@ -205,6 +384,11 @@ export default function NovoAgendamento() {
                 <Badge variant="secondary">
                   Preço: R$ {selectedService.precoBase.toFixed(2)}
                 </Badge>
+                {(selectedService.bufferAntesMin || selectedService.bufferDepoisMin) && (
+                  <Badge variant="outline">
+                    Buffers: {selectedService.bufferAntesMin || 0}min antes / {selectedService.bufferDepoisMin || 0}min depois
+                  </Badge>
+                )}
               </div>
             )}
           </div>
@@ -218,19 +402,30 @@ export default function NovoAgendamento() {
               <h3 className="font-semibold">
                 Profissional(is) <span className="text-destructive">*</span>
               </h3>
+              {selectedService?.staffHabilitadoIds && selectedService.staffHabilitadoIds.length > 0 && (
+                <Badge variant="outline" className="text-xs">
+                  Filtrado por serviço
+                </Badge>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {staff.map((s) => (
-                <Badge
-                  key={s.id}
-                  variant={staffIds.includes(s.id) ? 'default' : 'outline'}
-                  className="cursor-pointer"
-                  onClick={() => handleStaffToggle(s.id)}
-                >
-                  {s.nome}
-                </Badge>
-              ))}
+              {filteredStaff.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum profissional disponível para este serviço
+                </p>
+              ) : (
+                filteredStaff.map((s) => (
+                  <Badge
+                    key={s.id}
+                    variant={staffIds.includes(s.id) ? 'default' : 'outline'}
+                    className="cursor-pointer"
+                    onClick={() => handleStaffToggle(s.id)}
+                  >
+                    {s.nome}
+                  </Badge>
+                ))
+              )}
             </div>
           </div>
 
@@ -288,7 +483,7 @@ export default function NovoAgendamento() {
               </div>
 
               <div className="space-y-2">
-                <Label>Término</Label>
+                <Label>Término (estimado)</Label>
                 <Input value={endTime} readOnly className="bg-muted" />
               </div>
             </div>

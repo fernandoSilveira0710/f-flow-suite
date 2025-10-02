@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreVertical, User, Mail, Phone, Tag } from 'lucide-react';
 import { PageHeader } from '@/components/erp/page-header';
+import { AgendaTabs } from '@/components/erp/agenda-tabs';
 import { EmptyState } from '@/components/erp/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,24 +31,66 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { getCustomers, deleteCustomer, type Customer } from '@/lib/schedule-api';
+import { useUrlFilters } from '@/hooks/use-url-filters';
 import { toast } from 'sonner';
 
 export default function ClientesIndex() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [customers, setCustomers] = useState<Customer[]>(() => getCustomers());
 
-  const filteredCustomers = customers.filter((c) => {
-    const searchLower = search.toLowerCase();
-    return (
-      c.nome.toLowerCase().includes(searchLower) ||
-      c.email?.toLowerCase().includes(searchLower) ||
-      c.telefone?.toLowerCase().includes(searchLower) ||
-      c.documento?.toLowerCase().includes(searchLower)
-    );
+  const { filters, setFilters, activeFiltersCount, clearFilters } = useUrlFilters({
+    q: '',
+    status: 'all' as 'all' | 'active' | 'inactive',
+    tags: [] as string[],
   });
+
+  // Get all unique tags
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    customers.forEach(c => c.tags?.forEach(t => tags.add(t)));
+    return Array.from(tags).sort();
+  }, [customers]);
+
+  const filteredCustomers = useMemo(() => {
+    let result = customers;
+
+    // Text search
+    if (filters.q) {
+      const searchLower = filters.q.toLowerCase();
+      result = result.filter(
+        (c) =>
+          c.nome.toLowerCase().includes(searchLower) ||
+          c.email?.toLowerCase().includes(searchLower) ||
+          c.telefone?.toLowerCase().includes(searchLower) ||
+          c.documento?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Status filter
+    if (filters.status === 'active') {
+      result = result.filter((c) => c.ativo);
+    } else if (filters.status === 'inactive') {
+      result = result.filter((c) => !c.ativo);
+    }
+
+    // Tags filter
+    if (filters.tags.length > 0) {
+      result = result.filter((c) =>
+        filters.tags.some((tag) => c.tags?.includes(tag))
+      );
+    }
+
+    return result;
+  }, [customers, filters]);
 
   const handleDelete = () => {
     if (!deleteId) return;
@@ -57,29 +100,79 @@ export default function ClientesIndex() {
     toast.success('Cliente excluído com sucesso');
   };
 
+  const toggleTag = (tag: string) => {
+    const newTags = filters.tags.includes(tag)
+      ? filters.tags.filter((t) => t !== tag)
+      : [...filters.tags, tag];
+    setFilters({ tags: newTags });
+  };
+
   return (
     <div className="space-y-6">
+      <AgendaTabs />
+      
       <PageHeader
         title="Clientes"
-        description="Gerencie os clientes da agenda"
+        description={`${customers.length} clientes cadastrados`}
         actionLabel="Novo Cliente"
         actionIcon={Plus}
         onAction={() => navigate('/erp/agenda/clientes/novo')}
       />
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, telefone, email ou documento..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
+      {/* Filters */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, telefone, email ou documento..."
+              value={filters.q}
+              onChange={(e) => setFilters({ q: e.target.value })}
+              className="pl-10"
+            />
+          </div>
+
+          <Select
+            value={filters.status}
+            onValueChange={(value: any) => setFilters({ status: value })}
+          >
+            <SelectTrigger className="w-full md:w-[200px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent className="bg-background z-50">
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="active">Ativos</SelectItem>
+              <SelectItem value="inactive">Inativos</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {activeFiltersCount > 0 && (
+            <Button variant="outline" onClick={clearFilters}>
+              Limpar ({activeFiltersCount})
+            </Button>
+          )}
         </div>
+
+        {/* Tags filter */}
+        {allTags.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <span className="text-sm text-muted-foreground self-center">Tags:</span>
+            {allTags.map((tag) => (
+              <Badge
+                key={tag}
+                variant={filters.tags.includes(tag) ? 'default' : 'outline'}
+                className="cursor-pointer"
+                onClick={() => toggleTag(tag)}
+              >
+                <Tag className="h-3 w-3 mr-1" />
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
-      {filteredCustomers.length === 0 && !search ? (
+      {customers.length === 0 ? (
         <EmptyState
           icon={User}
           title="Nenhum cliente cadastrado"
@@ -177,6 +270,13 @@ export default function ClientesIndex() {
                           }
                         >
                           Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            navigate(`/erp/agenda/novo?customerId=${customer.id}`)
+                          }
+                        >
+                          Novo Agendamento
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive"

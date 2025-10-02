@@ -10,8 +10,17 @@ export interface Customer {
   documento?: string;
   email?: string;
   telefone?: string;
-  notas?: string;
+  dataNascISO?: string;
+  endereco?: {
+    rua?: string;
+    numero?: string;
+    bairro?: string;
+    cidade?: string;
+    uf?: string;
+    cep?: string;
+  };
   tags?: string[];
+  notas?: string;
   pets?: Array<{
     id: string;
     nome: string;
@@ -20,6 +29,7 @@ export interface Customer {
     observacoes?: string;
   }>;
   ativo: boolean;
+  createdAtISO: string;
 }
 
 export interface Service {
@@ -34,7 +44,9 @@ export interface Service {
   exigeRecursoUnico?: boolean;
   usaEstoque?: Array<{ sku: string; qtd: number }>;
   cor?: string;
+  staffHabilitadoIds?: string[];
   ativo: boolean;
+  createdAtISO: string;
 }
 
 export type StaffType = 'PROFISSIONAL' | 'RECURSO';
@@ -160,6 +172,7 @@ function initMockData() {
         bufferDepoisMin: 15,
         cor: '#3B82F6',
         ativo: true,
+        createdAtISO: new Date().toISOString(),
       },
       {
         id: uuid(),
@@ -170,6 +183,7 @@ function initMockData() {
         bufferDepoisMin: 10,
         cor: '#22C55E',
         ativo: true,
+        createdAtISO: new Date().toISOString(),
       },
       {
         id: uuid(),
@@ -179,6 +193,7 @@ function initMockData() {
         precoBase: 35.0,
         cor: '#F59E0B',
         ativo: true,
+        createdAtISO: new Date().toISOString(),
       },
     ];
     setStorage(KEYS.SERVICES, mockServices);
@@ -221,11 +236,12 @@ export function getServiceById(id: string): Service | null {
   return services.find(s => s.id === id) || null;
 }
 
-export function createService(data: Omit<Service, 'id'>): Service {
+export function createService(data: Omit<Service, 'id' | 'createdAtISO'>): Service {
   const services = getServices();
   const newService: Service = {
     ...data,
     id: uuid(),
+    createdAtISO: new Date().toISOString(),
   };
   services.push(newService);
   setStorage(KEYS.SERVICES, services);
@@ -312,11 +328,12 @@ export function getCustomerById(id: string): Customer | null {
   return customers.find(c => c.id === id) || null;
 }
 
-export function createCustomer(data: Omit<Customer, 'id'>): Customer {
+export function createCustomer(data: Omit<Customer, 'id' | 'createdAtISO'>): Customer {
   const customers = getCustomers();
   const newCustomer: Customer = {
     ...data,
     id: uuid(),
+    createdAtISO: new Date().toISOString(),
   };
   customers.push(newCustomer);
   setStorage(KEYS.CUSTOMERS, customers);
