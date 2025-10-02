@@ -36,6 +36,7 @@ import EditarCliente from './pages/erp/agenda/clientes/[id]/editar';
 import AgendaIndex from './pages/erp/agenda/index';
 import NovoAgendamento from './pages/erp/agenda/novo';
 import AgendamentoDetalhe from './pages/erp/agenda/[id]';
+import GroomingIndex from './pages/erp/grooming/index';
 import GroomingServicesIndex from './pages/erp/grooming/services/index';
 import NovoGroomingService from './pages/erp/grooming/services/novo';
 import EditarGroomingService from './pages/erp/grooming/services/[id]/editar';
@@ -142,7 +143,7 @@ function App() {
           <Route path="agenda/clientes/:id/editar" element={<EditarCliente />} />
           
           {/* Grooming Routes */}
-          <Route path="grooming" element={<StubPage title="Banho & Tosa" description="Kanban Operacional" />} />
+          <Route path="grooming" element={<GroomingIndex />} />
           <Route path="grooming/services" element={<GroomingServicesIndex />} />
           <Route path="grooming/services/novo" element={<NovoGroomingService />} />
           <Route path="grooming/services/:id/editar" element={<EditarGroomingService />} />
