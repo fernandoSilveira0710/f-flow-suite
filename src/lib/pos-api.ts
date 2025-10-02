@@ -10,6 +10,7 @@ export interface Product {
   preco: number;
   estoque: number;
   categoria?: string;
+  barcode?: string;
 }
 
 export interface CartItem {
@@ -18,6 +19,7 @@ export interface CartItem {
   sku: string;
   qtd: number;
   precoUnit: number;
+  descontoItem: number;
   subtotal: number;
 }
 
@@ -68,16 +70,16 @@ const setInStorage = <T>(key: string, value: T): void => {
 
 // Mock Products
 const DEFAULT_PRODUCTS: Product[] = [
-  { id: '1', nome: 'Ração Premium 15kg', sku: 'RAC001', preco: 189.90, estoque: 45, categoria: 'Ração' },
-  { id: '2', nome: 'Shampoo Pet 500ml', sku: 'SHP001', preco: 29.90, estoque: 120, categoria: 'Higiene' },
-  { id: '3', nome: 'Coleira Ajustável', sku: 'COL001', preco: 24.90, estoque: 80, categoria: 'Acessórios' },
-  { id: '4', nome: 'Brinquedo Mordedor', sku: 'BRI001', preco: 19.90, estoque: 150, categoria: 'Brinquedos' },
-  { id: '5', nome: 'Areia Sanitária 4kg', sku: 'ARE001', preco: 32.90, estoque: 60, categoria: 'Higiene' },
-  { id: '6', nome: 'Petiscos Variados', sku: 'PET001', preco: 15.90, estoque: 200, categoria: 'Petiscos' },
-  { id: '7', nome: 'Cama Confort M', sku: 'CAM001', preco: 79.90, estoque: 30, categoria: 'Camas' },
-  { id: '8', nome: 'Comedouro Duplo', sku: 'COM001', preco: 34.90, estoque: 50, categoria: 'Comedouros' },
-  { id: '9', nome: 'Antipulgas 3ml', sku: 'ANT001', preco: 45.90, estoque: 90, categoria: 'Medicamentos' },
-  { id: '10', nome: 'Osso Natural G', sku: 'OSS001', preco: 12.90, estoque: 180, categoria: 'Petiscos' },
+  { id: '1', nome: 'Ração Premium 15kg', sku: 'RAC001', preco: 189.90, estoque: 45, categoria: 'Ração', barcode: '7891234567890' },
+  { id: '2', nome: 'Shampoo Pet 500ml', sku: 'SHP001', preco: 29.90, estoque: 120, categoria: 'Higiene', barcode: '7891234567891' },
+  { id: '3', nome: 'Coleira Ajustável', sku: 'COL001', preco: 24.90, estoque: 80, categoria: 'Acessórios', barcode: '7891234567892' },
+  { id: '4', nome: 'Brinquedo Mordedor', sku: 'BRI001', preco: 19.90, estoque: 150, categoria: 'Brinquedos', barcode: '7891234567893' },
+  { id: '5', nome: 'Areia Sanitária 4kg', sku: 'ARE001', preco: 32.90, estoque: 60, categoria: 'Higiene', barcode: '7891234567894' },
+  { id: '6', nome: 'Petiscos Variados', sku: 'PET001', preco: 15.90, estoque: 200, categoria: 'Petiscos', barcode: '7891234567895' },
+  { id: '7', nome: 'Cama Confort M', sku: 'CAM001', preco: 79.90, estoque: 30, categoria: 'Camas', barcode: '7891234567896' },
+  { id: '8', nome: 'Comedouro Duplo', sku: 'COM001', preco: 34.90, estoque: 50, categoria: 'Comedouros', barcode: '7891234567897' },
+  { id: '9', nome: 'Antipulgas 3ml', sku: 'ANT001', preco: 45.90, estoque: 90, categoria: 'Medicamentos', barcode: '7891234567898' },
+  { id: '10', nome: 'Osso Natural G', sku: 'OSS001', preco: 12.90, estoque: 180, categoria: 'Petiscos', barcode: '7891234567899' },
 ];
 
 // Initialize products if not exists
@@ -96,8 +98,15 @@ export const searchProducts = async (query: string): Promise<Product[]> => {
   return products.filter(p => 
     p.nome.toLowerCase().includes(lowerQuery) ||
     p.sku.toLowerCase().includes(lowerQuery) ||
+    p.barcode?.toLowerCase().includes(lowerQuery) ||
     p.categoria?.toLowerCase().includes(lowerQuery)
   );
+};
+
+export const findProductByBarcode = async (barcode: string): Promise<Product | null> => {
+  await delay(200);
+  const products = getFromStorage<Product[]>(STORAGE_KEYS.products, DEFAULT_PRODUCTS);
+  return products.find(p => p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase()) || null;
 };
 
 export const getProducts = async (): Promise<Product[]> => {
@@ -136,7 +145,7 @@ export const addToCart = async (productId: string, qtd: number = 1): Promise<Car
     }
     updatedCart = cart.map(item =>
       item.productId === productId
-        ? { ...item, qtd: newQtd, subtotal: newQtd * item.precoUnit }
+        ? { ...item, qtd: newQtd, subtotal: (newQtd * item.precoUnit) - item.descontoItem }
         : item
     );
   } else {
@@ -146,6 +155,7 @@ export const addToCart = async (productId: string, qtd: number = 1): Promise<Car
       sku: product.sku,
       qtd,
       precoUnit: product.preco,
+      descontoItem: 0,
       subtotal: qtd * product.preco,
     };
     updatedCart = [...cart, newItem];
@@ -166,8 +176,29 @@ export const updateCartItem = async (productId: string, qtd: number): Promise<Ca
   const cart = getCart();
   const updatedCart = cart.map(item =>
     item.productId === productId
-      ? { ...item, qtd, subtotal: qtd * item.precoUnit }
+      ? { ...item, qtd, subtotal: (qtd * item.precoUnit) - item.descontoItem }
       : item
+  );
+  
+  setInStorage(STORAGE_KEYS.cart, updatedCart);
+  return updatedCart;
+};
+
+export const applyItemDiscount = async (productId: string, discount: number): Promise<CartItem[]> => {
+  await delay(200);
+  const cart = getCart();
+  const item = cart.find(i => i.productId === productId);
+  if (!item) throw new Error('Item não encontrado no carrinho');
+  
+  const maxDiscount = item.qtd * item.precoUnit;
+  if (discount < 0 || discount > maxDiscount) {
+    throw new Error('Desconto inválido');
+  }
+  
+  const updatedCart = cart.map(i =>
+    i.productId === productId
+      ? { ...i, descontoItem: discount, subtotal: (i.qtd * i.precoUnit) - discount }
+      : i
   );
   
   setInStorage(STORAGE_KEYS.cart, updatedCart);
@@ -308,4 +339,30 @@ export const getSaleById = async (id: string): Promise<Sale | null> => {
   await delay(200);
   const sales = await getSales();
   return sales.find(s => s.id === id) || null;
+};
+
+export const refundSale = async (saleId: string): Promise<Sale> => {
+  await delay(500);
+  const sales = await getSales();
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) throw new Error('Venda não encontrada');
+  if (sale.status === 'Cancelado') throw new Error('Venda já cancelada');
+  
+  // Update sale status
+  const updatedSale = { ...sale, status: 'Cancelado' as const };
+  const updatedSales = sales.map(s => s.id === saleId ? updatedSale : s);
+  setInStorage(STORAGE_KEYS.sales, updatedSales);
+  
+  // Restore product stock
+  const products = getFromStorage<Product[]>(STORAGE_KEYS.products, DEFAULT_PRODUCTS);
+  const updatedProducts = products.map(product => {
+    const cartItem = sale.itens.find(item => item.productId === product.id);
+    if (cartItem) {
+      return { ...product, estoque: product.estoque + cartItem.qtd };
+    }
+    return product;
+  });
+  setInStorage(STORAGE_KEYS.products, updatedProducts);
+  
+  return updatedSale;
 };
