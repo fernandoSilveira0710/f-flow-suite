@@ -24,6 +24,14 @@ import PdvCheckout from "./pages/erp/pdv/checkout";
 import PdvHistory from "./pages/erp/pdv/history";
 import StubPage from "./pages/erp/stub-page";
 
+// Stock pages
+import StockPosition from "./pages/erp/estoque/index";
+import StockMovements from "./pages/erp/estoque/movimentacoes";
+import StockSuppliers from "./pages/erp/estoque/fornecedores";
+import StockAlerts from "./pages/erp/estoque/alertas";
+import StockSettings from "./pages/erp/estoque/preferencias";
+import StockLabels from "./pages/erp/estoque/etiquetas";
+
 // Settings Layout & Pages
 import SettingsLayout from "./layouts/settings-layout";
 import OrganizacaoPage from "./pages/erp/configuracoes/organizacao";
@@ -74,7 +82,20 @@ const App = () => (
           <Route path="pdv/session" element={<PdvSession />} />
           <Route path="pdv/checkout" element={<PdvCheckout />} />
           <Route path="pdv/history" element={<PdvHistory />} />
-          <Route path="estoque" element={<StubPage title="Estoque" description="Controle de Estoque" />} />
+          
+          {/* Stock Routes */}
+          <Route path="estoque" element={<StockPosition />} />
+          <Route path="estoque/movimentacoes" element={<StockMovements />} />
+          <Route path="estoque/fornecedores" element={<StockSuppliers />} />
+          <Route path="estoque/pedidos-compra" element={<StubPage title="Pedidos de Compra" description="Gestão de pedidos" />} />
+          <Route path="estoque/pedidos-compra/novo" element={<StubPage title="Novo Pedido" description="Criar pedido de compra" />} />
+          <Route path="estoque/pedidos-compra/:id" element={<StubPage title="Detalhe do Pedido" description="Visualizar pedido" />} />
+          <Route path="estoque/inventarios" element={<StubPage title="Inventários" description="Contagens de estoque" />} />
+          <Route path="estoque/inventarios/novo" element={<StubPage title="Novo Inventário" description="Criar inventário" />} />
+          <Route path="estoque/inventarios/:id" element={<StubPage title="Detalhe do Inventário" description="Visualizar inventário" />} />
+          <Route path="estoque/alertas" element={<StockAlerts />} />
+          <Route path="estoque/preferencias" element={<StockSettings />} />
+          <Route path="estoque/etiquetas" element={<StockLabels />} />
           <Route path="agenda" element={<StubPage title="Agenda" description="Agendamento de Serviços" />} />
           <Route path="banho-tosa" element={<StubPage title="Banho & Tosa" description="Gestão de Pet Shop" />} />
           <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
