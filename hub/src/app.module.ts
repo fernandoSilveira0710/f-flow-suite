@@ -7,6 +7,7 @@ import { LicensesModule } from './licenses/licenses.module';
 import { EntitlementsModule } from './entitlements/entitlements.module';
 import { SyncModule } from './sync/sync.module';
 import { HealthController } from './health/health.controller';
+import { JwksController } from './auth/jwks.controller';
 import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
 
 @Module({
@@ -18,13 +19,16 @@ import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
     EntitlementsModule,
     SyncModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, JwksController],
   providers: [PrismaClient],
 })
 export class AppModule implements NestModule {
   constructor(private readonly prisma: PrismaClient) {}
 
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(PrismaTenantMiddleware).forRoutes('*');
+    consumer
+      .apply(PrismaTenantMiddleware)
+      .exclude('/.well-known/jwks.json', '/health')
+      .forRoutes('*');
   }
 }
