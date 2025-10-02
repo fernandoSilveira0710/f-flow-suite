@@ -1,7 +1,6 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Users, Briefcase, Settings } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Calendar, Users, Briefcase } from 'lucide-react';
 
 const tabs = [
   { value: 'calendario', label: 'Calendário', icon: Calendar, href: '/erp/agenda' },
@@ -11,6 +10,7 @@ const tabs = [
 ];
 
 export function AgendaTabs() {
+  const navigate = useNavigate();
   const location = useLocation();
   
   const currentTab = tabs.find(tab => {
@@ -24,18 +24,15 @@ export function AgendaTabs() {
     <Tabs value={currentTab} className="w-full">
       <TabsList className="w-full justify-start">
         {tabs.map((tab) => (
-          <Link key={tab.value} to={tab.href}>
-            <TabsTrigger
-              value={tab.value}
-              className={cn(
-                "gap-2",
-                currentTab === tab.value && "data-[state=active]:bg-background"
-              )}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </TabsTrigger>
-          </Link>
+          <TabsTrigger
+            key={tab.value}
+            value={tab.value}
+            onClick={() => navigate(tab.href)}
+            className="gap-2"
+          >
+            <tab.icon className="h-4 w-4" />
+            {tab.label}
+          </TabsTrigger>
         ))}
       </TabsList>
     </Tabs>
