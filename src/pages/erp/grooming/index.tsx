@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Printer, Calendar, DollarSign, Clock, TrendingUp } from 'lucide-react';
+import { Plus, Search, Printer, Calendar, DollarSign, ChevronDown, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 import { format, isToday, parseISO, startOfDay, endOfDay, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -30,14 +31,17 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-const COLUMNS: { status: TicketStatus; label: string; color: string }[] = [
-  { status: 'CHECKIN', label: 'Check-in', color: 'bg-blue-500' },
-  { status: 'BANHO', label: 'Banho', color: 'bg-cyan-500' },
-  { status: 'SECAGEM', label: 'Secagem', color: 'bg-orange-500' },
-  { status: 'TOSA', label: 'Tosa', color: 'bg-purple-500' },
-  { status: 'FINALIZACAO', label: 'Finalização', color: 'bg-indigo-500' },
-  { status: 'PRONTO', label: 'Pronto', color: 'bg-green-500' },
-  { status: 'ENTREGUE', label: 'Entregue', color: 'bg-gray-500' },
+type Density = 'comfort' | 'default' | 'compact';
+type Cluster = 'all' | 'entrada' | 'processo' | 'saida';
+
+const COLUMNS: { status: TicketStatus; label: string; color: string; cluster: Cluster }[] = [
+  { status: 'CHECKIN', label: 'Check-in', color: 'bg-blue-500', cluster: 'entrada' },
+  { status: 'BANHO', label: 'Banho', color: 'bg-cyan-500', cluster: 'processo' },
+  { status: 'SECAGEM', label: 'Secagem', color: 'bg-orange-500', cluster: 'processo' },
+  { status: 'TOSA', label: 'Tosa', color: 'bg-purple-500', cluster: 'processo' },
+  { status: 'FINALIZACAO', label: 'Finalização', color: 'bg-indigo-500', cluster: 'processo' },
+  { status: 'PRONTO', label: 'Pronto', color: 'bg-green-500', cluster: 'saida' },
+  { status: 'ENTREGUE', label: 'Entregue', color: 'bg-gray-500', cluster: 'saida' },
 ];
 
 export default function GroomingIndex() {
@@ -55,7 +59,14 @@ export default function GroomingIndex() {
     status: [] as TicketStatus[],
     servico: [] as string[],
     porte: [] as Porte[],
+    cluster: 'all' as Cluster,
+    collapsed: [] as TicketStatus[],
+    density: 'default' as Density,
   });
+
+  const [collapsedColumns, setCollapsedColumns] = useState<Set<TicketStatus>>(
+    new Set(filters.collapsed)
+  );
 
   // Calculate date range
   const dateRange = useMemo(() => {
@@ -150,6 +161,24 @@ export default function GroomingIndex() {
     });
     return groups;
   }, [filteredTickets]);
+
+  // Filter columns by cluster
+  const visibleColumns = useMemo(() => {
+    if (filters.cluster === 'all') return COLUMNS;
+    return COLUMNS.filter((col) => col.cluster === filters.cluster);
+  }, [filters.cluster]);
+
+  // Toggle column collapse
+  const toggleCollapse = (status: TicketStatus) => {
+    const newCollapsed = new Set(collapsedColumns);
+    if (newCollapsed.has(status)) {
+      newCollapsed.delete(status);
+    } else {
+      newCollapsed.add(status);
+    }
+    setCollapsedColumns(newCollapsed);
+    setFilters({ collapsed: Array.from(newCollapsed) });
+  };
 
   // Check if has basic data
   const hasServices = services.length > 0;
@@ -273,212 +302,256 @@ export default function GroomingIndex() {
     );
   }
 
+  const densityClasses = {
+    comfort: { card: 'p-4 space-y-3', text: 'text-base', icon: 'h-5 w-5' },
+    default: { card: 'p-3 space-y-2', text: 'text-sm', icon: 'h-4 w-4' },
+    compact: { card: 'p-2 space-y-1.5', text: 'text-xs', icon: 'h-4 w-4' },
+  };
+
+  const density = densityClasses[filters.density];
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Banho & Tosa</h1>
-          <p className="text-muted-foreground mt-1">
-            {format(dateRange.start, 'dd/MM/yyyy', { locale: ptBR })}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.print()}
-          >
-            <Printer className="h-4 w-4 mr-2" />
-            Imprimir
-          </Button>
-          <Button
-            onClick={() => navigate('/erp/grooming/new')}
-            disabled={!canCheckIn}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Check-in <kbd className="ml-2 px-1.5 py-0.5 text-xs border rounded bg-muted">N</kbd>
-          </Button>
-        </div>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Hoje
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpis.total}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Em Andamento
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{kpis.emAndamento}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Prontos p/ Entrega
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{kpis.prontos}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Receita Estimada
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {kpis.receita.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+    <div className="min-h-screen">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-4 space-y-4">
+          {/* Title & Actions */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">Banho & Tosa</h1>
+              <p className="text-muted-foreground text-sm mt-1">
+                {format(dateRange.start, 'dd/MM/yyyy', { locale: ptBR })}
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar por pet, tutor ou código... (F)"
-              value={filters.q}
-              onChange={(e) => setFilters({ q: e.target.value })}
-              className="pl-10"
-            />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFilters({ 
+                  density: filters.density === 'compact' ? 'default' : 'compact' 
+                })}
+              >
+                {filters.density === 'compact' ? (
+                  <Maximize2 className="h-4 w-4" />
+                ) : (
+                  <Minimize2 className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
+              >
+                <Printer className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Imprimir</span>
+              </Button>
+              <Button
+                onClick={() => navigate('/erp/grooming/new')}
+                disabled={!canCheckIn}
+              >
+                <Plus className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Check-in</span>
+                <kbd className="hidden md:inline ml-2 px-1.5 py-0.5 text-xs border rounded bg-muted">N</kbd>
+              </Button>
+            </div>
           </div>
 
-          <Select
-            value={filters.periodo}
-            onValueChange={(value: any) => setFilters({ periodo: value })}
-          >
-            <SelectTrigger className="w-full md:w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-background z-50">
-              <SelectItem value="hoje">Hoje</SelectItem>
-              <SelectItem value="7d">Últimos 7 dias</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* KPIs - Compact */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="border-0 shadow-none bg-muted/50">
+              <CardContent className="p-3">
+                <div className="text-xs text-muted-foreground">Total Hoje</div>
+                <div className="text-xl font-bold">{kpis.total}</div>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-none bg-muted/50">
+              <CardContent className="p-3">
+                <div className="text-xs text-muted-foreground">Em Andamento</div>
+                <div className="text-xl font-bold text-blue-600">{kpis.emAndamento}</div>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-none bg-muted/50">
+              <CardContent className="p-3">
+                <div className="text-xs text-muted-foreground">Prontos</div>
+                <div className="text-xl font-bold text-green-600">{kpis.prontos}</div>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-none bg-muted/50">
+              <CardContent className="p-3">
+                <div className="text-xs text-muted-foreground">Receita Est.</div>
+                <div className="text-xl font-bold">
+                  {kpis.receita.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-          {activeFiltersCount > 0 && (
-            <Button variant="outline" onClick={clearFilters}>
-              Limpar ({activeFiltersCount})
-            </Button>
-          )}
+          {/* Cluster Tabs + Filters */}
+          <div className="flex flex-col md:flex-row gap-3">
+            <Tabs
+              value={filters.cluster}
+              onValueChange={(value) => setFilters({ cluster: value as Cluster })}
+              className="flex-shrink-0"
+            >
+              <TabsList>
+                <TabsTrigger value="all">Todos</TabsTrigger>
+                <TabsTrigger value="entrada">Entrada</TabsTrigger>
+                <TabsTrigger value="processo">Processo</TabsTrigger>
+                <TabsTrigger value="saida">Saída</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <div className="flex-1 flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Buscar por pet, tutor ou código... (F)"
+                  value={filters.q}
+                  onChange={(e) => setFilters({ q: e.target.value })}
+                  className="pl-10"
+                />
+              </div>
+
+              <Select
+                value={filters.periodo}
+                onValueChange={(value: any) => setFilters({ periodo: value })}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background z-50">
+                  <SelectItem value="hoje">Hoje</SelectItem>
+                  <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {activeFiltersCount > 0 && (
+                <Button variant="outline" size="sm" onClick={clearFilters}>
+                  Limpar ({activeFiltersCount})
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Kanban Board */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {COLUMNS.map((column) => {
-          const columnTickets = ticketsByStatus[column.status] || [];
-          return (
-            <div key={column.status} className="flex-shrink-0 w-80">
-              <div className="space-y-3">
+      {/* Kanban Grid */}
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-6">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          {visibleColumns.map((column) => {
+            const columnTickets = ticketsByStatus[column.status] || [];
+            const isCollapsed = collapsedColumns.has(column.status);
+
+            return (
+              <section key={column.status} className="min-w-0">
                 {/* Column Header */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-card border">
-                  <div className="flex items-center gap-2">
-                    <div className={cn('w-3 h-3 rounded-full', column.color)} />
-                    <span className="font-semibold">{column.label}</span>
-                    <Badge variant="secondary" className="ml-auto">
-                      {columnTickets.length}
-                    </Badge>
+                <div 
+                  className="flex items-center justify-between p-2.5 rounded-lg bg-card border cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => toggleCollapse(column.status)}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {isCollapsed ? (
+                      <ChevronRight className="h-4 w-4 flex-shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                    )}
+                    <div className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', column.color)} />
+                    <span className="font-semibold text-sm truncate">{column.label}</span>
                   </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {columnTickets.length}
+                  </Badge>
                 </div>
 
                 {/* Cards */}
-                <div className="space-y-2">
-                  {columnTickets.length === 0 ? (
-                    <Card className="p-4 text-center text-sm text-muted-foreground">
-                      Nenhum ticket
-                    </Card>
-                  ) : (
-                    columnTickets.map((ticket) => {
-                      const pet = pets.find((p) => p.id === ticket.petId);
-                      const tutor = tutors.find((t) => t.id === ticket.tutorId);
+                {!isCollapsed && (
+                  <div className="mt-2 space-y-2 overflow-auto max-h-[calc(100vh-320px)]">
+                    {columnTickets.length === 0 ? (
+                      <Card className="p-3 text-center text-xs text-muted-foreground">
+                        Nenhum ticket
+                      </Card>
+                    ) : (
+                        columnTickets.map((ticket) => {
+                          const pet = pets.find((p) => p.id === ticket.petId);
+                          const tutor = tutors.find((t) => t.id === ticket.tutorId);
 
-                      return (
-                        <Card
-                          key={ticket.id}
-                          className="p-4 space-y-3 cursor-pointer hover:border-primary transition-colors"
-                          onClick={() => navigate(`/erp/grooming/${ticket.id}`)}
-                        >
-                          {/* Header */}
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="font-semibold">{ticket.petNome}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {ticket.tutorNome}
-                              </div>
-                            </div>
-                            {pet && (
-                              <Badge variant="outline" className="text-xs">
-                                {pet.porte}
-                              </Badge>
-                            )}
-                          </div>
-
-                          {/* Services */}
-                          <div className="flex flex-wrap gap-1">
-                            {ticket.itens.map((item, idx) => (
-                              <Badge key={idx} variant="secondary" className="text-xs">
-                                {item.nome}
-                              </Badge>
-                            ))}
-                          </div>
-
-                          {/* Footer */}
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{ticket.codigo}</span>
-                            {ticket.sinalRecebido && (
-                              <Badge variant="outline" className="text-xs">
-                                <DollarSign className="h-3 w-3 mr-1" />
-                                Sinal
-                              </Badge>
-                            )}
-                          </div>
-
-                          {/* Quick Actions */}
-                          {column.status !== 'ENTREGUE' && column.status !== 'CANCELADO' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMoveToNext(ticket.id, ticket.status);
-                              }}
+                          return (
+                            <Card
+                              key={ticket.id}
+                              className={cn(
+                                density.card,
+                                'cursor-pointer hover:border-primary transition-colors'
+                              )}
+                              onClick={() => navigate(`/erp/grooming/${ticket.id}`)}
                             >
-                              Próxima Etapa →
-                            </Button>
-                          )}
-                        </Card>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+                              {/* Header */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className={cn('font-semibold truncate', density.text)}>
+                                    {ticket.petNome}
+                                  </div>
+                                  {filters.density !== 'compact' && (
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {ticket.tutorNome}
+                                    </div>
+                                  )}
+                                </div>
+                                {pet && (
+                                  <Badge variant="outline" className="text-xs flex-shrink-0">
+                                    {pet.porte}
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {/* Services */}
+                              <div className="flex flex-wrap gap-1">
+                                {ticket.itens.slice(0, filters.density === 'compact' ? 2 : 3).map((item, idx) => (
+                                  <Badge key={idx} variant="secondary" className="text-xs">
+                                    {item.nome}
+                                  </Badge>
+                                ))}
+                                {ticket.itens.length > (filters.density === 'compact' ? 2 : 3) && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    +{ticket.itens.length - (filters.density === 'compact' ? 2 : 3)}
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {/* Footer */}
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span className="truncate">{ticket.codigo}</span>
+                                {ticket.sinalRecebido && (
+                                  <Badge variant="outline" className="text-xs flex-shrink-0">
+                                    <DollarSign className="h-3 w-3" />
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {/* Quick Actions */}
+                              {column.status !== 'ENTREGUE' && column.status !== 'CANCELADO' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMoveToNext(ticket.id, ticket.status);
+                                  }}
+                                >
+                                  Próxima Etapa →
+                                </Button>
+                              )}
+                            </Card>
+                          );
+                        })
+                      )}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
