@@ -228,82 +228,8 @@ export default function GroomingIndex() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [navigate, canCheckIn]);
 
-  // Empty state
-  if (tickets.length === 0) {
-    return (
-      <div className="space-y-6">
-        <GroomingTabs />
-        
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Banho & Tosa</h1>
-            <p className="text-muted-foreground mt-1">
-              Sistema operacional de pet shop
-            </p>
-          </div>
-        </div>
-
-        <Card className="p-12">
-          <div className="text-center space-y-6">
-            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Calendar className="h-8 w-8 text-primary" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Nenhum atendimento hoje</h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                {!canCheckIn
-                  ? 'Complete o cadastro básico antes de fazer check-ins'
-                  : 'Comece criando seu primeiro atendimento'}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-3xl mx-auto">
-              {!hasServices && (
-                <Card className="p-4 text-center hover:border-primary transition-colors cursor-pointer"
-                  onClick={() => navigate('/erp/grooming/services/novo')}
-                >
-                  <Plus className="h-6 w-6 mx-auto mb-2 text-primary" />
-                  <p className="text-sm font-medium">Cadastrar Serviço</p>
-                </Card>
-              )}
-              {!hasTutors && (
-                <Card className="p-4 text-center hover:border-primary transition-colors cursor-pointer"
-                  onClick={() => navigate('/erp/grooming/tutors/novo')}
-                >
-                  <Plus className="h-6 w-6 mx-auto mb-2 text-primary" />
-                  <p className="text-sm font-medium">Cadastrar Tutor</p>
-                </Card>
-              )}
-              {!hasPets && (
-                <Card className="p-4 text-center hover:border-primary transition-colors cursor-pointer"
-                  onClick={() => navigate('/erp/grooming/pets/novo')}
-                >
-                  <Plus className="h-6 w-6 mx-auto mb-2 text-primary" />
-                  <p className="text-sm font-medium">Cadastrar Pet</p>
-                </Card>
-              )}
-              {!hasResources && (
-                <Card className="p-4 text-center hover:border-primary transition-colors cursor-pointer"
-                  onClick={() => navigate('/erp/grooming/resources/novo')}
-                >
-                  <Plus className="h-6 w-6 mx-auto mb-2 text-primary" />
-                  <p className="text-sm font-medium">Cadastrar Recurso</p>
-                </Card>
-              )}
-              {canCheckIn && (
-                <Card className="p-4 text-center bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
-                  onClick={() => navigate('/erp/grooming/new')}
-                >
-                  <Plus className="h-6 w-6 mx-auto mb-2" />
-                  <p className="text-sm font-medium">Fazer Check-in</p>
-                </Card>
-              )}
-            </div>
-          </div>
-        </Card>
-      </div>
-    );
-  }
+  // Show setup prompt only if no basic data
+  const showSetupPrompt = !canCheckIn;
 
   const densityClasses = {
     comfort: { card: 'p-4 space-y-3', text: 'text-base', icon: 'h-5 w-5' },
@@ -314,7 +240,10 @@ export default function GroomingIndex() {
   const density = densityClasses[filters.density];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen space-y-6">
+      {/* Always visible tabs */}
+      <GroomingTabs />
+
       {/* Sticky Header */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-4 space-y-4">
@@ -441,7 +370,73 @@ export default function GroomingIndex() {
 
       {/* Kanban Grid */}
       <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-6">
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        {/* Setup prompt when no basic data */}
+        {showSetupPrompt && (
+          <Card className="p-8 mb-6">
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Calendar className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Complete o cadastro básico</h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Cadastre serviços, tutores e pets antes de fazer check-ins
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
+                {!hasServices && (
+                  <Button variant="outline" onClick={() => navigate('/erp/grooming/services/novo')}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Serviço
+                  </Button>
+                )}
+                {!hasTutors && (
+                  <Button variant="outline" onClick={() => navigate('/erp/grooming/tutors/novo')}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Tutor
+                  </Button>
+                )}
+                {!hasPets && (
+                  <Button variant="outline" onClick={() => navigate('/erp/grooming/pets/novo')}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Pet
+                  </Button>
+                )}
+                {!hasResources && (
+                  <Button variant="outline" onClick={() => navigate('/erp/grooming/resources/novo')}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Recurso
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Empty state when no tickets */}
+        {tickets.length === 0 && !showSetupPrompt && (
+          <Card className="p-12 mb-6">
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Calendar className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Nenhum atendimento registrado</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Comece criando seu primeiro check-in
+                </p>
+                <Button onClick={() => navigate('/erp/grooming/new')}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Fazer Check-in
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Kanban columns - always visible when there are tickets */}
+        {tickets.length > 0 && (
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {visibleColumns.map((column) => {
             const columnTickets = ticketsByStatus[column.status] || [];
             const isCollapsed = collapsedColumns.has(column.status);
@@ -571,6 +566,7 @@ export default function GroomingIndex() {
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );
