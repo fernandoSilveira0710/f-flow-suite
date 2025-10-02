@@ -27,6 +27,9 @@ import VendasIndex from './pages/erp/vendas/index';
 import ServicosIndex from './pages/erp/agenda/servicos/index';
 import NovoServico from './pages/erp/agenda/servicos/novo';
 import EditarServico from './pages/erp/agenda/servicos/[id]/editar';
+import ProfissionaisIndex from './pages/erp/agenda/profissionais/index';
+import NovoProfissional from './pages/erp/agenda/profissionais/novo';
+import EditarProfissional from './pages/erp/agenda/profissionais/[id]/editar';
 
 // Stock pages
 import StockPosition from "./pages/erp/estoque/index";
@@ -111,6 +114,9 @@ const App = () => (
           <Route path="agenda/servicos" element={<ServicosIndex />} />
           <Route path="agenda/servicos/novo" element={<NovoServico />} />
           <Route path="agenda/servicos/:id/editar" element={<EditarServico />} />
+          <Route path="agenda/profissionais" element={<ProfissionaisIndex />} />
+          <Route path="agenda/profissionais/novo" element={<NovoProfissional />} />
+          <Route path="agenda/profissionais/:id/editar" element={<EditarProfissional />} />
           
           <Route path="banho-tosa" element={<StubPage title="Banho & Tosa" description="Gestão de Pet Shop" />} />
           <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
