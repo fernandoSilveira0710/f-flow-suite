@@ -1,75 +1,122 @@
-import { PageHeader } from '@/components/erp/page-header';
-import { KpiCard } from '@/components/erp/kpi-card';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { mockAPI } from '@/lib/mock-data';
-import { BarChart3, Package, ShoppingCart, TrendingUp } from 'lucide-react';
+import { HeroCard } from '@/components/erp/hero-card';
+import { KpiTile } from '@/components/erp/kpi-tile';
+import { RevenueCard } from '@/components/erp/revenue-card';
+import { useDashboard } from '@/hooks/use-dashboard';
+import { useEntitlements } from '@/hooks/use-entitlements';
+import { 
+  ShoppingCart, 
+  TrendingUp, 
+  Package, 
+  AlertTriangle, 
+  AlertOctagon, 
+  Calendar 
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { useEffect } from 'react';
 
 export default function Dashboard() {
-  const kpis = mockAPI.getDashboardKPIs();
+  const { data, isLoading, error } = useDashboard();
+  const { entitlements } = useEntitlements();
+
+  useEffect(() => {
+    if (error) {
+      toast.error('Não foi possível carregar os dados do dashboard');
+    }
+  }, [error]);
+
+  const formatCurrency = (value: number) => {
+    return value.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    });
+  };
 
   return (
-    <div>
-      <PageHeader
-        title="Dashboard"
-        description="Visão geral do seu negócio"
+    <div className="space-y-8">
+      {/* Hero Card */}
+      <HeroCard
+        title="Bem-vindo ao 2F Solutions"
+        subtitle="Plataforma de Gestão Comercial"
+        metricLabel="Vendas de Hoje"
+        metricValue={data ? formatCurrency(data.todaySalesTotal) : 'R$ 0,00'}
+        metricLink="/erp/pdv/history?range=today"
+        isLoading={isLoading}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {kpis.map((kpi, index) => (
-          <KpiCard key={index} {...kpi} />
-        ))}
+      {/* KPI Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <KpiTile
+          label="Vendas Hoje"
+          value={data?.todaySalesCount ?? 0}
+          icon={ShoppingCart}
+          href="/erp/pdv/history?range=today"
+          tone="success"
+          isLoading={isLoading}
+        />
+
+        <KpiTile
+          label="Vendas do Mês"
+          value={data?.monthSalesCount ?? 0}
+          icon={TrendingUp}
+          href="/erp/reports/sales?range=month"
+          tone="default"
+          isLoading={isLoading}
+          disabled={!entitlements.reports}
+          disabledReason="Requer Reports"
+        />
+
+        <KpiTile
+          label="Produtos Ativos"
+          value={data?.activeProducts ?? 0}
+          icon={Package}
+          href="/erp/produtos?status=active"
+          tone="default"
+          isLoading={isLoading}
+        />
+
+        <KpiTile
+          label="Estoque Baixo"
+          value={data?.lowStockCount ?? 0}
+          icon={AlertTriangle}
+          href="/erp/estoque?filter=below-min"
+          tone="warning"
+          isLoading={isLoading}
+          disabled={!entitlements.stock}
+          disabledReason="Requer Stock"
+        />
+
+        <KpiTile
+          label="Sem Estoque"
+          value={data?.outOfStockCount ?? 0}
+          icon={AlertOctagon}
+          href="/erp/estoque?filter=out-of-stock"
+          tone="danger"
+          isLoading={isLoading}
+          disabled={!entitlements.stock}
+          disabledReason="Requer Stock"
+        />
+
+        <KpiTile
+          label="Produtos a Vencer"
+          value={data?.expiringSoonCount ?? 0}
+          icon={Calendar}
+          href="/erp/estoque?filter=expire-soon"
+          tone="warning"
+          isLoading={isLoading}
+          disabled={!entitlements.stock}
+          disabledReason="Requer Stock"
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              <CardTitle>Vendas Recentes</CardTitle>
-            </div>
-            <CardDescription>Últimas transações realizadas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div>
-                    <p className="text-sm font-medium">Venda #{1000 + i}</p>
-                    <p className="text-xs text-muted-foreground">Há {i} hora(s)</p>
-                  </div>
-                  <p className="font-semibold">R$ {(Math.random() * 200 + 50).toFixed(2)}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-secondary" />
-              <CardTitle>Produtos em Destaque</CardTitle>
-            </div>
-            <CardDescription>Mais vendidos do mês</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {mockAPI.getProducts().slice(0, 3).map((product) => (
-                <div key={product.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div>
-                    <p className="text-sm font-medium">{product.name}</p>
-                    <p className="text-xs text-muted-foreground">{product.sku}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">R$ {product.price.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">{product.stock} un.</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Revenue Card */}
+      <RevenueCard
+        title="Faturamento do Mês"
+        total={data ? formatCurrency(data.monthSalesTotal) : 'R$ 0,00'}
+        salesCount={data?.monthSalesCount ?? 0}
+        href={entitlements.reports ? "/erp/reports/sales?range=month" : "/erp/configuracoes/plano"}
+        series={data?.monthRevenueSeries}
+        isLoading={isLoading}
+      />
     </div>
   );
 }
