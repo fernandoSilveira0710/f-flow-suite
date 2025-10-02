@@ -1,5 +1,5 @@
-﻿import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { SyncService } from './sync.service.js';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { SyncService } from './sync.service';
 
 @Controller('tenants/:tenantId/sync')
 export class SyncController {

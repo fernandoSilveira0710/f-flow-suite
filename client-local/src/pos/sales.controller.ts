@@ -1,5 +1,5 @@
-﻿import { Body, Controller, Post } from '@nestjs/common';
-import { SalesService, CreateSaleDto } from './sales.service.js';
+import { Controller, Post, Body } from '@nestjs/common';
+import { SalesService, CreateSaleDto } from './sales.service';
 
 @Controller('pos/sales')
 export class SalesController {

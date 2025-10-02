@@ -1,5 +1,5 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
-import { SyncHttpClient } from './http.client.js';
+import { Injectable, Logger } from '@nestjs/common';
+import { SyncHttpClient } from './http.client';
 
 @Injectable()
 export class SyncService {

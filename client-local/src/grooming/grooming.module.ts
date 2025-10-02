@@ -1,5 +1,5 @@
-﻿import { Module } from '@nestjs/common';
-import { TicketsService } from './tickets.service.js';
+import { Module } from '@nestjs/common';
+import { TicketsService } from './tickets.service';
 
 @Module({
   providers: [TicketsService],
