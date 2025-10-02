@@ -49,6 +49,7 @@ import NovoRecurso from './pages/erp/grooming/resources/novo';
 import EditarRecurso from './pages/erp/grooming/resources/[id]/editar';
 import TutorsIndex from './pages/erp/grooming/tutors/index';
 import NovoTutor from './pages/erp/grooming/tutors/novo';
+import GroomingProfissionaisIndex from './pages/erp/grooming/profissionais/index';
 
 // Stock pages
 import StockPosition from "./pages/erp/estoque/index";
@@ -157,6 +158,7 @@ function App() {
           <Route path="grooming/resources/:id/editar" element={<EditarRecurso />} />
           <Route path="grooming/tutors" element={<TutorsIndex />} />
           <Route path="grooming/tutors/novo" element={<NovoTutor />} />
+          <Route path="grooming/profissionais" element={<GroomingProfissionaisIndex />} />
           
           {/* Banho & Tosa (alias for Grooming) */}
           <Route path="banho-tosa" element={<GroomingIndex />} />

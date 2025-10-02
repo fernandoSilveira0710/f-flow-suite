@@ -22,6 +22,7 @@ export default function EditarCliente() {
   const [telefone, setTelefone] = useState('');
   const [notas, setNotas] = useState('');
   const [ativo, setAtivo] = useState(true);
+  const [isTutor, setIsTutor] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [pets, setPets] = useState<
@@ -44,6 +45,7 @@ export default function EditarCliente() {
     setTelefone(customer.telefone || '');
     setNotas(customer.notas || '');
     setAtivo(customer.ativo);
+    setIsTutor(customer.isTutor || false);
     setTags(customer.tags || []);
     setPets(customer.pets || []);
     setLoading(false);
@@ -102,6 +104,7 @@ export default function EditarCliente() {
       tags: tags.length > 0 ? tags : undefined,
       pets: pets.filter((p) => p.nome.trim()).length > 0 ? pets : undefined,
       ativo,
+      isTutor,
     });
 
     toast.success('Cliente atualizado com sucesso');
@@ -207,6 +210,16 @@ export default function EditarCliente() {
                 </p>
               </div>
               <Switch checked={ativo} onCheckedChange={setAtivo} />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>É Tutor de Pet?</Label>
+                <p className="text-sm text-muted-foreground">
+                  Marque se este cliente possui pets para Banho & Tosa
+                </p>
+              </div>
+              <Switch checked={isTutor} onCheckedChange={setIsTutor} />
             </div>
           </div>
 

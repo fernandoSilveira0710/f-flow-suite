@@ -6,6 +6,7 @@
 
 export interface Tutor {
   id: string;
+  clienteId?: string; // FK para Cliente da Agenda
   nome: string;
   telefone: string;
   email?: string;

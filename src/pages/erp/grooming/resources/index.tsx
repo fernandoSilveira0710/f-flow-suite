@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreVertical } from 'lucide-react';
+import { GroomingTabs } from '@/components/erp/grooming-tabs';
 import { PageHeader } from '@/components/erp/page-header';
 import { EmptyState } from '@/components/erp/empty-state';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,8 @@ export default function GroomingResourcesIndex() {
 
   return (
     <div className="space-y-6">
+      <GroomingTabs />
+      
       <PageHeader
         title="Recursos Físicos"
         description="Gerencie box, gaiolas, mesas e secadores"

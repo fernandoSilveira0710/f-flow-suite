@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Printer, Calendar, DollarSign, ChevronDown, ChevronRight, Maximize2, Minimize2, Clock } from 'lucide-react';
+import { GroomingTabs } from '@/components/erp/grooming-tabs';
 import { format, isToday, parseISO, startOfDay, endOfDay, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -231,6 +232,8 @@ export default function GroomingIndex() {
   if (tickets.length === 0) {
     return (
       <div className="space-y-6">
+        <GroomingTabs />
+        
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Banho & Tosa</h1>

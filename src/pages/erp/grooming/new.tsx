@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Clock, DollarSign } from 'lucide-react';
+import { GroomingTabs } from '@/components/erp/grooming-tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -220,6 +221,8 @@ export default function GroomingCheckIn() {
 
   return (
     <div className="space-y-6 pb-12">
+      <GroomingTabs />
+      
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate('/erp/grooming')}>
           <ArrowLeft className="h-4 w-4" />

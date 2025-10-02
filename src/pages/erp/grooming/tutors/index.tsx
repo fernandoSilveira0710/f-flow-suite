@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreVertical, User, Mail, Phone } from 'lucide-react';
+import { GroomingTabs } from '@/components/erp/grooming-tabs';
 import { PageHeader } from '@/components/erp/page-header';
 import { EmptyState } from '@/components/erp/empty-state';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,8 @@ export default function TutorsIndex() {
 
   return (
     <div className="space-y-6">
+      <GroomingTabs />
+      
       <PageHeader
         title="Tutores"
         description="Gerencie os tutores dos pets"

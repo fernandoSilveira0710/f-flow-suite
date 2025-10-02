@@ -29,6 +29,7 @@ export interface Customer {
     observacoes?: string;
   }>;
   ativo: boolean;
+  isTutor?: boolean; // Flag para indicar se é tutor de pet
   createdAtISO: string;
 }
 
