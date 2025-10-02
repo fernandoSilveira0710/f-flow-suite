@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Printer, Calendar, DollarSign, ChevronDown, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
+import { Plus, Search, Printer, Calendar, DollarSign, ChevronDown, ChevronRight, Maximize2, Minimize2, Clock } from 'lucide-react';
 import { format, isToday, parseISO, startOfDay, endOfDay, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -35,13 +35,13 @@ type Density = 'comfort' | 'default' | 'compact';
 type Cluster = 'all' | 'entrada' | 'processo' | 'saida';
 
 const COLUMNS: { status: TicketStatus; label: string; color: string; cluster: Cluster }[] = [
-  { status: 'CHECKIN', label: 'Check-in', color: 'bg-blue-500', cluster: 'entrada' },
-  { status: 'BANHO', label: 'Banho', color: 'bg-cyan-500', cluster: 'processo' },
-  { status: 'SECAGEM', label: 'Secagem', color: 'bg-orange-500', cluster: 'processo' },
-  { status: 'TOSA', label: 'Tosa', color: 'bg-purple-500', cluster: 'processo' },
-  { status: 'FINALIZACAO', label: 'Finalização', color: 'bg-indigo-500', cluster: 'processo' },
-  { status: 'PRONTO', label: 'Pronto', color: 'bg-green-500', cluster: 'saida' },
-  { status: 'ENTREGUE', label: 'Entregue', color: 'bg-gray-500', cluster: 'saida' },
+  { status: 'CHECKIN', label: 'Check-in', color: 'bg-blue-600', cluster: 'entrada' },
+  { status: 'BANHO', label: 'Banho', color: 'bg-cyan-600', cluster: 'processo' },
+  { status: 'SECAGEM', label: 'Secagem', color: 'bg-orange-600', cluster: 'processo' },
+  { status: 'TOSA', label: 'Tosa', color: 'bg-purple-600', cluster: 'processo' },
+  { status: 'FINALIZACAO', label: 'Finalização', color: 'bg-indigo-600', cluster: 'processo' },
+  { status: 'PRONTO', label: 'Pronto', color: 'bg-green-600', cluster: 'saida' },
+  { status: 'ENTREGUE', label: 'Entregue', color: 'bg-muted-foreground', cluster: 'saida' },
 ];
 
 export default function GroomingIndex() {
@@ -468,8 +468,21 @@ export default function GroomingIndex() {
                 {!isCollapsed && (
                   <div className="mt-2 space-y-2 overflow-auto max-h-[calc(100vh-320px)]">
                     {columnTickets.length === 0 ? (
-                      <Card className="p-3 text-center text-xs text-muted-foreground">
-                        Nenhum ticket
+                      <Card className="p-4 text-center border-dashed">
+                        <div className="text-xs text-muted-foreground space-y-2">
+                          <div>Nenhum ticket nesta etapa</div>
+                          {column.cluster === 'entrada' && filteredTickets.length === 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full text-xs"
+                              onClick={() => navigate('/erp/grooming/new')}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Novo Check-in
+                            </Button>
+                          )}
+                        </div>
                       </Card>
                     ) : (
                         columnTickets.map((ticket) => {
@@ -519,8 +532,11 @@ export default function GroomingIndex() {
                               </div>
 
                               {/* Footer */}
-                              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span className="truncate">{ticket.codigo}</span>
+                              <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <Clock className="h-3 w-3 flex-shrink-0" />
+                                  <span className="truncate">{ticket.codigo}</span>
+                                </div>
                                 {ticket.sinalRecebido && (
                                   <Badge variant="outline" className="text-xs flex-shrink-0">
                                     <DollarSign className="h-3 w-3" />
