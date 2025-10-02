@@ -36,22 +36,41 @@ export interface Sale {
   operador: string;
 }
 
+export interface CashEntry {
+  id: string;
+  tipo: 'SANGRIA' | 'SUPRIMENTO';
+  valor: number;
+  obs?: string;
+  dataISO: string;
+}
+
 export interface Session {
   id: string;
+  operador: { id: string; nome: string };
   abertoEm: string;
   fechadoEm?: string;
   saldoInicial: number;
-  saldoFinal?: number;
   status: 'Aberto' | 'Fechado';
-  operador: string;
-  vendas: number;
-  totalVendas: number;
+  cash: CashEntry[];
+  vendasIds: string[];
+  resumoFechamento?: {
+    totalVendas: number;
+    totalDinheiro: number;
+    totalCartao: number;
+    totalPix: number;
+    totalOutros: number;
+    totalSangria: number;
+    totalSuprimento: number;
+    saldoFinalCalculado: number;
+    observacao?: string;
+  };
 }
 
 const STORAGE_KEYS = {
   products: '2f.pos.products',
   cart: '2f.pos.cart',
-  session: '2f.pos.session',
+  session: '2f.pos.session.current',
+  sessionsClosed: '2f.pos.sessions.closed',
   sales: '2f.pos.sales',
 };
 
@@ -231,7 +250,10 @@ export const getSession = (): Session | null => {
   return getFromStorage<Session | null>(STORAGE_KEYS.session, null);
 };
 
-export const openSession = async (saldoInicial: number): Promise<Session> => {
+export const openSession = async (
+  saldoInicial: number,
+  operador: { id: string; nome: string }
+): Promise<Session> => {
   await delay(500);
   const existingSession = getSession();
   if (existingSession?.status === 'Aberto') {
@@ -243,30 +265,102 @@ export const openSession = async (saldoInicial: number): Promise<Session> => {
     abertoEm: new Date().toISOString(),
     saldoInicial,
     status: 'Aberto',
-    operador: 'Admin Demo',
-    vendas: 0,
-    totalVendas: 0,
+    operador,
+    cash: [],
+    vendasIds: [],
   };
   
   setInStorage(STORAGE_KEYS.session, newSession);
   return newSession;
 };
 
-export const closeSession = async (): Promise<Session> => {
+export const addCashEntry = async (
+  tipo: 'SANGRIA' | 'SUPRIMENTO',
+  valor: number,
+  obs?: string
+): Promise<Session> => {
+  await delay(300);
+  const session = getSession();
+  if (!session || session.status !== 'Aberto') {
+    throw new Error('Nenhuma sessão aberta');
+  }
+
+  const entry: CashEntry = {
+    id: `CASH-${Date.now()}`,
+    tipo,
+    valor,
+    obs,
+    dataISO: new Date().toISOString(),
+  };
+
+  const updatedSession: Session = {
+    ...session,
+    cash: [...session.cash, entry],
+  };
+
+  setInStorage(STORAGE_KEYS.session, updatedSession);
+  return updatedSession;
+};
+
+export const closeSession = async (observacao?: string): Promise<Session> => {
   await delay(500);
   const session = getSession();
   if (!session || session.status === 'Fechado') {
     throw new Error('Nenhuma sessão aberta');
   }
-  
+
+  // Calculate resumo
+  const sales = getFromStorage<Sale[]>(STORAGE_KEYS.sales, []);
+  const sessionSales = sales.filter(s => session.vendasIds.includes(s.id) && s.status === 'Pago');
+
+  const totalVendas = sessionSales.reduce((sum, s) => sum + s.total, 0);
+  const totalDinheiro = sessionSales
+    .filter(s => s.pagamento === 'Dinheiro')
+    .reduce((sum, s) => sum + s.total, 0);
+  const totalCartao = sessionSales
+    .filter(s => s.pagamento.includes('Cartão'))
+    .reduce((sum, s) => sum + s.total, 0);
+  const totalPix = sessionSales
+    .filter(s => s.pagamento === 'PIX')
+    .reduce((sum, s) => sum + s.total, 0);
+  const totalOutros = sessionSales
+    .filter(s => !['Dinheiro', 'PIX'].includes(s.pagamento) && !s.pagamento.includes('Cartão'))
+    .reduce((sum, s) => sum + s.total, 0);
+
+  const totalSangria = session.cash
+    .filter(c => c.tipo === 'SANGRIA')
+    .reduce((sum, c) => sum + c.valor, 0);
+  const totalSuprimento = session.cash
+    .filter(c => c.tipo === 'SUPRIMENTO')
+    .reduce((sum, c) => sum + c.valor, 0);
+
+  const saldoFinalCalculado =
+    session.saldoInicial + totalSuprimento - totalSangria + totalDinheiro;
+
   const closedSession: Session = {
     ...session,
     fechadoEm: new Date().toISOString(),
-    saldoFinal: session.saldoInicial + session.totalVendas,
     status: 'Fechado',
+    resumoFechamento: {
+      totalVendas,
+      totalDinheiro,
+      totalCartao,
+      totalPix,
+      totalOutros,
+      totalSangria,
+      totalSuprimento,
+      saldoFinalCalculado,
+      observacao,
+    },
   };
-  
-  setInStorage(STORAGE_KEYS.session, closedSession);
+
+  // Save to closed sessions
+  const closedSessions = getFromStorage<Session[]>(STORAGE_KEYS.sessionsClosed, []);
+  setInStorage(STORAGE_KEYS.sessionsClosed, [closedSession, ...closedSessions]);
+
+  // Clear current session
+  setInStorage(STORAGE_KEYS.session, null);
+
   return closedSession;
 };
 
@@ -302,7 +396,7 @@ export const createSale = async (
     pagamento,
     parcelas,
     status: 'Pago',
-    operador: session.operador,
+    operador: session.operador.nome,
   };
   
   // Save sale
@@ -313,8 +407,7 @@ export const createSale = async (
   // Update session
   const updatedSession: Session = {
     ...session,
-    vendas: session.vendas + 1,
-    totalVendas: session.totalVendas + total,
+    vendasIds: [...session.vendasIds, newSale.id],
   };
   setInStorage(STORAGE_KEYS.session, updatedSession);
   

@@ -28,7 +28,7 @@ export default function SessionPage() {
 
     setLoading(true);
     try {
-      await openSession(valor);
+      await openSession(valor, { id: 'admin-1', nome: 'Admin Demo' });
       toast.success('Caixa aberto com sucesso!');
       navigate('/erp/pdv');
     } catch (error) {
