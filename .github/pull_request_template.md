@@ -1,7 +1,7 @@
 # Pull Request
 
 ## 📋 Etapa do Roadmap
-- [ ] Etapa 1 — Setup de DEV e Padrões de Projeto
+- [X] Etapa 1 — Setup de DEV e Padrões de Projeto
 - [ ] Etapa 2 — Autenticação e Licenças
 - [ ] Etapa 3 — Sync Agent Completo
 - [ ] Etapa 4 — Features do POS
