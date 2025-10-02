@@ -1,0 +1,220 @@
+# F-Flow Suite — Roadmap de Entrega (MVP ➜ SaaS)
+
+> **Regra de ouro:** cada etapa fecha com **critérios de aceite**, **flag de segurança** e **rollback** simples. Só avançamos quando a etapa anterior estiver verde em PR.
+
+## Etapa 1 — Setup de DEV e Padrões de Projeto
+
+**Objetivo:** time ligar o projeto em 1 comando e alinhar padrões (lint, testes, branch/PR).
+**Escopo**
+
+* Adicionar `docker-compose.yml` (apenas DEV) com `postgres + adminer + hub`.
+* Criar `hub/.env.example` e `client-local/.env.example`.
+* Scripts `npm run dev:up` / `dev:down` (ou `make`).
+* Padronizar ESLint/Prettier/EditorConfig nos 3 pacotes.
+* Definir convenções: `feat/`, `fix/`, `chore/`, `docs/` + PR template.
+  **Flags**
+* `DEV_COMPOSE_ENABLED=true` (apenas dev).
+  **Aceite**
+* `docker compose up -d` sobe Hub + DB e `GET /health` OK.
+* Lint e typecheck OK nos 3 pacotes.
+  **Rollback**
+* Remover compose e `.env` se der ruim (não afeta prod).
+
+---
+
+## Etapa 2 — Hub: Banco + RLS + JWKS
+
+**Objetivo:** segurança por tenant e chave pública para licença.
+**Escopo**
+
+* Rodar migrations Prisma do Hub; aplicar `sql/002-rls-policies.sql`.
+* Middleware global exigindo `x-tenant-id` (ou derivado do usuário).
+* Expor `GET /.well-known/jwks.json` com a key pública (RS256).
+* Tests de integração: dois tenants isolados (0 vazamento).
+  **Flags**
+* `RLS_ENFORCED=true`.
+  **Aceite**
+* Sem `x-tenant-id` → 403; com tenant errado → 200 + **0 linhas**.
+* `/.well-known/jwks.json` servindo JWKS válido.
+  **Rollback**
+* Desligar `RLS_ENFORCED` (só DEV) até corrigir.
+
+---
+
+## Etapa 3 — Client-Local Executável (DB embutido + Serviço SO)
+
+**Objetivo:** cliente clica e usa. Binário único sobe server e DB local.
+**Escopo**
+
+* Empacotar `client-local` com **pkg**/**nexe** (Win/Mac/Linux).
+* Bootstrap: resolve pastas por SO → roda migrations → sobe HTTP `127.0.0.1:3010`.
+* Serviço do SO: Windows Service / launchd / systemd (scripts básicos).
+* Logs estruturados (JSON) com rotação.
+  **Flags**
+* `LOCAL_SERVER_ENABLED=true`.
+  **Aceite**
+* Primeira execução cria DB e responde `GET /health`.
+* Serviço inicializa com o sistema (Windows validado).
+  **Rollback**
+* Parar serviço e usar `npm run start:dev` (DEV only).
+
+---
+
+## Etapa 4 — Licenciamento ponta-a-ponta (Ativar, Guardar, Renovar)
+
+**Objetivo:** ativar licença com o Hub, validar RS256 e operar offline com grace.
+**Escopo**
+
+* Hub: `POST /licenses/activate` assina **JWT RS256** com `LICENSE_PRIVATE_KEY_PEM`.
+* Client-local: `POST /licensing/activate` (usado pelo front), guarda token no **DPAPI/Keychain/Keyring**, agenda **renovação** automática.
+* `GET /install/status` para o front saber se precisa de setup.
+* Política **offline grace** (ex.: 7 dias).
+  **Flags**
+* `LICENSING_ENFORCED=true` (em dev pode ser false).
+  **Aceite**
+* Wizard de ativação funciona; serviço reinicia offline e continua dentro do grace.
+  **Rollback**
+* Setar `LICENSING_ENFORCED=false` (DEV) enquanto corrige.
+
+---
+
+## Etapa 5 — Autenticação OIDC real + Dupla Validação no Hub
+
+**Objetivo:** proteger Hub com IdP (Auth0/Keycloak/Cognito) **e** validar licença própria.
+**Escopo**
+
+* Guard OIDC no Hub (`aud/iss/exp` via JWKS do IdP).
+* License Guard nas rotas sensíveis (valida JWT de licença do cliente).
+* Variáveis `.env`: `OIDC_JWKS_URL`, `OIDC_AUDIENCE`, `OIDC_ISSUER`.
+  **Flags**
+* `OIDC_REQUIRED=true` (em dev pode ser false pra smoke).
+  **Aceite**
+* Sem OIDC → 401; com OIDC e sem licença → 403; com ambos → 200.
+  **Rollback**
+* `OIDC_REQUIRED=false` e/ou bypass licenças **só em DEV**.
+
+---
+
+## Etapa 6 — POS/Inventory MVP no Client-Local + Espelho básico no Hub
+
+**Objetivo:** rodar o fluxo core no executável (sem quebrar nada) e preparar espelho no Hub.
+**Escopo**
+
+* Client-local: CRUD **Produtos**, **Estoque**, **Vendas** com Prisma.
+* Eventos locais mínimos: `event.product.upserted.v1`, `event.sale.created.v1`.
+* Hub: endpoints de ingest ou leitura para espelhamento por tenant (simples).
+* Health de dependências: DB local OK e Hub reachable (quando online).
+  **Flags**
+* `MVP_POS_ENABLED=true`.
+  **Aceite**
+* CRUD local persistindo no SQLite/SQLCipher e APIs respondendo 200.
+* Schemas JSON validados por Ajv localmente.
+  **Rollback**
+* `MVP_POS_ENABLED=false` volta ao estado anterior.
+
+---
+
+## Etapa 7 — Sync Agent (Outbox/Inbox, Idempotência, Backoff, DLQ)
+
+**Objetivo:** sincronização automática, tolerante a falhas, invisível ao usuário.
+**Escopo**
+
+* **Outbox**: fila local com `PENDING/SENT/ACKED`, `retry_at`, **backoff exponencial**, **DLQ**.
+* **Inbox**: aplicação de **comandos versionados** do Hub com **idempotência** (`commandId`).
+* Schemas versionados em `client-local/src/sync/schemas/*`.
+* Scheduler interno (cron) gerenciando sync/renovação.
+  **Flags**
+* `SYNC_ENABLED=true` (padrão off até fechar testes).
+  **Aceite**
+* Sem internet: eventos acumulam; com internet: flush sem duplicar.
+* Logs mostram reprocesso e DLQ quando extrapola tentativas.
+  **Rollback**
+* `SYNC_ENABLED=false` deixa tudo local até ajustar.
+
+---
+
+## Etapa 8 — Pagamentos Mínimo Viável + Conciliação Simples
+
+**Objetivo:** registrar pagamentos (dinheiro, débito, crédito) e espelhar no Hub.
+**Escopo**
+
+* Client-local: módulo `payments` vinculado à venda.
+* Estender `event.sale.created.v1` com `payments[]`.
+* Hub: ingest/armazenamento para relatórios.
+  **Flags**
+* `PAYMENTS_ENABLED=true`.
+  **Aceite**
+* Vendas com pagamentos persistem local e sincronizam ao Hub quando online.
+* Hub rejeita payload inválido com erro claro (schema).
+  **Rollback**
+* `PAYMENTS_ENABLED=false` para operar sem pagamentos (somente registro de venda).
+
+---
+
+## Etapa 9 — Frontend Integrado ao Client-Local + Status de Sync
+
+**Objetivo:** trocar mocks por client-local e expor status na UI sem travar o uso.
+**Escopo**
+
+* `web`: `VITE_API_BASE=http://127.0.0.1:3010`.
+* Rota `/setup`: usa `GET /install/status` e `POST /licensing/activate`.
+* Integrar CRUDs do **POS/Inventory** via **React Query**.
+* Banner/Badge de status: **Online/Offline/Syncing**.
+* Loading/empty states decentes (sem UX travada).
+  **Flags**
+* `USE_LOCAL_API=true` (em dev dá pra forçar mock com `false`).
+  **Aceite**
+* Usuário final opera 100% via executável + UI; sem internet o sistema funciona (grace + local), com internet sincroniza.
+  **Rollback**
+* `USE_LOCAL_API=false` volta pro mock (apenas DEV).
+
+---
+
+## Etapa 10 — Site Institucional + Postman E2E + Releases/Auto-update
+
+**Objetivo:** pacote completo para distribuir o SaaS.
+**Escopo**
+
+* **Site institucional** (landing + docs de instalação) no monorepo (`/site`), build estático (Vite/Next estático).
+* **Coleção Postman** E2E: seed → health → ativar licença → CRUD → sync roundtrip.
+* **Auto-update** do client-local:
+
+  * Serviço verifica versão publicada (GitHub Releases/S3).
+  * Download silencioso + aplicação + rollback se health falhar.
+* **CI/CD (GitHub Actions)**:
+
+  * Lint, typecheck, unit, integração (Hub com Postgres de serviço).
+  * Build **binários** + **instaladores** (NSIS/pkgbuild/deb).
+  * Publica em **Releases** com changelog.
+    **Flags**
+* `AUTO_UPDATE_ENABLED=true` (produção).
+  **Aceite**
+* Instalação fresca: setup de licença → uso normal → sync OK.
+* Update publicado ➜ cliente atualiza sozinho e mantém dados/serviço.
+  **Rollback**
+* Pipeline mantém **artefato anterior**; auto-update reverte quando health falha.
+
+---
+
+## Convenções Gerais (valem em todas as etapas)
+
+* **Feature flags** via `.env` com defaults seguros; em produção tudo que não está pronto fica **OFF**.
+* **Testes**: unit + integração onde mexer; E2E via Postman na Etapa 10.
+* **Observabilidade** (ligar gradualmente): `/health`, `/health/deps`, logs JSON com `requestId`, `tenantId`, `deviceId`. Métricas no Hub (Prometheus).
+* **Segurança**: nunca logar segredos. Tokens/keys sempre em keystore do SO.
+* **Branches/PRs**:
+
+  * Um PR por etapa (ou sub-etapa). Nome: `feat/etapa-X-*`.
+  * Checklist no PR com critérios de aceite.
+  * Sem squash de features em PRs gigantes; preferir incrementos pequenos.
+
+---
+
+## Ordem de Merge (resumo)
+
+1. **Etapa 1** ➜ 2 ➜ 3 ➜ 4 ➜ 5 (fundação de segurança)
+2. **Etapa 6** (POS local)
+3. **Etapa 7** (Sync robusto)
+4. **Etapa 8** (Pagamentos)
+5. **Etapa 9** (Front integrado)
+6. **Etapa 10** (Site + E2E + Releases/Auto-update)

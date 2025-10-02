@@ -380,7 +380,7 @@ export const calculatePaymentTotal = (
 } => {
   let desconto = 0;
   let juros = 0;
-  let taxa = method.taxaFixa || 0;
+  const taxa = method.taxaFixa || 0;
   
   // Apply discount
   if (method.descontoFixoPct && method.descontoFixoPct > 0) {

@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for Hub development
+  postgres:
+    image: postgres:15-alpine
+    container_name: f-flow-postgres
+    environment:
+      POSTGRES_DB: f_flow_hub
+      POSTGRES_USER: f_flow_user
+      POSTGRES_PASSWORD: f_flow_dev_password
+      POSTGRES_MULTIPLE_DATABASES: f_flow_hub,f_flow_tenant_1,f_flow_tenant_2
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./hub/sql:/docker-entrypoint-initdb.d
+    networks:
+      - f-flow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U f_flow_user -d f_flow_hub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Adminer - Database Management UI for Hub development
+  adminer:
+    image: adminer:4.8.1
+    container_name: f-flow-adminer
+    ports:
+      - "8090:8080"
+    networks:
+      - f-flow-network
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: dracula
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  f-flow-network:
+    driver: bridge
