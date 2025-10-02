@@ -40,6 +40,13 @@ import GroomingServicesIndex from './pages/erp/grooming/services/index';
 import NovoGroomingService from './pages/erp/grooming/services/novo';
 import EditarGroomingService from './pages/erp/grooming/services/[id]/editar';
 import GroomingPetsIndex from './pages/erp/grooming/pets/index';
+import NovoPet from './pages/erp/grooming/pets/novo';
+import EditarPet from './pages/erp/grooming/pets/[id]/editar';
+import GroomingResourcesIndex from './pages/erp/grooming/resources/index';
+import NovoRecurso from './pages/erp/grooming/resources/novo';
+import EditarRecurso from './pages/erp/grooming/resources/[id]/editar';
+import TutorsIndex from './pages/erp/grooming/tutors/index';
+import NovoTutor from './pages/erp/grooming/tutors/novo';
 
 // Stock pages
 import StockPosition from "./pages/erp/estoque/index";
@@ -139,6 +146,13 @@ const App = () => (
           <Route path="grooming/services/novo" element={<NovoGroomingService />} />
           <Route path="grooming/services/:id/editar" element={<EditarGroomingService />} />
           <Route path="grooming/pets" element={<GroomingPetsIndex />} />
+          <Route path="grooming/pets/novo" element={<NovoPet />} />
+          <Route path="grooming/pets/:id/editar" element={<EditarPet />} />
+          <Route path="grooming/resources" element={<GroomingResourcesIndex />} />
+          <Route path="grooming/resources/novo" element={<NovoRecurso />} />
+          <Route path="grooming/resources/:id/editar" element={<EditarRecurso />} />
+          <Route path="grooming/tutors" element={<TutorsIndex />} />
+          <Route path="grooming/tutors/novo" element={<NovoTutor />} />
           
           <Route path="banho-tosa" element={<StubPage title="Banho & Tosa" description="Gestão de Pet Shop" />} />
           <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
