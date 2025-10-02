@@ -36,6 +36,10 @@ import EditarCliente from './pages/erp/agenda/clientes/[id]/editar';
 import AgendaIndex from './pages/erp/agenda/index';
 import NovoAgendamento from './pages/erp/agenda/novo';
 import AgendamentoDetalhe from './pages/erp/agenda/[id]';
+import GroomingServicesIndex from './pages/erp/grooming/services/index';
+import NovoGroomingService from './pages/erp/grooming/services/novo';
+import EditarGroomingService from './pages/erp/grooming/services/[id]/editar';
+import GroomingPetsIndex from './pages/erp/grooming/pets/index';
 
 // Stock pages
 import StockPosition from "./pages/erp/estoque/index";
@@ -128,6 +132,13 @@ const App = () => (
           <Route path="agenda/clientes" element={<ClientesIndex />} />
           <Route path="agenda/clientes/novo" element={<NovoCliente />} />
           <Route path="agenda/clientes/:id/editar" element={<EditarCliente />} />
+          
+          {/* Grooming Routes */}
+          <Route path="grooming" element={<StubPage title="Banho & Tosa" description="Kanban Operacional" />} />
+          <Route path="grooming/services" element={<GroomingServicesIndex />} />
+          <Route path="grooming/services/novo" element={<NovoGroomingService />} />
+          <Route path="grooming/services/:id/editar" element={<EditarGroomingService />} />
+          <Route path="grooming/pets" element={<GroomingPetsIndex />} />
           
           <Route path="banho-tosa" element={<StubPage title="Banho & Tosa" description="Gestão de Pet Shop" />} />
           <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
