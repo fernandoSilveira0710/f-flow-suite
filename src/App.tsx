@@ -156,7 +156,8 @@ function App() {
           <Route path="grooming/tutors" element={<TutorsIndex />} />
           <Route path="grooming/tutors/novo" element={<NovoTutor />} />
           
-          <Route path="banho-tosa" element={<StubPage title="Banho & Tosa" description="Gestão de Pet Shop" />} />
+          {/* Banho & Tosa (alias for Grooming) */}
+          <Route path="banho-tosa" element={<GroomingIndex />} />
           <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
           
           {/* Settings Routes */}
