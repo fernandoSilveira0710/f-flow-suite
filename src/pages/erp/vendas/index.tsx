@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, FileDown, Printer, RotateCcw, ExternalLink } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, FileDown, Printer, RotateCcw, ExternalLink, X, Filter as FilterIcon } from 'lucide-react';
 import { PageHeader } from '@/components/erp/page-header';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -28,12 +27,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { fetchSales, exportSalesToCSV, refundSale, type SaleDetail } from '@/lib/sales-api';
 import { format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface Filters {
   range: 'today' | 'yesterday' | '7d' | 'month' | 'custom';
@@ -42,8 +49,6 @@ interface Filters {
   q: string;
   pay: string[];
   status: string[];
-  minTotal: number;
-  maxTotal: number;
 }
 
 const defaultFilters: Filters = {
@@ -53,9 +58,20 @@ const defaultFilters: Filters = {
   q: '',
   pay: [],
   status: [],
-  minTotal: 0,
-  maxTotal: 0,
 };
+
+const paymentOptions = [
+  { value: 'PIX', label: 'PIX', color: 'bg-green-500' },
+  { value: 'DEBIT', label: 'Débito', color: 'bg-blue-500' },
+  { value: 'CREDIT', label: 'Crédito', color: 'bg-purple-500' },
+  { value: 'CASH', label: 'Dinheiro', color: 'bg-gray-500' },
+  { value: 'OTHER', label: 'Outros', color: 'bg-amber-500' },
+];
+
+const statusOptions = [
+  { value: 'Pago', label: 'Pago' },
+  { value: 'Cancelado', label: 'Cancelado' },
+];
 
 export default function SalesPage() {
   const { filters, setFilters, clearFilters, activeFiltersCount } = useUrlFilters(defaultFilters);
@@ -65,7 +81,6 @@ export default function SalesPage() {
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   // Load sales
   useEffect(() => {
@@ -77,8 +92,6 @@ export default function SalesPage() {
       q: filters.q || undefined,
       pay: filters.pay.length > 0 ? filters.pay : undefined,
       status: filters.status.length > 0 ? filters.status : undefined,
-      minTotal: filters.minTotal > 0 ? filters.minTotal : undefined,
-      maxTotal: filters.maxTotal > 0 ? filters.maxTotal : undefined,
     })
       .then(setSales)
       .finally(() => setIsLoading(false));
@@ -100,7 +113,7 @@ export default function SalesPage() {
     if (!selectedSale) return;
     try {
       await refundSale(selectedSale.id);
-      toast({ title: 'Estornado', description: `Venda ${selectedSale.id} estornada com sucesso` });
+      toast({ title: 'Estornado', description: `Venda ${selectedSale.id.slice(0, 8)} estornada com sucesso` });
       setShowRefundDialog(false);
       setSelectedSale(null);
       // Reload
@@ -116,11 +129,42 @@ export default function SalesPage() {
   };
 
   const handlePrint = (sale: SaleDetail) => {
-    toast({ title: 'Imprimindo...', description: `Recibo da venda ${sale.id} (mock)` });
+    toast({ title: 'Imprimindo...', description: `Recibo da venda ${sale.id.slice(0, 8)} (mock)` });
   };
 
   const formatCurrency = (value: number) =>
     value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const getPaymentBadgeColor = (payment: string) => {
+    const upper = payment.toUpperCase();
+    if (upper.includes('PIX')) return 'bg-green-500 text-white';
+    if (upper.includes('DÉBIT') || upper.includes('DEBIT')) return 'bg-blue-500 text-white';
+    if (upper.includes('CRÉDIT') || upper.includes('CREDIT')) return 'bg-purple-500 text-white';
+    if (upper.includes('DINHEIRO') || upper.includes('CASH')) return 'bg-gray-500 text-white';
+    return 'bg-amber-500 text-white';
+  };
+
+  const togglePaymentFilter = (value: string) => {
+    const newPay = filters.pay.includes(value)
+      ? filters.pay.filter(p => p !== value)
+      : [...filters.pay, value];
+    setFilters({ pay: newPay });
+  };
+
+  const toggleStatusFilter = (value: string) => {
+    const newStatus = filters.status.includes(value)
+      ? filters.status.filter(s => s !== value)
+      : [...filters.status, value];
+    setFilters({ status: newStatus });
+  };
+
+  const removeFilter = (type: 'pay' | 'status', value: string) => {
+    if (type === 'pay') {
+      setFilters({ pay: filters.pay.filter(p => p !== value) });
+    } else {
+      setFilters({ status: filters.status.filter(s => s !== value) });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -130,57 +174,143 @@ export default function SalesPage() {
       />
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por ID ou operador..."
-              value={filters.q}
-              onChange={(e) => setFilters({ q: e.target.value })}
-              className="pl-10"
-            />
+      <div className="space-y-4">
+        {/* Search and Range */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por ID ou operador..."
+                value={filters.q}
+                onChange={(e) => setFilters({ q: e.target.value })}
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          <Select value={filters.range} onValueChange={(v: any) => setFilters({ range: v })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Hoje</SelectItem>
+              <SelectItem value="yesterday">Ontem</SelectItem>
+              <SelectItem value="7d">Últimos 7 dias</SelectItem>
+              <SelectItem value="month">Este mês</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Filter buttons and chips */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Payment Filter */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <FilterIcon className="mr-2 h-4 w-4" />
+                Pagamento
+                {filters.pay.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">{filters.pay.length}</Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56">
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Forma de Pagamento</h4>
+                {paymentOptions.map((option) => (
+                  <div key={option.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`pay-${option.value}`}
+                      checked={filters.pay.includes(option.value)}
+                      onCheckedChange={() => togglePaymentFilter(option.value)}
+                    />
+                    <Label htmlFor={`pay-${option.value}`} className="text-sm cursor-pointer">
+                      {option.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Status Filter */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <FilterIcon className="mr-2 h-4 w-4" />
+                Status
+                {filters.status.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">{filters.status.length}</Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56">
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Status da Venda</h4>
+                {statusOptions.map((option) => (
+                  <div key={option.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`status-${option.value}`}
+                      checked={filters.status.includes(option.value)}
+                      onCheckedChange={() => toggleStatusFilter(option.value)}
+                    />
+                    <Label htmlFor={`status-${option.value}`} className="text-sm cursor-pointer">
+                      {option.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Active filter chips */}
+          {filters.pay.map((pay) => (
+            <Badge key={pay} variant="secondary" className="gap-1">
+              {paymentOptions.find(p => p.value === pay)?.label}
+              <X
+                className="h-3 w-3 cursor-pointer"
+                onClick={() => removeFilter('pay', pay)}
+              />
+            </Badge>
+          ))}
+
+          {filters.status.map((status) => (
+            <Badge key={status} variant="secondary" className="gap-1">
+              {status}
+              <X
+                className="h-3 w-3 cursor-pointer"
+                onClick={() => removeFilter('status', status)}
+              />
+            </Badge>
+          ))}
+
+          {activeFiltersCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Limpar filtros
+            </Button>
+          )}
+
+          <div className="ml-auto">
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Exportar CSV
+            </Button>
           </div>
         </div>
-
-        <Select value={filters.range} onValueChange={(v: any) => setFilters({ range: v })}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="today">Hoje</SelectItem>
-            <SelectItem value="yesterday">Ontem</SelectItem>
-            <SelectItem value="7d">Últimos 7 dias</SelectItem>
-            <SelectItem value="month">Este mês</SelectItem>
-            <SelectItem value="custom">Personalizado</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={clearFilters} disabled={activeFiltersCount === 0}>
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Limpar filtros
-                  {activeFiltersCount > 0 && (
-                    <Badge variant="secondary" className="ml-2">{activeFiltersCount}</Badge>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Remover todos os filtros aplicados</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+      {/* Summary */}
+      {!isLoading && (
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <span>{sales.length} vendas encontradas</span>
+          {sales.length > 0 && (
+            <span>Total: {formatCurrency(sales.reduce((sum, s) => sum + s.total, 0))}</span>
+          )}
         </div>
-
-        <Button variant="outline" onClick={handleExport}>
-          <FileDown className="mr-2 h-4 w-4" />
-          Exportar CSV
-        </Button>
-      </div>
+      )}
 
       {/* Table */}
       <div className="border rounded-lg">
@@ -226,7 +356,9 @@ export default function SalesPage() {
                   <TableCell>{sale.itens.length}</TableCell>
                   <TableCell className="font-semibold tabular-nums">{formatCurrency(sale.total)}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">{sale.pagamento}</Badge>
+                    <Badge className={cn("text-xs", getPaymentBadgeColor(sale.pagamento))}>
+                      {sale.pagamento}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant={sale.status === 'Pago' ? 'default' : 'destructive'}>
@@ -313,11 +445,13 @@ export default function SalesPage() {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Forma de Pagamento</p>
-                  <p className="font-medium">{selectedSale.pagamento}</p>
+                  <Badge className={cn("mt-1", getPaymentBadgeColor(selectedSale.pagamento))}>
+                    {selectedSale.pagamento}
+                  </Badge>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Status</p>
-                  <Badge variant={selectedSale.status === 'Pago' ? 'default' : 'destructive'}>
+                  <Badge variant={selectedSale.status === 'Pago' ? 'default' : 'destructive'} className="mt-1">
                     {selectedSale.status}
                   </Badge>
                 </div>
@@ -362,7 +496,8 @@ export default function SalesPage() {
           <DialogHeader>
             <DialogTitle>Estornar Venda</DialogTitle>
             <DialogDescription>
-              Tem certeza que deseja estornar a venda {selectedSale?.id}?
+              Tem certeza que deseja estornar a venda {selectedSale?.id.slice(0, 8)}?
+              Esta ação não pode ser desfeita.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

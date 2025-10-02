@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Package,
   ShoppingCart,
+  Receipt,
   Warehouse,
   Calendar,
   Scissors,
@@ -60,6 +61,12 @@ export default function ErpLayout() {
       enabled: entitlements.pdv,
       feature: 'PDV',
       plan: 'Starter',
+    },
+    {
+      label: 'Vendas',
+      icon: Receipt,
+      path: '/erp/vendas',
+      enabled: true,
     },
     {
       label: 'Estoque',
@@ -140,7 +147,7 @@ export default function ErpLayout() {
         <nav className="flex-1 p-4 space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname.startsWith(item.path);
             
             return (
               <Link
