@@ -18,6 +18,10 @@ import ProdutosIndex from "./pages/erp/produtos/index";
 import ProdutosNovo from "./pages/erp/produtos/novo";
 import ProdutoDetalhe from "./pages/erp/produtos/[id]";
 import ProdutoEditar from "./pages/erp/produtos/[id]/editar";
+import PdvIndex from "./pages/erp/pdv/index";
+import PdvSession from "./pages/erp/pdv/session";
+import PdvCheckout from "./pages/erp/pdv/checkout";
+import PdvHistory from "./pages/erp/pdv/history";
 import StubPage from "./pages/erp/stub-page";
 
 // Settings Layout & Pages
@@ -65,8 +69,11 @@ const App = () => (
             <Route path="produtos/:id" element={<ProdutoDetalhe />} />
             <Route path="produtos/:id/editar" element={<ProdutoEditar />} />
 
-          {/* Stub Pages */}
-          <Route path="pdv" element={<StubPage title="PDV" description="Ponto de Venda" />} />
+          {/* PDV Routes */}
+          <Route path="pdv" element={<PdvIndex />} />
+          <Route path="pdv/session" element={<PdvSession />} />
+          <Route path="pdv/checkout" element={<PdvCheckout />} />
+          <Route path="pdv/history" element={<PdvHistory />} />
           <Route path="estoque" element={<StubPage title="Estoque" description="Controle de Estoque" />} />
           <Route path="agenda" element={<StubPage title="Agenda" description="Agendamento de Serviços" />} />
           <Route path="banho-tosa" element={<StubPage title="Banho & Tosa" description="Gestão de Pet Shop" />} />
