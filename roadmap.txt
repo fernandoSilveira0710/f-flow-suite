@@ -2,7 +2,7 @@
 
 > **Regra de ouro:** cada etapa fecha com **critérios de aceite**, **flag de segurança** e **rollback** simples. Só avançamos quando a etapa anterior estiver verde em PR.
 
-## Etapa 1 — Setup de DEV e Padrões de Projeto
+## Etapa 1 — Setup de DEV e Padrões de Projeto (Concluida)
 
 **Objetivo:** time ligar o projeto em 1 comando e alinhar padrões (lint, testes, branch/PR).
 **Escopo**
