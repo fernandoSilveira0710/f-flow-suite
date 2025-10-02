@@ -60,19 +60,17 @@ import StockLabels from "./pages/erp/estoque/etiquetas";
 // Settings Layout & Pages
 import SettingsLayout from "./layouts/settings-layout";
 import OrganizacaoPage from "./pages/erp/configuracoes/organizacao";
-import BrandingPage from "./pages/erp/configuracoes/branding";
 import UsuariosPage from "./pages/erp/configuracoes/usuarios";
 import PapeisPage from "./pages/erp/configuracoes/papeis";
 import PlanoPage from "./pages/erp/configuracoes/plano";
 import LicencasPage from "./pages/erp/configuracoes/licencas";
-import ApiKeysPage from "./pages/erp/configuracoes/api";
-import WebhooksPage from "./pages/erp/configuracoes/webhooks";
-import PreferenciasPage from "./pages/erp/configuracoes/preferencias";
-import NotificacoesPage from "./pages/erp/configuracoes/notificacoes";
-import AuditoriaPage from "./pages/erp/configuracoes/auditoria";
-import ImportarExportarPage from "./pages/erp/configuracoes/importar-exportar";
-import DangerPage from "./pages/erp/configuracoes/danger";
-import PagamentosSettings from "./pages/erp/configuracoes/pagamentos";
+import PosSettings from "./pages/settings/pos";
+import ScheduleSettings from "./pages/settings/schedule";
+import GroomingSettings from "./pages/settings/grooming";
+import InventorySettings from "./pages/settings/inventory";
+import PaymentsIndex from "./pages/settings/payments/index";
+import NotificationsSettings from "./pages/settings/notifications";
+import ImportExportSettings from "./pages/settings/import-export";
 import NovoPagamento from "./pages/erp/configuracoes/pagamentos/novo";
 
 import NotFound from "./pages/NotFound";
@@ -161,27 +159,22 @@ function App() {
           <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
           
           {/* Settings Routes */}
-          <Route path="configuracoes" element={<SettingsLayout />}>
-            <Route index element={<Navigate to="/erp/configuracoes/organizacao" replace />} />
-            <Route path="organizacao" element={<OrganizacaoPage />} />
-            <Route path="branding" element={<BrandingPage />} />
-            <Route path="usuarios" element={<UsuariosPage />} />
-            <Route path="papeis" element={<PapeisPage />} />
-            <Route path="plano" element={<PlanoPage />} />
-            <Route path="licencas" element={<LicencasPage />} />
-            <Route path="api" element={<ApiKeysPage />} />
-            <Route path="webhooks" element={<WebhooksPage />} />
-            <Route path="pdv" element={<PreferenciasPage />} />
-            <Route path="agenda" element={<PreferenciasPage />} />
-            <Route path="pet" element={<PreferenciasPage />} />
-            <Route path="estoque" element={<PreferenciasPage />} />
-            <Route path="notificacoes" element={<NotificacoesPage />} />
-            <Route path="pagamentos" element={<PagamentosSettings />} />
-            <Route path="pagamentos/novo" element={<NovoPagamento />} />
-            <Route path="pagamentos/:id/editar" element={<NovoPagamento />} />
-            <Route path="auditoria" element={<AuditoriaPage />} />
-            <Route path="importar-exportar" element={<ImportarExportarPage />} />
-            <Route path="danger" element={<DangerPage />} />
+          <Route path="settings" element={<SettingsLayout />}>
+            <Route index element={<Navigate to="/settings/organization" replace />} />
+            <Route path="organization" element={<OrganizacaoPage />} />
+            <Route path="users" element={<UsuariosPage />} />
+            <Route path="roles" element={<PapeisPage />} />
+            <Route path="billing" element={<PlanoPage />} />
+            <Route path="licenses" element={<LicencasPage />} />
+            <Route path="pos" element={<PosSettings />} />
+            <Route path="schedule" element={<ScheduleSettings />} />
+            <Route path="grooming" element={<GroomingSettings />} />
+            <Route path="inventory" element={<InventorySettings />} />
+            <Route path="payments" element={<PaymentsIndex />} />
+            <Route path="payments/new" element={<NovoPagamento />} />
+            <Route path="payments/:id/edit" element={<NovoPagamento />} />
+            <Route path="notifications" element={<NotificationsSettings />} />
+            <Route path="import-export" element={<ImportExportSettings />} />
           </Route>
         </Route>
 

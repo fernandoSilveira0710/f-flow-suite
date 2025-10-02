@@ -4,123 +4,114 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Building2,
-  Palette,
   Users,
   Shield,
   CreditCard,
   Key as KeyIcon,
-  Webhook,
   ShoppingCart,
   Calendar,
   Scissors,
   Package,
   Bell,
-  FileText,
   Upload,
-  AlertTriangle,
-  Settings,
+  Wallet,
+  LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+type MenuItem = {
+  label: string;
+  icon: LucideIcon;
+  path: string;
+  requiresPlan: string | null;
+} | {
+  type: 'separator';
+  label: string;
+};
 
 export default function SettingsLayout() {
   const location = useLocation();
   const { currentPlan, entitlements } = useEntitlements();
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     {
       label: 'Organização',
       icon: Building2,
-      path: '/erp/configuracoes/organizacao',
-      requiresPlan: null,
-    },
-    {
-      label: 'Branding & Tema',
-      icon: Palette,
-      path: '/erp/configuracoes/branding',
+      path: '/settings/organization',
       requiresPlan: null,
     },
     {
       label: 'Usuários & Assentos',
       icon: Users,
-      path: '/erp/configuracoes/usuarios',
+      path: '/settings/users',
       requiresPlan: null,
     },
     {
       label: 'Papéis & Permissões',
       icon: Shield,
-      path: '/erp/configuracoes/papeis',
+      path: '/settings/roles',
       requiresPlan: null,
     },
     {
       label: 'Plano & Faturamento',
       icon: CreditCard,
-      path: '/erp/configuracoes/plano',
+      path: '/settings/billing',
       requiresPlan: null,
     },
     {
       label: 'Licenças & Ativação',
       icon: KeyIcon,
-      path: '/erp/configuracoes/licencas',
+      path: '/settings/licenses',
       requiresPlan: null,
     },
     {
-      label: 'API Keys',
-      icon: Settings,
-      path: '/erp/configuracoes/api',
-      requiresPlan: null,
-    },
-    {
-      label: 'Webhooks',
-      icon: Webhook,
-      path: '/erp/configuracoes/webhooks',
-      requiresPlan: null,
+      type: 'separator' as const,
+      label: 'Módulos',
     },
     {
       label: 'PDV',
       icon: ShoppingCart,
-      path: '/erp/configuracoes/pdv',
+      path: '/settings/pos',
       requiresPlan: null,
     },
     {
       label: 'Agenda',
       icon: Calendar,
-      path: '/erp/configuracoes/agenda',
+      path: '/settings/schedule',
       requiresPlan: null,
     },
     {
       label: 'Banho & Tosa',
       icon: Scissors,
-      path: '/erp/configuracoes/pet',
+      path: '/settings/grooming',
       requiresPlan: 'pro',
     },
     {
       label: 'Estoque',
       icon: Package,
-      path: '/erp/configuracoes/estoque',
+      path: '/settings/inventory',
+      requiresPlan: null,
+    },
+    {
+      type: 'separator' as const,
+      label: 'Geral',
+    },
+    {
+      label: 'Métodos de Pagamento',
+      icon: Wallet,
+      path: '/settings/payments',
       requiresPlan: null,
     },
     {
       label: 'Notificações',
       icon: Bell,
-      path: '/erp/configuracoes/notificacoes',
-      requiresPlan: null,
-    },
-    {
-      label: 'Auditoria',
-      icon: FileText,
-      path: '/erp/configuracoes/auditoria',
+      path: '/settings/notifications',
       requiresPlan: null,
     },
     {
       label: 'Importar/Exportar',
       icon: Upload,
-      path: '/erp/configuracoes/importar-exportar',
-      requiresPlan: null,
-    },
-    {
-      label: 'Danger Zone',
-      icon: AlertTriangle,
-      path: '/erp/configuracoes/danger',
+      path: '/settings/import-export',
       requiresPlan: null,
     },
   ];
@@ -144,7 +135,17 @@ export default function SettingsLayout() {
       <aside className="w-64 flex-shrink-0">
         <div className="sticky top-6">
           <nav className="space-y-1">
-            {menuItems.map((item) => {
+            {menuItems.map((item, idx) => {
+              if ('type' in item) {
+                return (
+                  <div key={`sep-${idx}`} className="pt-4 pb-2">
+                    <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      {item.label}
+                    </p>
+                  </div>
+                );
+              }
+
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
               const needsUpgrade = isPlanRequired(item.requiresPlan);
