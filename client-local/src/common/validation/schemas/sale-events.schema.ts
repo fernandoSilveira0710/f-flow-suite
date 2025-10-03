@@ -4,7 +4,7 @@ export interface SaleCreatedEventPayload {
   id: string;
   code: string;
   operator: string;
-  payment: string;
+  paymentMethod: string;
   total: number;
   customerId?: string;
   createdAt: string;
@@ -23,7 +23,7 @@ export const saleCreatedEventSchema: JSONSchemaType<SaleCreatedEventPayload> = {
     id: { type: 'string', format: 'uuid' },
     code: { type: 'string' },
     operator: { type: 'string' },
-    payment: { type: 'string' },
+    paymentMethod: { type: 'string' },
     total: { type: 'number', minimum: 0 },
     customerId: { type: 'string', format: 'uuid', nullable: true },
     createdAt: { type: 'string', format: 'date-time' },
@@ -44,6 +44,6 @@ export const saleCreatedEventSchema: JSONSchemaType<SaleCreatedEventPayload> = {
       minItems: 1,
     },
   },
-  required: ['id', 'code', 'operator', 'payment', 'total', 'createdAt', 'items'],
+  required: ['id', 'code', 'operator', 'paymentMethod', 'total', 'createdAt', 'items'],
   additionalProperties: false,
 };

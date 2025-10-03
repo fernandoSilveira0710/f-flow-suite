@@ -51,9 +51,14 @@ export class SyncService {
 
   private async processSaleCreatedEvent(tenantId: string, payload: Record<string, unknown>): Promise<void> {
     this.logger.debug(`Processing sale.created.v1 event for tenant ${tenantId}`);
-    // For now, we just log the event since sales are read-only in the Hub
-    // In the future, we might want to store sales data locally for analytics
-    this.logger.log(`Sale created: ${JSON.stringify(payload)}`);
+    
+    try {
+      await this.salesService.upsertFromEvent(tenantId, payload as any);
+      this.logger.log(`Successfully processed sale.created.v1 event for tenant ${tenantId}`);
+    } catch (error) {
+      this.logger.error(`Failed to process sale.created.v1 event for tenant ${tenantId}:`, error);
+      throw error;
+    }
   }
 
   async fetchCommands(tenantId: string, limit = 100): Promise<Record<string, unknown>[]> {

@@ -554,6 +554,128 @@
               }
             }
           ]
+        },
+        {
+          "name": "Push Pending Events",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/sync/push/pending",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "sync",
+                "push",
+                "pending"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna número de eventos processados', function () {",
+                  "  const body = pm.response.text();",
+                  "  pm.expect(body).to.match(/^\\d+$/);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Outbox Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/sync/events",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "sync",
+                "events"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna lista de eventos', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('total');",
+                  "  pm.expect(body).to.have.property('events');",
+                  "  pm.expect(body.events).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hub - Receive Events",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    {\n      \"id\": \"test-123\",\n      \"aggregate\": \"sale\",\n      \"type\": \"sale.created.v1\",\n      \"payload\": {\n        \"id\": \"88315df7-387e-4198-8f7a-8e5e048ea254\",\n        \"code\": \"SALE-1759517877660\",\n        \"operator\": \"Operador Teste\",\n        \"paymentMethod\": \"dinheiro\",\n        \"total\": 59.8,\n        \"customerId\": null,\n        \"createdAt\": \"2025-10-03T18:57:57.663Z\",\n        \"items\": [\n          {\n            \"id\": \"541fcd3e-7c2b-4d2a-8bd9-94ef026d0a06\",\n            \"productId\": \"ef6a6e54-a0d1-4e5b-95d1-6cc2723d5a37\",\n            \"qty\": 2,\n            \"unitPrice\": 29.9,\n            \"subtotal\": 59.8\n          }\n        ]\n      },\n      \"occurredAt\": \"2025-10-03T18:57:57.663Z\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{hub_url}}/tenants/{{tenant_id}}/sync/events",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants",
+                "{{tenant_id}}",
+                "sync",
+                "events"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna accepted', function () {",
+                  "  const body = pm.response.text();",
+                  "  pm.expect(body).to.equal('accepted');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     }

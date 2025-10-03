@@ -222,3 +222,15 @@ model StockMovement {
 
   @@index([productId])
 }
+
+model OutboxEvent {
+  id        String   @id @default(uuid())
+  eventType String
+  payload   String   // JSON string
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  processedAt DateTime?
+
+  @@index([processed])
+  @@index([eventType])
+}
