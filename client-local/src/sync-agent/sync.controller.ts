@@ -1,13 +1,23 @@
 import { Controller, Post, Get, Body } from '@nestjs/common';
 import { SyncService } from './sync.service';
+import { PrismaService } from '../common/prisma/prisma.service';
 
 @Controller('sync')
 export class SyncController {
-  constructor(private readonly syncService: SyncService) {}
+  constructor(
+    private readonly syncService: SyncService,
+    private readonly prisma: PrismaService
+  ) {}
 
   @Post('push')
-  async pushEvents(@Body() body: { events: any[] }) {
-    const result = await this.syncService.pushOutbox(body.events || []);
+  async pushEvents(@Body() body?: { events?: any[] }) {
+    const result = await this.syncService.pushOutbox(body?.events);
+    return result;
+  }
+
+  @Post('push/pending')
+  async pushPendingEvents() {
+    const result = await this.syncService.pushOutbox();
     return result;
   }
 
@@ -17,6 +27,26 @@ export class SyncController {
     return result;
   }
 
+  @Get('events')
+  async getOutboxEvents() {
+    const events = await this.prisma.outboxEvent.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+    
+    return {
+      total: events.length,
+      events: events.map(event => ({
+        id: event.id,
+        eventType: event.eventType,
+        payload: JSON.parse(event.payload),
+        processed: event.processed,
+        createdAt: event.createdAt,
+        processedAt: event.processedAt
+      }))
+    };
+  }
+
   @Get('test')
   async testSync() {
     // Test event to push to Hub
@@ -24,7 +54,7 @@ export class SyncController {
       {
         id: '1',
         aggregate: 'sale',
-        type: 'sale.created',
+        type: 'sale.created.v1',
         payload: { saleId: '123', amount: 100.50 },
         occurredAt: new Date().toISOString()
       }

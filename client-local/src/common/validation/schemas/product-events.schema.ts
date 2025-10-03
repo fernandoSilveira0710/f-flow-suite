@@ -2,27 +2,26 @@ import { JSONSchemaType } from 'ajv';
 
 export interface ProductUpsertedEventPayload {
   id: string;
-  sku: string;
+  sku?: string;
   name: string;
   description?: string;
   salePrice: number;
   costPrice?: number;
-  stockQty: number;
   category?: string;
   barcode?: string;
   unit?: string;
   minStock?: number;
   maxStock?: number;
-  trackStock: boolean;
-  active: boolean;
+  stockQty?: number;
+  currentStock?: number; // Alternative field name for stockQty
+  trackStock?: boolean;
+  active?: boolean;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface ProductDeletedEventPayload {
   id: string;
-  sku: string;
-  name: string;
   deletedAt: string;
 }
 
@@ -30,33 +29,24 @@ export const productUpsertedEventSchema: JSONSchemaType<ProductUpsertedEventPayl
   type: 'object',
   properties: {
     id: { type: 'string', format: 'uuid' },
-    sku: { type: 'string', minLength: 1, maxLength: 100 },
-    name: { type: 'string', minLength: 1, maxLength: 255 },
-    description: { type: 'string', nullable: true, maxLength: 1000 },
+    sku: { type: 'string', nullable: true },
+    name: { type: 'string' },
+    description: { type: 'string', nullable: true },
     salePrice: { type: 'number', minimum: 0 },
-    costPrice: { type: 'number', nullable: true, minimum: 0 },
-    stockQty: { type: 'integer', minimum: 0 },
-    category: { type: 'string', nullable: true, maxLength: 100 },
-    barcode: { type: 'string', nullable: true, maxLength: 100 },
-    unit: { type: 'string', nullable: true, maxLength: 50 },
-    minStock: { type: 'integer', nullable: true, minimum: 0 },
-    maxStock: { type: 'integer', nullable: true, minimum: 0 },
-    trackStock: { type: 'boolean' },
-    active: { type: 'boolean' },
+    costPrice: { type: 'number', minimum: 0, nullable: true },
+    category: { type: 'string', nullable: true },
+    barcode: { type: 'string', nullable: true },
+    unit: { type: 'string', nullable: true },
+    minStock: { type: 'number', minimum: 0, nullable: true },
+    maxStock: { type: 'number', minimum: 0, nullable: true },
+    stockQty: { type: 'number', minimum: 0, nullable: true },
+    currentStock: { type: 'number', minimum: 0, nullable: true },
+    trackStock: { type: 'boolean', nullable: true },
+    active: { type: 'boolean', nullable: true },
     createdAt: { type: 'string', format: 'date-time' },
-    updatedAt: { type: 'string', format: 'date-time' },
+    updatedAt: { type: 'string', format: 'date-time', nullable: true },
   },
-  required: [
-    'id',
-    'sku',
-    'name',
-    'salePrice',
-    'stockQty',
-    'trackStock',
-    'active',
-    'createdAt',
-    'updatedAt',
-  ],
+  required: ['id', 'name', 'salePrice', 'createdAt'],
   additionalProperties: false,
 };
 
@@ -64,10 +54,8 @@ export const productDeletedEventSchema: JSONSchemaType<ProductDeletedEventPayloa
   type: 'object',
   properties: {
     id: { type: 'string', format: 'uuid' },
-    sku: { type: 'string', minLength: 1, maxLength: 100 },
-    name: { type: 'string', minLength: 1, maxLength: 255 },
     deletedAt: { type: 'string', format: 'date-time' },
   },
-  required: ['id', 'sku', 'name', 'deletedAt'],
+  required: ['id', 'deletedAt'],
   additionalProperties: false,
 };

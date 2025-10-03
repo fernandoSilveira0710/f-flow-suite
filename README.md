@@ -240,6 +240,102 @@ DEVICE_ID=<guid-da-maquina>
 SYNC_INTERVAL_MS=60000
 ```
 
+#### Endpoints de Sincronização
+
+O Cliente Local oferece os seguintes endpoints para sincronização com o Hub:
+
+##### Visualizar Eventos Pendentes
+```bash
+GET /sync/events
+```
+Retorna todos os eventos na OutboxEvent, incluindo status de processamento:
+```json
+{
+  "total": 1,
+  "events": [
+    {
+      "id": "e84eff5b-8578-443d-bbbb-dc6112992d88",
+      "eventType": "sale.created.v1",
+      "payload": { /* dados da venda */ },
+      "processed": false,
+      "createdAt": "2025-10-03T18:57:57.663Z",
+      "processedAt": null
+    }
+  ]
+}
+```
+
+##### Sincronizar Eventos Pendentes
+```bash
+POST /sync/push/pending
+```
+Envia todos os eventos não processados para o Hub e os marca como processados:
+```bash
+# Exemplo de uso
+curl -X POST http://localhost:3010/sync/push/pending
+# Resposta: número de eventos sincronizados
+```
+
+##### Sincronizar Eventos Específicos
+```bash
+POST /sync/push
+```
+Permite enviar eventos específicos para o Hub:
+```json
+{
+  "events": [
+    {
+      "id": "evt-001",
+      "aggregate": "sale",
+      "type": "sale.created.v1",
+      "payload": { /* dados do evento */ },
+      "occurredAt": "2024-01-01T10:00:00Z"
+    }
+  ]
+}
+```
+
+##### Receber Comandos do Hub
+```bash
+GET /sync/pull
+```
+Busca comandos pendentes do Hub para execução local.
+
+#### Testando a Sincronização
+
+1. **Criar uma venda** (gera evento `sale.created.v1`):
+```bash
+curl -X POST http://localhost:3010/pos/sales \
+  -H "Content-Type: application/json" \
+  -d '{
+    "operator": "Operador Teste",
+    "paymentMethod": "dinheiro",
+    "items": [
+      {
+        "productId": "produto-id",
+        "qty": 2,
+        "unitPrice": 29.9
+      }
+    ]
+  }'
+```
+
+2. **Verificar eventos pendentes**:
+```bash
+curl http://localhost:3010/sync/events
+```
+
+3. **Sincronizar com o Hub**:
+```bash
+curl -X POST http://localhost:3010/sync/push/pending
+```
+
+4. **Confirmar processamento**:
+```bash
+curl http://localhost:3010/sync/events
+# Verificar se "processed": true
+```
+
 ## 4. Próximos Passos
 1. **Backend real**: ligar Prisma nas services do Hub e do Cliente local, implementando queries de verdade (tenants, sync commands, etc.).
 2. **Segurança**: integrar OIDC real (Auth0/Keycloak/Cognito), validar token e substituir guard placeholder.

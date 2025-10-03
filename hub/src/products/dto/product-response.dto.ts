@@ -1,4 +1,4 @@
-export class ProductResponseDto {
+export interface ProductResponseDto {
   id: string;
   tenantId: string;
   name: string;
@@ -11,7 +11,7 @@ export class ProductResponseDto {
   unit?: string;
   minStock?: number;
   maxStock?: number;
-  currentStock: number;
+  stockQty: number; // Changed from currentStock to stockQty to match Prisma schema
   trackStock: boolean;
   active: boolean;
   createdAt: Date;

@@ -224,17 +224,13 @@ model StockMovement {
 }
 
 model OutboxEvent {
-  id          String    @id @default(uuid())
-  aggregate   String    // e.g., "product", "inventory", "sale"
-  aggregateId String?   // ID of the entity that generated the event
-  type        String    // e.g., "product.upserted.v1", "inventory.adjusted.v1"
-  payload     String    // JSON payload of the event
-  occurredAt  DateTime  @default(now())
-  sentAt      DateTime? // null until successfully sent to Hub
-  retryCount  Int       @default(0)
-  createdAt   DateTime  @default(now())
+  id        String   @id @default(uuid())
+  eventType String
+  payload   String   // JSON string
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  processedAt DateTime?
 
-  @@index([sentAt])
-  @@index([aggregate])
-  @@index([type])
+  @@index([processed])
+  @@index([eventType])
 }
