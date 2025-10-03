@@ -126,7 +126,7 @@ LICENSING_ENFORCED=false
 npm run start:dev
 ```
 
-### 4. Testar Endpoints (PowerShell)
+### 4. Testar Endpoints (PowerShell)✅
 ```powershell
 # Status da instalação
 Invoke-RestMethod -Uri "http://localhost:3010/licensing/install/status" -Method GET
@@ -197,7 +197,7 @@ npm run test:cov
 
 ---
 
-## Etapa 5 — Autenticação OIDC real + Dupla Validação no Hub
+## Etapa 5 — Autenticação OIDC real + Dupla Validação no Hub ✅
 
 **Objetivo:** proteger Hub com IdP (Auth0/Keycloak/Cognito) **e** validar licença própria.
 **Escopo**
@@ -230,6 +230,118 @@ npm run test:cov
 * Schemas JSON validados por Ajv localmente.
   **Rollback**
 * `MVP_POS_ENABLED=false` volta ao estado anterior.
+
+Modelagem e Migrations (6.1)
+
+Definir todas as entidades no schema Prisma do client‑local e do Hub. Exemplos de modelos:
+
+Product: id, tenantId, sku, name, description, salePrice, costPrice, stockQty, createdAt, updatedAt;
+
+Sale / SaleItem: id, tenantId, code, date, operator, total, paymentMethod, createdAt, updatedAt; itens: productId, qty, unitPrice;
+
+InventoryAdjustment: id, tenantId, productId, delta, reason, createdAt;
+
+Customer (Tutor): id, tenantId, name, phone, email, createdAt, updatedAt;
+
+Pet: id, tenantId, tutorId, name, species, breed, weight, birthDate, createdAt, updatedAt;
+
+Service: id, tenantId, name, description, price, duration, createdAt, updatedAt;
+
+Professional: id, tenantId, name, role, createdAt, updatedAt;
+
+Appointment (Agenda): id, tenantId, petId, serviceId, professionalId, date, startTime, endTime, status, createdAt;
+
+GroomingTicket / GroomingItem: id, tenantId, petId, tutorId, status, createdAt; itens: serviceId, name, price, qty;
+
+Resource: id, tenantId, name, type, createdAt;
+
+CheckIn: id, tenantId, petId, professionalId, checkInAt, checkOutAt, notes;
+
+Configuration: key, value, tenantId; etc.
+
+Atualizar migrations no Hub e no client-local. Adicionar políticas RLS para as novas tabelas.
+
+CRUD de Produtos e Estoque (6.2)
+
+Client-local: criar módulo product com controller/DTO/service usando Prisma; endpoints: GET/POST/PATCH/DELETE em /products. Idêntico para inventory: endpoint para ajustar estoque (POST /inventory/adjust) e obter níveis atuais (GET /inventory/:productId). Persistir em SQLite/SQLCipher.
+
+Eventos: gerar event.product.upserted.v1 e event.product.deleted.v1 e armazenar em OutboxEvent.
+
+Hub: criar endpoints de leitura (GET /tenants/:tenantId/products) e ingestão via SyncService para aplicar eventos.
+
+CRUD de Vendas/PDV (6.3)
+
+Client-local: módulo sales com endpoints POST /sales, GET /sales, GET /sales/:id. Salvar vendas e itens na base. Calcular total, registrar método de pagamento.
+
+Gerar event.sale.created.v1 com itens e pagamento.
+
+Hub: endpoint de leitura /tenants/:tenantId/sales e ingestão de vendas via sync.
+
+Clientes (Tutores) e Pets (6.4)
+
+CRUD completo para Customer e Pet no client-local. Ligação tutor→pet.
+
+Eventos event.customer.upserted.v1, event.pet.upserted.v1.
+
+Espelho no Hub para relatórios e sincronização.
+
+Serviços e Profissionais (6.5)
+
+CRUD de Service (grooming, banho, consulta etc.) e Professional (veterinários, groomers) no client-local.
+
+Eventos correspondentes para sync. Hub espelha.
+
+Agenda, Check‑in e Recursos (6.6)
+
+CRUD de Appointment com validação de choques de agenda.
+
+Endpoint para check‑in/check‑out de pets (POST /checkin, POST /checkout) e armazenamento em CheckIn.
+
+CRUD de Resource e vinculação aos agendamentos se necessário (sala, mesa).
+
+Eventos event.appointment.created.v1, event.checkin.created.v1, etc.
+
+Grooming (Banho e tosa) (6.7)
+
+Completar módulo grooming: endpoints para abrir ticket, adicionar itens, atualizar status. Persistir ticket e itens.
+
+Gerar event.grooming.ticket.created.v1 e event.grooming.ticket.updated.v1.
+
+Hub espelha para relatórios.
+
+Configurações e Dashboard (6.8)
+
+CRUD simples para configurações da loja: métodos de pagamento, impostos, temas, etc.
+
+Endpoint /dashboard/summary que retorna métricas (total de vendas, estoque baixo, agendas do dia).
+
+Criar queries no Hub para relatórios agregados.
+
+Integração e Saúde (6.9)
+
+Atualizar o SyncAgent para lidar com todos os novos eventos, com schemas JSON validados por Ajv.
+
+Ajustar sync.service.ts no Hub para aplicar eventos a cada tabela.
+
+Melhorar /health/deps no client-local para checar SQLite e pingar Hub.
+
+Documentação e Flags (6.10)
+
+Atualizar .env.example adicionando MVP_POS_ENABLED, MVP_GROOMING_ENABLED, etc., caso deseje ativar módulos individualmente.
+
+Atualizar README e Roadmap.
+
+Atualizar coleção Postman: novos grupos para Produtos, Estoque, Vendas, Clientes, Pets, Serviços, Profissionais, Agenda, Grooming, Configurações, Dashboard.
+
+📌 Observações finais
+
+Nenhum mock: todas as operações devem persistir em banco e gerar eventos.
+
+Ajv validation: defina esquemas JSON para cada evento e valide no client-local antes de registrar no outbox.
+
+Hub RLS: adicione políticas para novas tabelas com tenant_id usando SET app.tenant_id (já implementado).
+
+Incremental PRs: cada sub-etapa pode ser submetida em um PR, garantindo que testes passem e que a base não quebre.
 
 ---
 

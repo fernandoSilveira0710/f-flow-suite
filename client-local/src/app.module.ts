@@ -5,6 +5,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { GroomingModule } from './grooming/grooming.module';
 import { LicensingModule } from './licensing/licensing.module';
 import { SyncAgentModule } from './sync-agent/sync.module';
+import { ProductsModule } from './products/products.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -12,6 +13,7 @@ import { HealthController } from './health/health.controller';
     ConfigModule.forRoot({ isGlobal: true }),
     LicensingModule,
     PosModule,
+    ProductsModule,
     InventoryModule,
     GroomingModule,
     SyncAgentModule,

@@ -6,6 +6,8 @@ import { TenantsModule } from './tenants/tenants.module';
 import { LicensesModule } from './licenses/licenses.module';
 import { EntitlementsModule } from './entitlements/entitlements.module';
 import { SyncModule } from './sync/sync.module';
+import { ProductsModule } from './products/products.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { HealthController } from './health/health.controller';
 import { JwksController } from './auth/jwks.controller';
 import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
@@ -18,6 +20,8 @@ import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
     LicensesModule,
     EntitlementsModule,
     SyncModule,
+    ProductsModule,
+    InventoryModule,
   ],
   controllers: [HealthController, JwksController],
   providers: [PrismaClient],
