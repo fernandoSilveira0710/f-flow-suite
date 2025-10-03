@@ -24,6 +24,34 @@ services:
       timeout: 5s
       retries: 5
 
+  # Hub Service - Main API server
+  hub:
+    build:
+      context: ./hub
+      dockerfile: Dockerfile
+    container_name: f-flow-hub
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://f_flow_user:f_flow_dev_password@postgres:5432/f_flow_hub
+      DEV_COMPOSE_ENABLED: true
+      RLS_ENFORCED: false
+      OIDC_REQUIRED: false
+      LICENSING_ENFORCED: false
+      LICENSE_JWT_EXPIRATION: 24h
+      PORT: 3000
+    networks:
+      - f-flow-network
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./hub:/app
+      - /app/node_modules
+    command: npm run start:dev
+
   # Adminer - Database Management UI for Hub development
   adminer:
     image: adminer:4.8.1

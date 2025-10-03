@@ -21,15 +21,15 @@ export class LicensesController {
       );
 
       return { licenseToken };
-    } catch (error) {
-      if (error.message === 'LICENSE_NOT_FOUND') {
+    } catch (error: any) {
+      if (error?.message === 'LICENSE_NOT_FOUND') {
         throw new HttpException(
           'Licença não encontrada para o tenant especificado',
           HttpStatus.NOT_FOUND
         );
       }
       
-      if (error.message === 'MISSING_LICENSE_PRIVATE_KEY_PEM') {
+      if (error?.message === 'MISSING_LICENSE_PRIVATE_KEY_PEM') {
         throw new HttpException(
           'Configuração de chave privada ausente',
           HttpStatus.INTERNAL_SERVER_ERROR

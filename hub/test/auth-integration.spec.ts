@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import * as jwt from 'jsonwebtoken';
 import { generateKeyPairSync } from 'crypto';
@@ -137,10 +137,23 @@ describe('Auth Integration (e2e)', () => {
 
       const response = await request(app.getHttpServer())
         .get('/tenants')
-        .set('Authorization', `Bearer ${licenseToken}`)
+        .set('X-License-Token', licenseToken)
         .expect(200);
 
       // Reset for other tests
+      process.env.OIDC_REQUIRED = 'true';
+    });
+
+    it('should work with Authorization header for backward compatibility', async () => {
+      process.env.OIDC_REQUIRED = 'false';
+
+      const licenseToken = generateLicenseToken();
+
+      const response = await request(app.getHttpServer())
+        .get('/tenants')
+        .set('Authorization', `Bearer ${licenseToken}`)
+        .expect(200);
+
       process.env.OIDC_REQUIRED = 'true';
     });
   });
@@ -170,7 +183,7 @@ describe('Auth Integration (e2e)', () => {
 
       const response = await request(app.getHttpServer())
         .post('/tenants/test-tenant/sync/events')
-        .set('Authorization', `Bearer ${licenseToken}`)
+        .set('X-License-Token', licenseToken)
         .send({ events: [] })
         .expect(201);
 
