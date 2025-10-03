@@ -76,7 +76,24 @@ export class LicensingController {
   @Get('license')
   async getLicense() {
     try {
-      return await this.licensingService.getCurrentLicense();
+      const license = await this.licensingService.getCurrentLicense();
+      
+      if (!license) {
+        throw new HttpException(
+          'Licença não encontrada',
+          HttpStatus.NOT_FOUND
+        );
+      }
+
+      // Map internal token format to API response format
+      return {
+        tenantId: license.tid,
+        deviceId: license.did,
+        plan: license.plan,
+        entitlements: Array.isArray(license.ent) ? license.ent : Object.keys(license.ent || {}),
+        status: license.status,
+        expiresAt: license.exp ? new Date(license.exp * 1000).toISOString() : undefined
+      };
     } catch (error) {
       throw new HttpException(
         'Licença não encontrada',
