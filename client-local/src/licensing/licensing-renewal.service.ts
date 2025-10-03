@@ -82,9 +82,12 @@ export class LicensingRenewalService implements OnModuleInit, OnModuleDestroy {
 
       const now = Math.floor(Date.now() / 1000);
       const timeUntilExpiry = currentLicense.exp - now;
-      const renewalThreshold = 24 * 3600; // 24 hours in seconds
+      
+      // Get renewal threshold from environment or default to 24 hours
+      const renewalThresholdHours = parseInt(process.env.LICENSE_RENEWAL_THRESHOLD_HOURS || '24', 10);
+      const renewalThreshold = renewalThresholdHours * 3600; // Convert to seconds
 
-      // Check if we need to renew (less than 24 hours until expiry)
+      // Check if we need to renew (less than threshold until expiry)
       if (timeUntilExpiry <= renewalThreshold) {
         this.logger.log(`License expires in ${Math.floor(timeUntilExpiry / 3600)} hours - attempting renewal`);
         
