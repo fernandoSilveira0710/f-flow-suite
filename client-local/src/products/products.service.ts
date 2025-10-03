@@ -1,12 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { EventValidatorService } from '../common/validation/event-validator.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly logger = new Logger(ProductsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventValidator: EventValidatorService,
+  ) {}
 
   async create(createProductDto: CreateProductDto): Promise<ProductResponseDto> {
     const product = await this.prisma.product.create({
