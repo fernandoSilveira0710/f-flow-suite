@@ -1,4 +1,4 @@
-﻿Kit de arranque completo para você subir o Hub (cloud) e o Cliente local (on-premise) com licenças, entitlements, SQLite local, Postgres multi-tenant com RLS e sincronização via outbox.
+Kit de arranque completo para você subir o Hub (cloud) e o Cliente local (on-premise) com licenças, entitlements, SQLite local, Postgres multi-tenant com RLS e sincronização via outbox.
 
 Visão geral da arquitetura
 
@@ -221,10 +221,19 @@ npx prisma migrate dev
 npm run start:dev
 ```
 
+Implementações Concluídas
+- ✅ OIDC Authentication: Implementado OidcJwtStrategy com validação JWKS
+- ✅ License Guard: Validação de tokens de licença em rotas sensíveis
+- ✅ Dual Authentication: Combinação OIDC + License para máxima segurança
+- ✅ Environment Flags: OIDC_REQUIRED e LICENSING_ENFORCED para controle granular
+- ✅ Integration Tests: Cenários completos de autenticação e autorização
+- ✅ Postman Collection: Testes automatizados para todos os cenários
+- ✅ Documentation: README atualizado com configuração e rollback
+
 Próximos incrementos
-- OIDC real (Auth0/Keycloak/Cognito) substituindo mocks.
 - CRUD de métodos de pagamento no Hub + comando de distribuição p/ lojas.
 - Fila (SQS/Kafka) entre `/sync/events` e processamento assíncrono no Hub.
 - Relatórios: materialized views por `tenant_id` no Postgres.
 - Atualização automática do app local (code signing) + migrações idempotentes.
 - Observabilidade: Sentry + Prometheus/Grafana.
+- Frontend Integration: Substituir mocks por chamadas autenticadas ao Hub.
