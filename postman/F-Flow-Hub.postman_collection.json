@@ -77,8 +77,8 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status 201', function () {",
-                  "  pm.response.to.have.status(201);",
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
                   "});",
                   "",
                   "const json = pm.response.json();",
@@ -110,22 +110,17 @@
           ]
         },
         {
-          "name": "Status da Instalação",
+          "name": "Status da Instalação (Client)",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{license_token}}",
-                "type": "text"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{hub_url}}/install/status",
+              "raw": "{{client_local_url}}/licensing/install/status",
               "host": [
-                "{{hub_url}}"
+                "{{client_local_url}}"
               ],
               "path": [
+                "licensing",
                 "install",
                 "status"
               ]
@@ -142,8 +137,8 @@
                   "});",
                   "",
                   "const json = pm.response.json();",
-                  "pm.test('Retorna status da instalação', function () {",
-                  "  pm.expect(json).to.have.property('status');",
+                  "pm.test('Retorna informações de instalação', function () {",
+                  "  pm.expect(json).to.have.any.keys('needsSetup', 'status');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -152,22 +147,17 @@
           ]
         },
         {
-          "name": "Validar Licença",
+          "name": "Obter Licença (Client)",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{license_token}}",
-                "type": "text"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{hub_url}}/license",
+              "raw": "{{client_local_url}}/licensing/license",
               "host": [
-                "{{hub_url}}"
+                "{{client_local_url}}"
               ],
               "path": [
+                "licensing",
                 "license"
               ]
             }
@@ -234,7 +224,7 @@
           ]
         },
         {
-          "name": "Apenas OIDC (Espera 403)",
+          "name": "Token OIDC sem Licença (Espera 403)",
           "request": {
             "method": "GET",
             "header": [
@@ -276,19 +266,13 @@
           ]
         },
         {
-          "name": "OIDC + Licença (Espera 200)",
+          "name": "Licença Válida (Espera 200)",
           "request": {
             "method": "GET",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{oidc_token}}",
-                "type": "text",
-                "description": "Token OIDC válido"
-              },
-              {
-                "key": "X-License-Token",
-                "value": "{{license_token}}",
+                "value": "Bearer {{license_token}}",
                 "type": "text",
                 "description": "Token de licença válido"
               }
