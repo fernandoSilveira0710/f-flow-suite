@@ -73,33 +73,40 @@ model InventoryAdjustment {
 }
 
 model Customer {
-  id        String   @id @default(uuid())
-  name      String
-  email     String?  @unique
-  phone     String?
-  address   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String    @id @default(uuid())
+  name         String
+  documento    String?   // CPF/CNPJ
+  email        String?   @unique
+  phone        String?
+  dataNascISO  DateTime? // Data de nascimento
+  tags         String?   // JSON string for tags
+  notes        String?   // Notas/observações
+  address      String?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   appointments Appointment[]
-  sales     Sale[]
-  pets      Pet[]
+  sales        Sale[]
+  pets         Pet[]
   groomingTickets GroomingTicket[]
 }
 
 model Pet {
-  id        String    @id @default(uuid())
-  tutorId   String
-  tutor     Customer  @relation(fields: [tutorId], references: [id])
-  name      String
-  species   String
-  breed     String?
-  weight    Decimal?
-  birthDate DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id           String    @id @default(uuid())
+  tutorId      String
+  tutor        Customer  @relation(fields: [tutorId], references: [id])
+  name         String
+  species      String    // espécie (dog, cat, etc.)
+  breed        String?   // raça
+  weight       Decimal?  // peso
+  birthDate    DateTime? // dataNascimento
+  observations String?   // observações
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   appointments Appointment[]
   groomingTickets GroomingTicket[]
-  checkIns  CheckIn[]
+  checkIns     CheckIn[]
 
   @@index([tutorId])
 }
