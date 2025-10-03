@@ -1,8 +1,8 @@
-﻿{
+{
   "info": {
     "_postman_id": "f6d9b5b0-0000-0000-0000-000000000001",
     "name": "F-Flow Hub API",
-    "description": "Coleção para validar o Hub (health check, ativação de licença e variáveis comuns).",
+    "description": "Coleção para validar o Hub com autenticação OIDC e licenciamento (health check, ativação de licença, rotas protegidas).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -44,65 +44,383 @@
       ]
     },
     {
-      "name": "Ativar Licença",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"deviceId\": \"{{device_id}}\"\n}"
+      "name": "Licensing",
+      "item": [
+        {
+          "name": "Ativar Licença",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"deviceId\": \"{{device_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{hub_url}}/licenses/activate",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "licenses",
+                "activate"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Retorna token de licença', function () {",
+                  "  pm.expect(json).to.have.property('licenseToken');",
+                  "});",
+                  "",
+                  "if (json.licenseToken) {",
+                  "  pm.environment.set('license_token', json.licenseToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.environment.get('tenant_id')) {",
+                  "  throw new Error('Defina a variável de ambiente tenant_id antes de ativar a licença.');",
+                  "}",
+                  "if (!pm.environment.get('device_id')) {",
+                  "  pm.environment.set('device_id', 'dev-01');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         },
-        "url": {
-          "raw": "{{hub_url}}/licenses/activate",
-          "host": [
-            "{{hub_url}}"
-          ],
-          "path": [
-            "licenses",
-            "activate"
+        {
+          "name": "Status da Instalação",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{license_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{hub_url}}/install/status",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "install",
+                "status"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Retorna status da instalação', function () {",
+                  "  pm.expect(json).to.have.property('status');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validar Licença",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{license_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{hub_url}}/license",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "license"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Retorna dados da licença', function () {",
+                  "  pm.expect(json).to.have.property('tenant_id');",
+                  "  pm.expect(json).to.have.property('plan_id');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
           ]
         }
-      },
-      "response": [],
-      "event": [
+      ]
+    },
+    {
+      "name": "Auth - Cenários de Teste",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status 200', function () {",
-              "  pm.response.to.have.status(200);",
-              "});",
-              "",
-              "const json = pm.response.json();",
-              "pm.test('Retorna token de licença', function () {",
-              "  pm.expect(json).to.have.property('licenseToken');",
-              "});",
-              "",
-              "if (json.licenseToken) {",
-              "  pm.environment.set('license_token', json.licenseToken);",
-              "}"
-            ],
-            "type": "text/javascript"
-          }
+          "name": "Sem Tokens (Espera 401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{hub_url}}/tenants",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 - Unauthorized', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Mensagem de erro adequada', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.include('Missing or invalid identity token');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         },
         {
-          "listen": "prerequest",
-          "script": {
-            "exec": [
-              "if (!pm.environment.get('tenant_id')) {",
-              "  throw new Error('Defina a variável de ambiente tenant_id antes de ativar a licença.');",
-              "}",
-              "if (!pm.environment.get('device_id')) {",
-              "  pm.environment.set('device_id', 'dev-01');",
-              "}"
+          "name": "Apenas OIDC (Espera 403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oidc_token}}",
+                "type": "text",
+                "description": "Token OIDC válido (configurar na variável de ambiente)"
+              }
             ],
-            "type": "text/javascript"
-          }
+            "url": {
+              "raw": "{{hub_url}}/tenants",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 - Forbidden', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});",
+                  "",
+                  "pm.test('Mensagem de erro adequada', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.include('Missing or invalid license token');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "OIDC + Licença (Espera 200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oidc_token}}",
+                "type": "text",
+                "description": "Token OIDC válido"
+              },
+              {
+                "key": "X-License-Token",
+                "value": "{{license_token}}",
+                "type": "text",
+                "description": "Token de licença válido"
+              }
+            ],
+            "url": {
+              "raw": "{{hub_url}}/tenants",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 - Success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna lista de tenants', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sync Events - Sem Tokens (Espera 401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    {\n      \"id\": \"evt-001\",\n      \"type\": \"sale.created\",\n      \"payload\": {\n        \"saleId\": \"sale-123\",\n        \"total\": 50.00\n      },\n      \"createdAt\": \"2024-01-01T10:00:00Z\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{hub_url}}/tenants/{{tenant_id}}/sync/events",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants",
+                "{{tenant_id}}",
+                "sync",
+                "events"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 - Unauthorized', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Mensagem de erro adequada', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.include('Missing or invalid identity token');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sync Commands - Com Licença (Espera 200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{license_token}}",
+                "type": "text",
+                "description": "Para teste com OIDC desabilitado"
+              }
+            ],
+            "url": {
+              "raw": "{{hub_url}}/tenants/{{tenant_id}}/sync/commands?limit=10",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants",
+                "{{tenant_id}}",
+                "sync",
+                "commands"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 - Success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna comandos de sincronização', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('commands');",
+                  "  pm.expect(json.commands).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     }
