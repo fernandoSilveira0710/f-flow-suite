@@ -311,6 +311,257 @@ rm -rf ~/.local/share/f-flow-suite
 ./install-[platform].sh
 ```
 
+## 🔐 Sistema de Licenciamento
+
+O F-Flow Client Local inclui um sistema robusto de licenciamento que suporta tanto modo de desenvolvimento quanto produção.
+
+### Configuração de Licenciamento
+
+#### Variáveis de Ambiente
+
+```bash
+# Configuração obrigatória para produção
+LICENSING_ENFORCED=true|false          # Ativa/desativa verificação de licença
+HUB_BASE_URL=https://hub.f-flow.com    # URL do F-Flow Hub
+DEVICE_ID=unique-device-identifier     # ID único do dispositivo
+OFFLINE_GRACE_DAYS=7                   # Dias de tolerância offline (padrão: 7)
+
+# Chave pública RSA para verificação de tokens JWT
+LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
+-----END PUBLIC KEY-----"
+```
+
+#### Geração de Chaves RSA
+
+Para gerar um par de chaves RSA para o sistema de licenciamento:
+
+```bash
+# Gerar chave privada (para o Hub)
+openssl genrsa -out license-private-key.pem 2048
+
+# Extrair chave pública (para o Client Local)
+openssl rsa -in license-private-key.pem -pubout -out license-public-key.pem
+
+# Visualizar chave pública em formato PEM (para variável de ambiente)
+cat license-public-key.pem
+```
+
+### Endpoints de Licenciamento
+
+#### POST /licensing/activate
+Ativa uma licença no dispositivo.
+
+**Request:**
+```json
+{
+  "tenantId": "tenant-uuid",
+  "deviceId": "device-uuid",
+  "licenseKey": "license-key-optional"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "activated",
+  "message": "Licença ativada com sucesso",
+  "expiresIn": 2592000,
+  "graceDays": 7,
+  "plan": "pro"
+}
+```
+
+#### GET /licensing/install/status
+Verifica o status da instalação e licenciamento.
+
+**Response:**
+```json
+{
+  "needsSetup": false,
+  "status": "activated",
+  "plan": "pro",
+  "exp": 1672531200,
+  "grace": 7
+}
+```
+
+**Status possíveis:**
+- `activated`: Licença válida e ativa
+- `not_activated`: Sem licença ativada
+- `offline_grace`: Offline mas dentro do período de tolerância
+- `expired`: Licença expirada
+- `development`: Modo de desenvolvimento (LICENSING_ENFORCED=false)
+
+#### GET /licensing/license
+Retorna informações da licença atual.
+
+**Response:**
+```json
+{
+  "tenantId": "tenant-uuid",
+  "deviceId": "device-uuid",
+  "plan": "pro",
+  "status": "activated",
+  "entitlements": ["POS", "INVENTORY", "GROOMING"],
+  "expiresAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+### Modos de Operação
+
+#### Modo de Desenvolvimento
+Quando `LICENSING_ENFORCED=false`:
+- Todas as funcionalidades ficam disponíveis
+- Retorna dados mock para licenciamento
+- Não requer conexão com o Hub
+- Ideal para desenvolvimento e testes
+
+#### Modo de Produção
+Quando `LICENSING_ENFORCED=true`:
+- Requer licença válida para funcionar
+- Verifica tokens JWT com chave pública RSA
+- Suporte a modo offline com período de tolerância
+- Renovação automática de licenças
+
+### Cenários Offline
+
+O sistema suporta operação offline por um período configurável:
+
+1. **Conexão Normal**: Verifica licença no Hub regularmente
+2. **Modo Offline**: Usa token local por até `OFFLINE_GRACE_DAYS` dias
+3. **Expiração**: Bloqueia funcionalidades após período de tolerância
+
+### Testando o Sistema
+
+#### Testes Unitários
+```bash
+npm test -- --testPathPattern=licensing.service.spec.ts
+```
+
+#### Testes E2E
+```bash
+npm run test:e2e -- --testPathPattern=licensing.e2e-spec.ts
+```
+
+#### Teste Manual de Ativação
+
+**Como testar:**
+
+### 1. Preparação do Ambiente
+```bash
+# Na pasta client-local
+cd client-local
+
+# Instalar dependências
+npm install
+
+# Configurar variáveis de ambiente
+cp .env.example .env
+```
+
+### 2. Modo Desenvolvimento (sem enforcement)
+```bash
+# Editar .env e definir:
+LICENSING_ENFORCED=false
+
+# Iniciar o serviço
+npm run start:dev
+```
+
+### 3. Testar Endpoints (PowerShell)
+```powershell
+# Verificar status da instalação
+Invoke-RestMethod -Uri "http://localhost:3010/licensing/install/status" -Method GET
+
+# Ativar licença (simulação)
+Invoke-RestMethod -Uri "http://localhost:3010/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "test-tenant", "deviceId": "test-device"}'
+
+# Verificar licença atual
+Invoke-RestMethod -Uri "http://localhost:3010/licensing/license" -Method GET
+```
+
+### 4. Modo Produção (com enforcement)
+```bash
+# Editar .env e definir:
+LICENSING_ENFORCED=true
+
+# Gerar chaves RSA (se não existirem)
+openssl genrsa -out private_key.pem 2048
+openssl rsa -in private_key.pem -pubout -out public_key.pem
+
+# Configurar no .env:
+LICENSE_PUBLIC_KEY_PATH=./public_key.pem
+
+# Iniciar o serviço
+npm run start:dev
+```
+
+### 5. Executar Testes
+```bash
+# Testes unitários (alguns podem falhar em modo dev)
+npm test
+
+# Testes e2e
+npm run test:e2e
+
+# Testes com cobertura
+npm run test:cov
+```
+
+### 6. Testar Modo Offline
+1. Ativar uma licença válida
+2. Desconectar da internet
+3. Reiniciar o serviço
+4. Verificar se continua funcionando dentro do grace period (7 dias)
+
+### 7. Resultados Esperados
+
+**Status da Instalação (Modo Dev):**
+```json
+{
+  "needsSetup": false,
+  "status": "development", 
+  "plan": "development"
+}
+```
+
+**Ativação (Modo Dev):**
+```json
+{
+  "status": "activated",
+  "message": "Licensing not enforced in development mode"
+}
+```
+
+**Licença Atual (Modo Dev):**
+```json
+{
+  "tid": "dev-tenant",
+  "did": "00000000-0000-0000-0000-000000000000",
+  "plan": "enterprise",
+  "ent": ["POS", "INVENTORY", "GROOMING", "ANALYTICS"],
+  "exp": 1759582419,
+  "grace": 7,
+  "iat": 1759496019,
+  "iss": "dev-mode",
+  "status": "development"
+}
+```
+```
+
+### Middleware de Proteção
+
+O sistema inclui um `LicensingGuard` que pode ser aplicado a rotas que requerem licença válida:
+
+```typescript
+@UseGuards(LicensingGuard)
+@Get('protected-endpoint')
+async protectedEndpoint() {
+  // Este endpoint só funciona com licença válida
+}
+```
+
 ## 🔄 Rollback
 
 Para voltar ao modo de desenvolvimento:

@@ -17,6 +17,7 @@ export interface ActivateResponse {
 
 export interface InstallStatusResponse {
   needsSetup: boolean;
+  status: 'activated' | 'not_activated' | 'offline_grace' | 'expired' | 'development';
   plan?: string;
   exp?: number;
   grace?: number;
@@ -68,7 +69,7 @@ export class LicensingController {
       this.licensingService.logger.error('Failed to get install status', error);
       
       // In case of error, assume setup is needed
-      return { needsSetup: true };
+      return { needsSetup: true, status: 'not_activated' };
     }
   }
 

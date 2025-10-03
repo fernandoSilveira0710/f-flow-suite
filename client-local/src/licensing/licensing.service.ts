@@ -1,6 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { readFileSync } from 'node:fs';
-import * as jose from 'jose';
 import axios from 'axios';
 import { TokenStore } from './token.store';
 import { ActivateResponse, InstallStatusResponse } from './licensing.controller';
@@ -9,11 +8,12 @@ export interface LicenseToken {
   tid: string; // tenantId
   did: string; // deviceId
   plan: string;
-  ent: Record<string, unknown>; // entitlements
+  ent: Record<string, unknown> | string[]; // entitlements - can be object or array
   exp: number; // expiration timestamp
   grace: number; // grace days
   iat: number; // issued at
   iss: string; // issuer
+  status?: 'activated' | 'offline_grace' | 'expired' | 'development'; // status for response
 }
 
 @Injectable()
@@ -22,10 +22,12 @@ export class LicensingService implements OnModuleInit {
   private hubBaseUrl: string;
   private licensingEnforced: boolean;
   private publicKey: string | null = null;
+  private deviceId: string;
 
   constructor(private readonly tokenStore: TokenStore) {
     this.hubBaseUrl = process.env.HUB_BASE_URL || 'http://localhost:3000';
     this.licensingEnforced = process.env.LICENSING_ENFORCED === 'true';
+    this.deviceId = process.env.DEVICE_ID || 'dev-device';
     
     if (!this.licensingEnforced) {
       this.logger.warn('LICENSING_ENFORCED is disabled - running in development mode');
@@ -104,6 +106,7 @@ export class LicensingService implements OnModuleInit {
     if (!this.licensingEnforced) {
       return { 
         needsSetup: false,
+        status: 'development',
         plan: 'development'
       };
     }
@@ -113,30 +116,53 @@ export class LicensingService implements OnModuleInit {
       const token = await this.tokenStore.getToken();
       
       if (!token) {
-        return { needsSetup: true };
+        return { 
+          needsSetup: true,
+          status: 'not_activated'
+        };
       }
 
       // Validate the token
       const decodedToken = await this.validateAndDecodeToken(token);
       const now = Math.floor(Date.now() / 1000);
       
-      // Check if token is expired and outside grace period
+      // Check if token is still valid
+      if (now <= decodedToken.exp) {
+        return {
+          needsSetup: false,
+          status: 'activated',
+          plan: decodedToken.plan,
+          exp: decodedToken.exp,
+          grace: decodedToken.grace
+        };
+      }
+      
+      // Check if token is expired but within grace period
       const graceEndTime = decodedToken.exp + (decodedToken.grace * 86400); // grace in seconds
       
-      if (now > graceEndTime) {
-        this.logger.warn('License expired and outside grace period');
-        return { needsSetup: true };
+      if (now <= graceEndTime) {
+        return {
+          needsSetup: false,
+          status: 'offline_grace',
+          plan: decodedToken.plan,
+          exp: decodedToken.exp,
+          grace: decodedToken.grace
+        };
       }
-
-      return {
-        needsSetup: false,
-        plan: decodedToken.plan,
-        exp: decodedToken.exp,
-        grace: decodedToken.grace
+      
+      // Token expired and outside grace period
+      this.logger.warn('License expired and outside grace period');
+      return { 
+        needsSetup: true,
+        status: 'expired'
       };
+
     } catch (error) {
       this.logger.error('Failed to check install status', error);
-      return { needsSetup: true };
+      return { 
+        needsSetup: true,
+        status: 'not_activated'
+      };
     }
   }
 
@@ -144,13 +170,14 @@ export class LicensingService implements OnModuleInit {
     if (!this.licensingEnforced) {
       return {
         tid: 'dev-tenant',
-        did: 'dev-device',
-        plan: 'development',
-        ent: {},
+        did: this.deviceId,
+        plan: 'enterprise',
+        ent: ['POS', 'INVENTORY', 'GROOMING', 'ANALYTICS'],
         exp: Math.floor(Date.now() / 1000) + 86400, // 24h from now
         grace: 7,
         iat: Math.floor(Date.now() / 1000),
-        iss: 'dev-mode'
+        iss: 'dev-mode',
+        status: 'development'
       };
     }
 
@@ -161,7 +188,22 @@ export class LicensingService implements OnModuleInit {
         return null;
       }
 
-      return await this.validateAndDecodeToken(token);
+      const decodedToken = await this.validateAndDecodeToken(token);
+      const now = Math.floor(Date.now() / 1000);
+      
+      // Add status based on token validity
+      if (now <= decodedToken.exp) {
+        decodedToken.status = 'activated';
+      } else {
+        const graceEndTime = decodedToken.exp + (decodedToken.grace * 86400);
+        if (now <= graceEndTime) {
+          decodedToken.status = 'offline_grace';
+        } else {
+          decodedToken.status = 'expired';
+        }
+      }
+      
+      return decodedToken;
     } catch (error) {
       this.logger.error('Failed to get current license', error);
       return null;
@@ -172,8 +214,9 @@ export class LicensingService implements OnModuleInit {
     try {
       if (this.publicKey) {
         // Validate signature if public key is available
-        const publicKey = await jose.importSPKI(this.publicKey, 'RS256');
-        const { payload } = await jose.jwtVerify(token, publicKey, {
+        const { importSPKI, jwtVerify } = await import('jose');
+        const publicKey = await importSPKI(this.publicKey, 'RS256');
+        const { payload } = await jwtVerify(token, publicKey, {
           algorithms: ['RS256']
         });
         
@@ -181,7 +224,8 @@ export class LicensingService implements OnModuleInit {
       } else {
         // Just decode without validation if no public key
         this.logger.warn('No public key available - decoding token without signature validation');
-        const { payload } = jose.decodeJwt(token);
+        const { decodeJwt } = await import('jose');
+        const { payload } = decodeJwt(token);
         return payload as unknown as LicenseToken;
       }
     } catch (error) {
