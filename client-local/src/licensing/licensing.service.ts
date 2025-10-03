@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { readFileSync } from 'node:fs';
 import axios from 'axios';
 import { TokenStore } from './token.store';
@@ -24,10 +25,13 @@ export class LicensingService implements OnModuleInit {
   private publicKey: string | null = null;
   private deviceId: string;
 
-  constructor(private readonly tokenStore: TokenStore) {
-    this.hubBaseUrl = process.env.HUB_BASE_URL || 'http://localhost:3000';
-    this.licensingEnforced = process.env.LICENSING_ENFORCED === 'true';
-    this.deviceId = process.env.DEVICE_ID || 'dev-device';
+  constructor(
+    private readonly tokenStore: TokenStore,
+    private readonly configService: ConfigService
+  ) {
+    this.hubBaseUrl = this.configService.get<string>('HUB_BASE_URL', 'http://localhost:3000');
+    this.licensingEnforced = this.configService.get<string>('LICENSING_ENFORCED', 'false') === 'true';
+    this.deviceId = this.configService.get<string>('DEVICE_ID', 'dev-device');
     
     if (!this.licensingEnforced) {
       this.logger.warn('LICENSING_ENFORCED is disabled - running in development mode');
@@ -37,7 +41,7 @@ export class LicensingService implements OnModuleInit {
   async onModuleInit() {
     // Load public key if available
     try {
-      const publicKeyPem = process.env.LICENSE_PUBLIC_KEY_PEM;
+      const publicKeyPem = this.configService.get<string>('LICENSE_PUBLIC_KEY_PEM');
       if (publicKeyPem) {
         this.publicKey = publicKeyPem;
         this.logger.log('License public key loaded for token validation');
@@ -103,22 +107,22 @@ export class LicensingService implements OnModuleInit {
   }
 
   async getInstallStatus(): Promise<InstallStatusResponse> {
-    if (!this.licensingEnforced) {
-      return { 
-        needsSetup: false,
-        status: 'development',
-        plan: 'development'
-      };
-    }
-
     try {
-      // Try to get stored token
-      const token = await this.tokenStore.getToken();
+      // Try to get stored token - pass deviceId for proper token retrieval
+      const token = await this.tokenStore.getToken(undefined, this.deviceId);
       
       if (!token) {
         return { 
           needsSetup: true,
           status: 'not_activated'
+        };
+      }
+
+      if (!this.licensingEnforced) {
+        return { 
+          needsSetup: false,
+          status: 'development',
+          plan: 'development'
         };
       }
 
@@ -225,7 +229,7 @@ export class LicensingService implements OnModuleInit {
         // Just decode without validation if no public key
         this.logger.warn('No public key available - decoding token without signature validation');
         const { decodeJwt } = await import('jose');
-        const { payload } = decodeJwt(token);
+        const payload = decodeJwt(token);
         return payload as unknown as LicenseToken;
       }
     } catch (error) {
