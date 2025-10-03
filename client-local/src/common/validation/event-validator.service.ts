@@ -2,13 +2,20 @@ import { Injectable, Logger } from '@nestjs/common';
 import Ajv, { JSONSchemaType, ValidateFunction } from 'ajv';
 import addFormats from 'ajv-formats';
 import {
-  productUpsertedEventSchema,
-  productDeletedEventSchema,
-  inventoryAdjustedEventSchema,
   ProductUpsertedEventPayload,
   ProductDeletedEventPayload,
+  productUpsertedEventSchema,
+  productDeletedEventSchema,
   InventoryAdjustedEventPayload,
+  inventoryAdjustedEventSchema,
+  SaleCreatedEventPayload,
+  saleCreatedEventSchema,
 } from './schemas';
+
+export interface ValidationResult {
+  valid: boolean;
+  errors?: string[];
+}
 
 @Injectable()
 export class EventValidatorService {
@@ -17,13 +24,13 @@ export class EventValidatorService {
   private readonly validators: Map<string, ValidateFunction<any>> = new Map();
 
   constructor() {
-    this.ajv = new Ajv({ allErrors: true, strict: true });
+    this.ajv = new Ajv({ allErrors: true });
     addFormats(this.ajv);
-    this.initializeValidators();
+    this.initializeSchemas();
   }
 
-  private initializeValidators(): void {
-    // Product event validators
+  private initializeSchemas(): void {
+    // Product event schemas
     this.validators.set(
       'product.upserted.v1',
       this.ajv.compile(productUpsertedEventSchema)
@@ -33,55 +40,59 @@ export class EventValidatorService {
       this.ajv.compile(productDeletedEventSchema)
     );
 
-    // Inventory event validators
+    // Inventory event schemas
     this.validators.set(
       'inventory.adjusted.v1',
       this.ajv.compile(inventoryAdjustedEventSchema)
     );
 
-    this.logger.log(`Initialized ${this.validators.size} event validators`);
+    // Sale event schemas
+    this.validators.set(
+      'sale.created.v1',
+      this.ajv.compile(saleCreatedEventSchema)
+    );
+
+    this.logger.log('Event validation schemas initialized');
   }
 
-  validateEvent(eventType: string, payload: any): { valid: boolean; errors?: string[] } {
+  validateEvent(eventType: string, payload: unknown): ValidationResult {
     const validator = this.validators.get(eventType);
-    
     if (!validator) {
-      this.logger.warn(`No validator found for event type: ${eventType}`);
-      return { valid: false, errors: [`Unknown event type: ${eventType}`] };
+      return {
+        valid: false,
+        errors: [`Unknown event type: ${eventType}`],
+      };
     }
 
-    const valid = validator(payload);
-    
-    if (!valid) {
-      const errors = validator.errors?.map(error => {
-        const path = error.instancePath || 'root';
-        return `${path}: ${error.message}`;
-      }) || ['Unknown validation error'];
+    const isValid = validator(payload);
+    if (!isValid) {
+      const errors = validator.errors?.map(
+        (error) => `${error.instancePath} ${error.message}`
+      ) || ['Unknown validation error'];
       
-      this.logger.warn(`Validation failed for event ${eventType}:`, errors);
-      return { valid: false, errors };
+      return {
+        valid: false,
+        errors,
+      };
     }
 
-    this.logger.debug(`Event ${eventType} validated successfully`);
     return { valid: true };
   }
 
-  validateProductUpsertedEvent(payload: any): payload is ProductUpsertedEventPayload {
-    const result = this.validateEvent('product.upserted.v1', payload);
-    return result.valid;
+  // Type-safe validation methods
+  validateProductUpsertedEvent(payload: unknown): payload is ProductUpsertedEventPayload {
+    return this.validateEvent('product.upserted.v1', payload).valid;
   }
 
-  validateProductDeletedEvent(payload: any): payload is ProductDeletedEventPayload {
-    const result = this.validateEvent('product.deleted.v1', payload);
-    return result.valid;
+  validateProductDeletedEvent(payload: unknown): payload is ProductDeletedEventPayload {
+    return this.validateEvent('product.deleted.v1', payload).valid;
   }
 
-  validateInventoryAdjustedEvent(payload: any): payload is InventoryAdjustedEventPayload {
-    const result = this.validateEvent('inventory.adjusted.v1', payload);
-    return result.valid;
+  validateInventoryAdjustedEvent(payload: unknown): payload is InventoryAdjustedEventPayload {
+    return this.validateEvent('inventory.adjusted.v1', payload).valid;
   }
 
-  getSupportedEventTypes(): string[] {
-    return Array.from(this.validators.keys());
+  validateSaleCreatedEvent(payload: unknown): payload is SaleCreatedEventPayload {
+    return this.validateEvent('sale.created.v1', payload).valid;
   }
 }
