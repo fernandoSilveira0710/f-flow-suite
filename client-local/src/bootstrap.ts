@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'fs-extra';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -78,7 +78,18 @@ export function ensureDirectories(dataDir: string, logDir: string): void {
  * Setup database URL
  */
 export function setupDatabase(dataDir: string): string {
+  const logger = new Logger('Bootstrap');
   const dbPath = path.join(dataDir, 'local.db');
+  
+  // Se estiver rodando em binário (pkg) e o banco não existir, copiar do semente
+  if ((process as any).pkg && !fs.existsSync(dbPath)) {
+    const seedDbPath = path.join(__dirname, '..', 'prisma', 'local.db');
+    if (fs.existsSync(seedDbPath)) {
+      fs.copySync(seedDbPath, dbPath);
+      logger.log('Copied seed database to data directory');
+    }
+  }
+  
   return `file:${dbPath}`;
 }
 
@@ -87,6 +98,12 @@ export function setupDatabase(dataDir: string): string {
  */
 export async function runMigrations(databaseUrl: string): Promise<void> {
   const logger = new Logger('Bootstrap');
+  
+  // Se estiver rodando em binário (pkg), não execute migrations
+  if ((process as any).pkg) {
+    logger.warn('Running in packaged mode; skipping Prisma migrations');
+    return;
+  }
   
   try {
     // Set DATABASE_URL for Prisma
