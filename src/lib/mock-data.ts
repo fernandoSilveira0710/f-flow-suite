@@ -33,7 +33,7 @@ export interface DashboardKPI {
   trend: 'up' | 'down';
 }
 
-let mockProducts: Product[] = [
+const mockProducts: Product[] = [
   {
     id: '1',
     name: 'Ração Premium 15kg',
