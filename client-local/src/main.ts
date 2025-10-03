@@ -1,24 +1,22 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { AppModule } from './app.module';
 import { loadEnvConfig } from './common/env';
+import { bootstrap } from './bootstrap';
+import { runAsWindowsService } from './windows-service';
 
-async function bootstrap() {
+async function main() {
+  // Load environment configuration
   loadEnvConfig();
-
-  const app = await NestFactory.create(AppModule, {
-    bufferLogs: true,
-  });
-
-  const port = process.env.PORT ? Number(process.env.PORT) : 3010;
-  await app.listen(port);
-
-  const logger = new Logger('Bootstrap');
-  logger.log(`Client-local API listening on port ${port}`);
+  
+  // Check if running as Windows service
+  if (process.platform === 'win32' && process.argv.includes('--service')) {
+    // Run with Windows service integration
+    await runAsWindowsService(bootstrap);
+  } else {
+    // Run normally
+    await bootstrap();
+  }
 }
 
-bootstrap().catch((error) => {
-  const logger = new Logger('Bootstrap');
-  logger.error('Failed to start client-local service', error);
+main().catch((error) => {
+  console.error('Failed to start application:', error);
   process.exit(1);
 });
