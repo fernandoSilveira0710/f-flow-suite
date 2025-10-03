@@ -139,6 +139,10 @@ model Product {
   stockQty    Int      @default(0)
   category    String?
   barcode     String?
+  unit        String?  // Added field for product unit
+  minStock    Int?     // Added field for minimum stock level
+  maxStock    Int?     // Added field for maximum stock level
+  trackStock  Boolean  @default(true) // Added field to enable/disable stock tracking
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
