@@ -1,4 +1,4 @@
-﻿import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import * as jose from 'jose';
 
@@ -41,8 +41,8 @@ export class LicensesService {
     const privateKey = await jose.importPKCS8(privateKeyPem, 'RS256');
 
     const token = await new jose.SignJWT(payload)
-      .setProtectedHeader({ alg: 'RS256' })
-      .setExpirationTime('24h')
+      .setProtectedHeader({ alg: 'RS256', kid: 'license-key' })
+      .setExpirationTime(payload.exp)
       .sign(privateKey);
 
     return token;
