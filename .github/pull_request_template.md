@@ -2,7 +2,7 @@
 
 ## 📋 Etapa do Roadmap
 - [X] Etapa 1 — Setup de DEV e Padrões de Projeto
-- [ ] Etapa 2 — Autenticação e Licenças
+- [X] Etapa 2 — Autenticação e Licenças
 - [ ] Etapa 3 — Sync Agent Completo
 - [ ] Etapa 4 — Features do POS
 - [ ] Etapa 5 — Features do Grooming
