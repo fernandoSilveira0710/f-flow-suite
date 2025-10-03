@@ -10,6 +10,14 @@ import {
   inventoryAdjustedEventSchema,
   SaleCreatedEventPayload,
   saleCreatedEventSchema,
+  CustomerUpsertedEventPayload,
+  CustomerDeletedEventPayload,
+  customerUpsertedEventSchema,
+  customerDeletedEventSchema,
+  PetUpsertedEventPayload,
+  PetDeletedEventPayload,
+  petUpsertedEventSchema,
+  petDeletedEventSchema,
 } from './schemas';
 
 export interface ValidationResult {
@@ -50,6 +58,26 @@ export class EventValidatorService {
     this.validators.set(
       'sale.created.v1',
       this.ajv.compile(saleCreatedEventSchema)
+    );
+
+    // Customer event schemas
+    this.validators.set(
+      'customer.upserted.v1',
+      this.ajv.compile(customerUpsertedEventSchema)
+    );
+    this.validators.set(
+      'customer.deleted.v1',
+      this.ajv.compile(customerDeletedEventSchema)
+    );
+
+    // Pet event schemas
+    this.validators.set(
+      'pet.upserted.v1',
+      this.ajv.compile(petUpsertedEventSchema)
+    );
+    this.validators.set(
+      'pet.deleted.v1',
+      this.ajv.compile(petDeletedEventSchema)
     );
 
     this.logger.log('Event validation schemas initialized');
@@ -94,5 +122,21 @@ export class EventValidatorService {
 
   validateSaleCreatedEvent(payload: unknown): payload is SaleCreatedEventPayload {
     return this.validateEvent('sale.created.v1', payload).valid;
+  }
+
+  validateCustomerUpsertedEvent(payload: unknown): payload is CustomerUpsertedEventPayload {
+    return this.validateEvent('customer.upserted.v1', payload).valid;
+  }
+
+  validateCustomerDeletedEvent(payload: unknown): payload is CustomerDeletedEventPayload {
+    return this.validateEvent('customer.deleted.v1', payload).valid;
+  }
+
+  validatePetUpsertedEvent(payload: unknown): payload is PetUpsertedEventPayload {
+    return this.validateEvent('pet.upserted.v1', payload).valid;
+  }
+
+  validatePetDeletedEvent(payload: unknown): payload is PetDeletedEventPayload {
+    return this.validateEvent('pet.deleted.v1', payload).valid;
   }
 }

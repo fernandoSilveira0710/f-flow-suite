@@ -33,6 +33,14 @@ import EditarProfissional from './pages/erp/agenda/profissionais/[id]/editar';
 import ClientesIndex from './pages/erp/agenda/clientes/index';
 import NovoCliente from './pages/erp/agenda/clientes/novo';
 import EditarCliente from './pages/erp/agenda/clientes/[id]/editar';
+
+// New Customer & Pet pages
+import ClientesIndexNew from './pages/erp/clientes/index';
+import NovoClienteNew from './pages/erp/clientes/novo';
+import EditarClienteNew from './pages/erp/clientes/[id]';
+import GerenciarPetsCliente from './pages/erp/clientes/[id]/pets/index';
+import NovoPetCliente from './pages/erp/clientes/[id]/pets/novo';
+import EditarPetCliente from './pages/erp/clientes/[id]/pets/[petId]';
 import AgendaIndex from './pages/erp/agenda/index';
 import NovoAgendamento from './pages/erp/agenda/novo';
 import AgendamentoDetalhe from './pages/erp/agenda/[id]';
@@ -143,6 +151,14 @@ function App() {
           <Route path="agenda/clientes" element={<ClientesIndex />} />
           <Route path="agenda/clientes/novo" element={<NovoCliente />} />
           <Route path="agenda/clientes/:id/editar" element={<EditarCliente />} />
+          
+          {/* New Customers Routes */}
+          <Route path="clientes" element={<ClientesIndexNew />} />
+          <Route path="clientes/novo" element={<NovoClienteNew />} />
+          <Route path="clientes/:id" element={<EditarClienteNew />} />
+          <Route path="clientes/:id/pets" element={<GerenciarPetsCliente />} />
+          <Route path="clientes/:id/pets/novo" element={<NovoPetCliente />} />
+          <Route path="clientes/:id/pets/:petId" element={<EditarPetCliente />} />
           
           {/* Grooming Routes */}
           <Route path="grooming" element={<GroomingIndex />} />
