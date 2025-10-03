@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
 import { InventoryController } from './inventory.controller';
 import { InventoryService } from './inventory.service';
-import { PrismaModule } from '../common/prisma/prisma.module';
-import { ValidationModule } from '../common/validation/validation.module';
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule, ValidationModule],
+  imports: [PrismaModule],
   controllers: [InventoryController],
   providers: [InventoryService],
   exports: [InventoryService],
