@@ -157,6 +157,58 @@ curl -X POST http://localhost:8080/licenses/activate \
 
 Para validar RLS, execute uma query com `x-tenant-id` incorreto: o select deve retornar zero linhas.
 
+#### Autenticação OIDC e Licenciamento
+
+O Hub implementa autenticação dupla:
+1. **OIDC (OpenID Connect)**: Validação de identidade via token JWT do IdP
+2. **Licenciamento**: Validação de licença e entitlements via token próprio
+
+##### Configuração OIDC
+
+Variáveis de ambiente necessárias no `hub/.env`:
+```bash
+# OIDC Configuration
+OIDC_REQUIRED=true                                    # Habilita validação OIDC
+OIDC_JWKS_URL=https://your-idp.com/.well-known/jwks.json
+OIDC_ISSUER=https://your-idp.com/
+OIDC_AUDIENCE=f-flow-suite-hub
+
+# Licensing Configuration  
+LICENSING_ENFORCED=true                               # Habilita validação de licença
+LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+```
+
+##### Rotas Protegidas
+
+As seguintes rotas requerem ambos os tokens:
+- `/tenants/*` - Gestão de tenants
+- `/tenants/{id}/sync/*` - Sincronização de dados
+
+**Headers necessários:**
+```bash
+Authorization: Bearer <oidc-token>      # Token do IdP (Auth0, Keycloak, etc.)
+X-License-Token: <license-token>        # Token de licença obtido via /licenses/activate
+```
+
+##### Cenários de Teste (Postman)
+
+A coleção Postman inclui cenários para validar:
+1. **Sem tokens** → 401 Unauthorized
+2. **Apenas OIDC** → 403 Forbidden (falta licença)
+3. **OIDC + Licença** → 200 Success
+
+##### Rollback para Desenvolvimento
+
+Para desabilitar autenticação durante desenvolvimento:
+```bash
+# Desabilita OIDC (apenas licença será validada)
+OIDC_REQUIRED=false
+
+# Desabilita ambos (acesso livre)
+OIDC_REQUIRED=false
+LICENSING_ENFORCED=false
+```
+
 ## 3. Cliente Local (NestJS + SQLite)
 Local: `client-local/`
 - Módulos: `pos`, `inventory`, `grooming`, `licensing`, `sync-agent`.

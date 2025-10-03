@@ -1,14 +1,17 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { SyncService, OutboxEvent } from './sync.service';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { SyncService } from './sync.service';
+import { OidcGuard } from '../auth/oidc.guard';
+import { LicenseGuard } from '../auth/license.guard';
 
 @Controller('tenants/:tenantId/sync')
+@UseGuards(OidcGuard, LicenseGuard)
 export class SyncController {
   constructor(private readonly syncService: SyncService) {}
 
   @Post('events')
   async pushEvents(
     @Param('tenantId') tenantId: string,
-    @Body('events') events: OutboxEvent[] = [],
+    @Body('events') events: any[] = [],
   ) {
     await this.syncService.ingestEvents(tenantId, events);
     return { accepted: events.length };
