@@ -37,25 +37,48 @@ try {
     $existingService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
     if ($existingService) {
         Write-Host "Stopping existing service..."
-        Stop-Service -Name $ServiceName -Force
-        Start-Sleep -Seconds 2
+        Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 3
     }
 
-    # Remove existing service
-    $scResult = sc.exe delete $ServiceName
+    # Remove existing service using sc.exe with proper error handling
+    Write-Host "Removing any existing service..."
+    $deleteResult = sc.exe delete $ServiceName 2>&1
     if ($LASTEXITCODE -eq 0) {
         Write-Host "Removed existing service"
-        Start-Sleep -Seconds 2
+    } elseif ($LASTEXITCODE -eq 1060) {
+        Write-Host "No existing service found (this is normal)"
+    } else {
+        Write-Warning "Service deletion returned code $LASTEXITCODE : $deleteResult"
     }
+    Start-Sleep -Seconds 3
 
-    # Create new service
+    # Create new service with proper error handling
     Write-Host "Creating service..."
-    $scCreateResult = sc.exe create $ServiceName binPath= "`"$BinaryPath`" --service" start= auto DisplayName= $DisplayName
+    $createResult = sc.exe create $ServiceName binPath= "`"$BinaryPath --service`"" start= auto DisplayName= "`"$DisplayName`"" 2>&1
     
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Failed to create service. Exit code: $LASTEXITCODE"
+        Write-Error "Failed to create service. Exit code: $LASTEXITCODE. Output: $createResult"
+        
+        # Additional troubleshooting info
+        Write-Host "Troubleshooting information:"
+        Write-Host "- Service Name: $ServiceName"
+        Write-Host "- Binary Path: $BinaryPath"
+        Write-Host "- Binary Exists: $(Test-Path $BinaryPath)"
+        
+        # Check if service already exists with different method
+        $existingServices = Get-WmiObject -Class Win32_Service | Where-Object { $_.Name -eq $ServiceName }
+        if ($existingServices) {
+            Write-Host "- Service already exists in WMI"
+            foreach ($svc in $existingServices) {
+                Write-Host "  State: $($svc.State), Status: $($svc.Status)"
+            }
+        }
+        
         exit 1
     }
+
+    Write-Host "Service created successfully"
 
     # Set service description
     sc.exe description $ServiceName $Description
