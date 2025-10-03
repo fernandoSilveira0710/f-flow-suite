@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsNumber, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class InventoryAdjustmentItemDto {
@@ -10,10 +10,6 @@ export class InventoryAdjustmentItemDto {
 
   @IsString()
   reason: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
 }
 
 export class AdjustInventoryDto {
