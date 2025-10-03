@@ -1,24 +1,8 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { AppModule } from './app.module';
 import { loadEnvConfig } from './common/env';
+import { bootstrap } from './bootstrap';
 
-async function bootstrap() {
-  loadEnvConfig();
+// Load environment configuration first
+loadEnvConfig();
 
-  const app = await NestFactory.create(AppModule, {
-    bufferLogs: true,
-  });
-
-  const port = process.env.PORT ? Number(process.env.PORT) : 3010;
-  await app.listen(port);
-
-  const logger = new Logger('Bootstrap');
-  logger.log(`Client-local API listening on port ${port}`);
-}
-
-bootstrap().catch((error) => {
-  const logger = new Logger('Bootstrap');
-  logger.error('Failed to start client-local service', error);
-  process.exit(1);
-});
+// Start the application using the new bootstrap system
+bootstrap();
