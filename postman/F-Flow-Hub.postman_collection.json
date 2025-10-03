@@ -1,8 +1,8 @@
-﻿{
+{
   "info": {
     "_postman_id": "f6d9b5b0-0000-0000-0000-000000000001",
     "name": "F-Flow Hub API",
-    "description": "Coleção para validar o Hub (health check, ativação de licença e variáveis comuns).",
+    "description": "Coleção para validar o Hub com autenticação OIDC e licenciamento (health check, ativação de licença, rotas protegidas).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -44,65 +44,516 @@
       ]
     },
     {
-      "name": "Ativar Licença",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"deviceId\": \"{{device_id}}\"\n}"
+      "name": "Licensing",
+      "item": [
+        {
+          "name": "Ativar Licença",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"deviceId\": \"{{device_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{hub_url}}/licenses/activate",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "licenses",
+                "activate"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Retorna token de licença', function () {",
+                  "  pm.expect(json).to.have.property('licenseToken');",
+                  "});",
+                  "",
+                  "if (json.licenseToken) {",
+                  "  pm.environment.set('license_token', json.licenseToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.environment.get('tenant_id')) {",
+                  "  throw new Error('Defina a variável de ambiente tenant_id antes de ativar a licença.');",
+                  "}",
+                  "if (!pm.environment.get('device_id')) {",
+                  "  pm.environment.set('device_id', 'dev-01');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         },
-        "url": {
-          "raw": "{{hub_url}}/licenses/activate",
-          "host": [
-            "{{hub_url}}"
-          ],
-          "path": [
-            "licenses",
-            "activate"
+        {
+          "name": "Status da Instalação (Client)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/licensing/install/status",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "licensing",
+                "install",
+                "status"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Retorna informações de instalação', function () {",
+                  "  pm.expect(json).to.have.any.keys('needsSetup', 'status');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obter Licença (Client)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/licensing/license",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "licensing",
+                "license"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('Retorna dados da licença', function () {",
+                  "  pm.expect(json).to.have.property('tenant_id');",
+                  "  pm.expect(json).to.have.property('plan_id');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
           ]
         }
-      },
-      "response": [],
-      "event": [
+      ]
+    },
+    {
+      "name": "Auth - Cenários de Teste",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status 200', function () {",
-              "  pm.response.to.have.status(200);",
-              "});",
-              "",
-              "const json = pm.response.json();",
-              "pm.test('Retorna token de licença', function () {",
-              "  pm.expect(json).to.have.property('licenseToken');",
-              "});",
-              "",
-              "if (json.licenseToken) {",
-              "  pm.environment.set('license_token', json.licenseToken);",
-              "}"
-            ],
-            "type": "text/javascript"
-          }
+          "name": "Sem Tokens (Espera 401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{hub_url}}/tenants",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 - Unauthorized', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Mensagem de erro adequada', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.include('Missing or invalid identity token');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         },
         {
-          "listen": "prerequest",
-          "script": {
-            "exec": [
-              "if (!pm.environment.get('tenant_id')) {",
-              "  throw new Error('Defina a variável de ambiente tenant_id antes de ativar a licença.');",
-              "}",
-              "if (!pm.environment.get('device_id')) {",
-              "  pm.environment.set('device_id', 'dev-01');",
-              "}"
+          "name": "Token OIDC sem Licença (Espera 403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{oidc_token}}",
+                "type": "text",
+                "description": "Token OIDC válido (configurar na variável de ambiente)"
+              }
             ],
-            "type": "text/javascript"
-          }
+            "url": {
+              "raw": "{{hub_url}}/tenants",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 - Forbidden', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});",
+                  "",
+                  "pm.test('Mensagem de erro adequada', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.include('Missing or invalid license token');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Licença Válida (Espera 200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{license_token}}",
+                "type": "text",
+                "description": "Token de licença válido"
+              }
+            ],
+            "url": {
+              "raw": "{{hub_url}}/tenants",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 - Success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna lista de tenants', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sync Events - Sem Tokens (Espera 401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    {\n      \"id\": \"evt-001\",\n      \"type\": \"sale.created\",\n      \"payload\": {\n        \"saleId\": \"sale-123\",\n        \"total\": 50.00\n      },\n      \"createdAt\": \"2024-01-01T10:00:00Z\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{hub_url}}/tenants/{{tenant_id}}/sync/events",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants",
+                "{{tenant_id}}",
+                "sync",
+                "events"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 - Unauthorized', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Mensagem de erro adequada', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.message).to.include('Missing or invalid identity token');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sync Commands - Com Licença (Espera 200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{license_token}}",
+                "type": "text",
+                "description": "Para teste com OIDC desabilitado"
+              }
+            ],
+            "url": {
+              "raw": "{{hub_url}}/tenants/{{tenant_id}}/sync/commands?limit=10",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants",
+                "{{tenant_id}}",
+                "sync",
+                "commands"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 - Success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna comandos de sincronização', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('commands');",
+                  "  pm.expect(json.commands).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Client-Local API",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/health",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna status ok', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('ok');",
+                  "  pm.expect(body.service).to.eql('f-flow-client-local');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sync Test",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/sync/test",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "sync",
+                "test"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna resultado de push e pull', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('push');",
+                  "  pm.expect(body).to.have.property('pull');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Push Events",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    {\n      \"id\": \"evt-001\",\n      \"aggregate\": \"sale\",\n      \"type\": \"sale.created\",\n      \"payload\": {\n        \"saleId\": \"sale-123\",\n        \"amount\": 100.50\n      },\n      \"occurredAt\": \"2024-01-01T10:00:00Z\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{client_local_url}}/sync/push",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "sync",
+                "push"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pull Commands",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/sync/pull",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "sync",
+                "pull"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     }
