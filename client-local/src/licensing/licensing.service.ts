@@ -172,12 +172,16 @@ export class LicensingService implements OnModuleInit {
 
   async getCurrentLicense(): Promise<LicenseToken | null> {
     if (!this.licensingEnforced) {
+      // Get development license expiration from environment or default to 24 hours
+      const devExpirationHours = parseInt(process.env.LICENSE_DEV_EXPIRATION_HOURS || '24', 10);
+      const devExpirationSeconds = devExpirationHours * 3600;
+      
       return {
         tid: 'dev-tenant',
         did: this.deviceId,
         plan: 'enterprise',
         ent: ['POS', 'INVENTORY', 'GROOMING', 'ANALYTICS'],
-        exp: Math.floor(Date.now() / 1000) + 86400, // 24h from now
+        exp: Math.floor(Date.now() / 1000) + devExpirationSeconds,
         grace: 7,
         iat: Math.floor(Date.now() / 1000),
         iss: 'dev-mode',

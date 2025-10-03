@@ -36,14 +36,24 @@ export class LicenseGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<Request>();
-    const authHeader = request.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      this.logger.warn('Missing or invalid Authorization header for license token');
-      throw new ForbiddenException('Missing or invalid license token');
+    
+    // Try X-License-Token header first (preferred)
+    let token = request.headers['x-license-token'] as string;
+    
+    // Fallback to Authorization header if X-License-Token is not present
+    // This maintains backward compatibility
+    if (!token) {
+      const authHeader = request.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7); // Remove 'Bearer ' prefix
+        this.logger.debug('Using Authorization header for license token (consider using X-License-Token)');
+      }
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    if (!token) {
+      this.logger.warn('Missing license token in X-License-Token or Authorization header');
+      throw new ForbiddenException('Missing or invalid license token');
+    }
 
     try {
       // Validate and decode the license token

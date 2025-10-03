@@ -48,8 +48,8 @@ export class OidcJwtStrategy extends PassportStrategy(Strategy, 'oidc-jwt') {
       });
 
       this.jwksClientInitialized = true;
-    } catch (error) {
-      throw new Error(`Failed to initialize JWKS client: ${error.message}`);
+    } catch (error: any) {
+      throw new Error(`Failed to initialize JWKS client: ${error?.message || 'Unknown error'}`);
     }
   }
 
@@ -72,9 +72,13 @@ export class OidcJwtStrategy extends PassportStrategy(Strategy, 'oidc-jwt') {
         const key = await this.jwksClient.getSigningKey(kid);
         signingKey = key.getPublicKey();
         this.cache.set(cacheKey, signingKey);
-      } catch (error) {
-        throw new UnauthorizedException(`Unable to find signing key: ${error.message}`);
+      } catch (error: any) {
+        throw new UnauthorizedException(`Unable to find signing key: ${error?.message || 'Unknown error'}`);
       }
+    }
+
+    if (!signingKey) {
+      throw new UnauthorizedException('Unable to retrieve signing key');
     }
 
     return signingKey;

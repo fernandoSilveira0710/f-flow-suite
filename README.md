@@ -190,6 +190,11 @@ Authorization: Bearer <oidc-token>      # Token do IdP (Auth0, Keycloak, etc.)
 X-License-Token: <license-token>        # Token de licença obtido via /licenses/activate
 ```
 
+**Nota sobre Headers:**
+- O cabeçalho `X-License-Token` é preferido para tokens de licença
+- Por compatibilidade, o `Authorization: Bearer` ainda funciona quando apenas licença é necessária
+- Quando ambos OIDC e licença são necessários, use `Authorization` para OIDC e `X-License-Token` para licença
+
 ##### Cenários de Teste (Postman)
 
 A coleção Postman inclui cenários para validar:
