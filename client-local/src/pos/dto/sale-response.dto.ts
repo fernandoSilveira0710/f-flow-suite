@@ -11,7 +11,7 @@ export class SaleResponseDto {
   id: string;
   code: string;
   operator: string;
-  payment: string;
+  paymentMethod: string;
   status: string;
   total: number;
   customerId?: string;

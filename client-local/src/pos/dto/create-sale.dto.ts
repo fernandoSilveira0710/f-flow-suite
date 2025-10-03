@@ -7,7 +7,7 @@ export class CreateSaleDto {
   operator: string;
 
   @IsString()
-  payment: string;
+  paymentMethod: string;
 
   @IsOptional()
   @IsString()
