@@ -441,7 +441,7 @@ npm test -- --testPathPattern=licensing.service.spec.ts
 
 #### Testes E2E
 ```bash
-npm run test:e2e -- --testPathPattern=licensing.e2e-spec.ts
+npm run test:e2e
 ```
 
 #### Teste Manual de Ativação
