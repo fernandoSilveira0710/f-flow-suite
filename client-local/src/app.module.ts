@@ -5,17 +5,17 @@ import { InventoryModule } from './inventory/inventory.module';
 import { GroomingModule } from './grooming/grooming.module';
 import { LicensingModule } from './licensing/licensing.module';
 import { SyncAgentModule } from './sync-agent/sync.module';
-import { HealthModule } from './health/health.module';
+import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    HealthModule,
     LicensingModule,
     PosModule,
     InventoryModule,
     GroomingModule,
     SyncAgentModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

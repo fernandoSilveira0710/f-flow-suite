@@ -8,7 +8,7 @@ export class HealthController {
       status: 'ok',
       timestamp: new Date().toISOString(),
       service: 'f-flow-client-local',
-      version: '1.0.0'
+      version: '1.0.0',
     };
   }
 }
