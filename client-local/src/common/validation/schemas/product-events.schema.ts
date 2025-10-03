@@ -2,9 +2,22 @@ import { JSONSchemaType } from 'ajv';
 
 export interface ProductUpsertedEventPayload {
   id: string;
+  sku?: string;
   name: string;
-  price: number;
+  description?: string;
+  salePrice: number;
+  costPrice?: number;
+  category?: string;
+  barcode?: string;
+  unit?: string;
+  minStock?: number;
+  maxStock?: number;
+  stockQty?: number;
+  currentStock?: number; // Alternative field name for stockQty
+  trackStock?: boolean;
+  active?: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface ProductDeletedEventPayload {
@@ -16,11 +29,24 @@ export const productUpsertedEventSchema: JSONSchemaType<ProductUpsertedEventPayl
   type: 'object',
   properties: {
     id: { type: 'string', format: 'uuid' },
+    sku: { type: 'string', nullable: true },
     name: { type: 'string' },
-    price: { type: 'number', minimum: 0 },
+    description: { type: 'string', nullable: true },
+    salePrice: { type: 'number', minimum: 0 },
+    costPrice: { type: 'number', minimum: 0, nullable: true },
+    category: { type: 'string', nullable: true },
+    barcode: { type: 'string', nullable: true },
+    unit: { type: 'string', nullable: true },
+    minStock: { type: 'number', minimum: 0, nullable: true },
+    maxStock: { type: 'number', minimum: 0, nullable: true },
+    stockQty: { type: 'number', minimum: 0, nullable: true },
+    currentStock: { type: 'number', minimum: 0, nullable: true },
+    trackStock: { type: 'boolean', nullable: true },
+    active: { type: 'boolean', nullable: true },
     createdAt: { type: 'string', format: 'date-time' },
+    updatedAt: { type: 'string', format: 'date-time', nullable: true },
   },
-  required: ['id', 'name', 'price', 'createdAt'],
+  required: ['id', 'name', 'salePrice', 'createdAt'],
   additionalProperties: false,
 };
 

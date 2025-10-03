@@ -116,19 +116,24 @@ export class ProductsService {
       costPrice: product.costPrice,
       category: product.category,
       barcode: product.barcode,
+      unit: product.unit,
+      minStock: product.minStock,
+      maxStock: product.maxStock,
+      stockQty: product.stockQty,
+      trackStock: product.trackStock,
       active: product.active,
-      currentStock: product.stockQty,
-      // Fields not in current schema - set as undefined for optional fields
-      unit: undefined,
-      minStock: undefined,
-      maxStock: undefined,
-      trackStock: undefined,
+      createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: product.updatedAt?.toISOString(),
     };
 
-    // Note: OutboxEvent table needs to be created in the schema
-    // For now, we'll skip the actual database insert to avoid errors
-    // TODO: Add OutboxEvent model to schema.prisma
-    console.log(`Generated ${eventType} event for product ${product.id}:`, eventPayload);
+    // Store event in OutboxEvent table for synchronization
+    await this.prisma.outboxEvent.create({
+      data: {
+        eventType,
+        payload: JSON.stringify(eventPayload),
+        processed: false,
+      },
+    });
   }
 
   private mapToResponseDto(product: any): ProductResponseDto {
