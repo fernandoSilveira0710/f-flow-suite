@@ -27,6 +27,19 @@ model Tenant {
   outbox          OutboxEvent[]
   inbox           InboxCommand[]
   paymentMethods  PaymentMethod[]
+  
+  // Business entities
+  products             Product[]
+  sales                Sale[]
+  inventoryAdjustments InventoryAdjustment[]
+  customers            Customer[]
+  services             Service[]
+  professionals        Professional[]
+  appointments         Appointment[]
+  groomingTickets      GroomingTicket[]
+  resources            Resource[]
+  checkIns             CheckIn[]
+  configurations       Configuration[]
 }
 
 model User {
@@ -110,4 +123,300 @@ model InboxCommand {
   appliedAt DateTime?
 
   @@index([tenantId, appliedAt])
+}
+
+// ===== CORE BUSINESS ENTITIES =====
+
+model Product {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sku         String
+  name        String
+  description String?
+  salePrice   Decimal
+  costPrice   Decimal?
+  stockQty    Int      @default(0)
+  category    String?
+  barcode     String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  saleItems            SaleItem[]
+  inventoryAdjustments InventoryAdjustment[]
+  groomingItems        GroomingItem[]
+
+  @@unique([tenantId, sku])
+  @@unique([tenantId, barcode])
+  @@index([tenantId, active])
+}
+
+model Sale {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code          String
+  date          DateTime @default(now())
+  operator      String
+  total         Decimal
+  paymentMethod String
+  status        String   @default("completed") // draft, completed, cancelled
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  items SaleItem[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, date])
+  @@index([tenantId, operator])
+}
+
+model SaleItem {
+  id        String  @id @default(uuid())
+  tenantId  String
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  qty       Int
+  unitPrice Decimal
+  subtotal  Decimal
+  
+  @@index([tenantId, saleId])
+  @@index([tenantId, productId])
+}
+
+model InventoryAdjustment {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  delta     Int      // positive for increase, negative for decrease
+  reason    String
+  notes     String?
+  createdAt DateTime @default(now())
+  
+  @@index([tenantId, productId])
+  @@index([tenantId, createdAt])
+}
+
+// ===== CUSTOMER & PET ENTITIES =====
+
+model Customer {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  pets             Pet[]
+  appointments     Appointment[]
+  groomingTickets  GroomingTicket[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, name])
+  @@index([tenantId, phone])
+}
+
+model Pet {
+  id        String    @id @default(uuid())
+  tenantId  String
+  tutorId   String
+  tutor     Customer  @relation(fields: [tutorId], references: [id])
+  name      String
+  species   String    // dog, cat, etc.
+  breed     String?
+  weight    Decimal?
+  birthDate DateTime?
+  gender    String?   // male, female
+  color     String?
+  notes     String?
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  // Relations
+  appointments     Appointment[]
+  groomingTickets  GroomingTicket[]
+  checkIns         CheckIn[]
+
+  @@index([tenantId, tutorId])
+  @@index([tenantId, name])
+  @@index([tenantId, species])
+}
+
+// ===== SERVICE & APPOINTMENT ENTITIES =====
+
+model Service {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  price       Decimal
+  duration    Int      // duration in minutes
+  category    String?  // grooming, veterinary, etc.
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  appointments    Appointment[]
+  groomingItems   GroomingItem[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, category])
+  @@index([tenantId, active])
+}
+
+model Professional {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  role      String   // groomer, veterinarian, assistant, etc.
+  phone     String?
+  email     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  appointments Appointment[]
+  checkIns     CheckIn[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, role])
+  @@index([tenantId, active])
+}
+
+model Appointment {
+  id             String       @id @default(uuid())
+  tenantId       String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  petId          String
+  pet            Pet          @relation(fields: [petId], references: [id])
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  serviceId      String
+  service        Service      @relation(fields: [serviceId], references: [id])
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  date           DateTime
+  startTime      DateTime
+  endTime        DateTime
+  status         String       @default("scheduled") // scheduled, confirmed, in_progress, completed, cancelled, no_show
+  notes          String?
+  price          Decimal?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([tenantId, date])
+  @@index([tenantId, professionalId, date])
+  @@index([tenantId, petId])
+  @@index([tenantId, status])
+}
+
+// ===== GROOMING ENTITIES =====
+
+model GroomingTicket {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  petId      String
+  pet        Pet      @relation(fields: [petId], references: [id])
+  tutorId    String
+  tutor      Customer @relation(fields: [tutorId], references: [id])
+  code       String   // ticket number for identification
+  status     String   @default("pending") // pending, in_progress, completed, cancelled
+  totalPrice Decimal  @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  // Relations
+  items GroomingItem[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@index([tenantId, petId])
+  @@index([tenantId, createdAt])
+}
+
+model GroomingItem {
+  id        String         @id @default(uuid())
+  tenantId  String
+  ticketId  String
+  ticket    GroomingTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  serviceId String?
+  service   Service?       @relation(fields: [serviceId], references: [id])
+  productId String?
+  product   Product?       @relation(fields: [productId], references: [id])
+  name      String         // service or product name
+  price     Decimal
+  qty       Int            @default(1)
+  subtotal  Decimal
+  
+  @@index([tenantId, ticketId])
+  @@index([tenantId, serviceId])
+  @@index([tenantId, productId])
+}
+
+model Resource {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  type      String   // equipment, room, tool, etc.
+  description String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId, type])
+  @@index([tenantId, active])
+}
+
+model CheckIn {
+  id             String       @id @default(uuid())
+  tenantId       String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  petId          String
+  pet            Pet          @relation(fields: [petId], references: [id])
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  checkInAt      DateTime     @default(now())
+  checkOutAt     DateTime?
+  notes          String?
+  
+  @@index([tenantId, petId])
+  @@index([tenantId, professionalId])
+  @@index([tenantId, checkInAt])
+}
+
+// ===== CONFIGURATION ENTITIES =====
+
+model Configuration {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  key      String
+  value    String
+  category String? // system, business, ui, etc.
+  
+  @@unique([tenantId, key])
+  @@index([tenantId, category])
 }
