@@ -1,65 +1,44 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
-import { JwksClient } from 'jwks-client';
+import { Strategy, ExtractJwt } from 'passport-jwt';
+import { verify } from 'jsonwebtoken';
 import NodeCache from 'node-cache';
-
-type OidcJwtPayload = {
-  iss: string;
-  aud: string | string[];
-  sub: string;
-  exp: number;
-  iat: number;
-  [key: string]: any;
-};
 
 @Injectable()
 export class OidcJwtStrategy extends PassportStrategy(Strategy, 'oidc-jwt') {
-  private readonly logger = new Logger(OidcJwtStrategy.name);
-  private readonly jwksClient: JwksClient;
-  private readonly keyCache = new NodeCache({ stdTTL: 3600 }); // Cache keys for 1 hour
-  private readonly requiredIssuer: string;
-  private readonly requiredAudience: string;
-  private readonly oidcRequired: boolean;
+  private cache = new NodeCache({ stdTTL: 3600 }); // 1 hour cache
+  private jwksClient: any;
+  private jwksClientInitialized = false;
 
   constructor() {
-    const jwksUrl = process.env.OIDC_JWKS_URL;
-    const issuer = process.env.OIDC_ISSUER;
-    const audience = process.env.OIDC_AUDIENCE;
-    const oidcRequired = process.env.OIDC_REQUIRED !== 'false';
-
-    if (oidcRequired && (!jwksUrl || !issuer || !audience)) {
-      throw new Error(
-        'OIDC configuration missing: OIDC_JWKS_URL, OIDC_ISSUER, and OIDC_AUDIENCE are required when OIDC_REQUIRED=true'
-      );
-    }
-
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKeyProvider: async (request: any, rawJwtToken: any, done: any) => {
+      ignoreExpiration: false,
+      secretOrKeyProvider: async (request: any, rawJwtToken: string, done: any) => {
         try {
-          if (!oidcRequired) {
-            // If OIDC is not required, skip validation
-            return done(null, 'skip-validation');
-          }
-
           const key = await this.getSigningKey(rawJwtToken);
           done(null, key);
         } catch (error) {
-          this.logger.error('Error getting signing key:', error);
-          done(error);
+          done(error, null);
         }
       },
-      algorithms: ['RS256', 'RS512', 'ES256'],
-      ignoreExpiration: false,
-      passReqToCallback: false,
     });
+  }
 
-    this.requiredIssuer = issuer || '';
-    this.requiredAudience = audience || '';
-    this.oidcRequired = oidcRequired;
+  private async initializeJwksClient() {
+    if (this.jwksClientInitialized) {
+      return;
+    }
 
-    if (jwksUrl) {
+    try {
+      const jwksClientModule = await import('jwks-client');
+      const JwksClient = jwksClientModule.default;
+
+      const jwksUrl = process.env.OIDC_JWKS_URL;
+      if (!jwksUrl) {
+        throw new Error('OIDC_JWKS_URL environment variable is required');
+      }
+
       this.jwksClient = new JwksClient({
         jwksUri: jwksUrl,
         cache: true,
@@ -67,59 +46,87 @@ export class OidcJwtStrategy extends PassportStrategy(Strategy, 'oidc-jwt') {
         rateLimit: true,
         jwksRequestsPerMinute: 10,
       });
+
+      this.jwksClientInitialized = true;
+    } catch (error) {
+      throw new Error(`Failed to initialize JWKS client: ${error.message}`);
     }
   }
 
   private async getSigningKey(token: string): Promise<string> {
-    if (!this.jwksClient) {
-      throw new Error('JWKS client not initialized');
-    }
+    await this.initializeJwksClient();
 
-    // Decode token header to get kid
-    const header = JSON.parse(
-      Buffer.from(token.split('.')[0], 'base64url').toString()
-    );
-    
-    const kid = header.kid;
+    const decoded = this.decodeToken(token);
+    const kid = decoded.header.kid;
+
     if (!kid) {
-      throw new Error('Token header missing kid (key ID)');
+      throw new UnauthorizedException('Token missing kid in header');
     }
 
     // Check cache first
-    const cachedKey = this.keyCache.get(kid);
-    if (cachedKey) {
-      return cachedKey as string;
+    const cacheKey = `jwks-key-${kid}`;
+    let signingKey = this.cache.get<string>(cacheKey);
+
+    if (!signingKey) {
+      try {
+        const key = await this.jwksClient.getSigningKey(kid);
+        signingKey = key.getPublicKey();
+        this.cache.set(cacheKey, signingKey);
+      } catch (error) {
+        throw new UnauthorizedException(`Unable to find signing key: ${error.message}`);
+      }
     }
 
-    // Fetch key from JWKS
-    const key = await this.jwksClient.getSigningKey(kid);
-    const publicKey = key.getPublicKey();
-    
-    // Cache the key
-    this.keyCache.set(kid, publicKey);
-    
-    return publicKey;
+    return signingKey;
   }
 
-  async validate(payload: OidcJwtPayload): Promise<OidcJwtPayload> {
-    if (!this.oidcRequired) {
-      return payload;
+  private decodeToken(token: string) {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new UnauthorizedException('Invalid token format');
     }
 
+    try {
+      const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString());
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+      return { header, payload };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid token encoding');
+    }
+  }
+
+  async validate(payload: any) {
+    const requiredIssuer = process.env.OIDC_ISSUER;
+    const requiredAudience = process.env.OIDC_AUDIENCE;
+
     // Validate issuer
-    if (payload.iss !== this.requiredIssuer) {
-      this.logger.warn(`Invalid issuer: expected ${this.requiredIssuer}, got ${payload.iss}`);
-      throw new Error('Invalid token issuer');
+    if (requiredIssuer && payload.iss !== requiredIssuer) {
+      throw new UnauthorizedException(`Invalid issuer. Expected: ${requiredIssuer}, Got: ${payload.iss}`);
     }
 
     // Validate audience
-    const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-    if (!audiences.includes(this.requiredAudience)) {
-      this.logger.warn(`Invalid audience: expected ${this.requiredAudience}, got ${audiences.join(', ')}`);
-      throw new Error('Invalid token audience');
+    if (requiredAudience) {
+      const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+      if (!audiences.includes(requiredAudience)) {
+        throw new UnauthorizedException(`Invalid audience. Expected: ${requiredAudience}, Got: ${audiences.join(', ')}`);
+      }
     }
 
-    this.logger.debug(`OIDC token validated for subject: ${payload.sub}`);
-    return payload;
+    // Validate expiration
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      throw new UnauthorizedException('Token has expired');
+    }
+
+    // Return user info for request.user
+    return {
+      sub: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      iss: payload.iss,
+      aud: payload.aud,
+      exp: payload.exp,
+      iat: payload.iat,
+    };
   }
 }

@@ -5,6 +5,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { GroomingModule } from './grooming/grooming.module';
 import { LicensingModule } from './licensing/licensing.module';
 import { SyncAgentModule } from './sync-agent/sync.module';
+import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [
@@ -15,5 +16,6 @@ import { SyncAgentModule } from './sync-agent/sync.module';
     GroomingModule,
     SyncAgentModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

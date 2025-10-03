@@ -423,6 +423,155 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Client-Local API",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/health",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna status ok', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('ok');",
+                  "  pm.expect(body.service).to.eql('f-flow-client-local');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sync Test",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/sync/test",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "sync",
+                "test"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna resultado de push e pull', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('push');",
+                  "  pm.expect(body).to.have.property('pull');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Push Events",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    {\n      \"id\": \"evt-001\",\n      \"aggregate\": \"sale\",\n      \"type\": \"sale.created\",\n      \"payload\": {\n        \"saleId\": \"sale-123\",\n        \"amount\": 100.50\n      },\n      \"occurredAt\": \"2024-01-01T10:00:00Z\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{client_local_url}}/sync/push",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "sync",
+                "push"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pull Commands",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/sync/pull",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "sync",
+                "pull"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
