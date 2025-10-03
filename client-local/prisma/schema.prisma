@@ -1,4 +1,4 @@
-﻿generator client {
+generator client {
   provider = "prisma-client-js"
 }
 
@@ -28,38 +28,51 @@ model SaleItem {
   subtotal  Decimal
 }
 
-model Inventory {
-  productId String  @id
-  qty       Int     @default(0)
-  updatedAt DateTime @default(now())
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Decimal
+  stock       Int      @default(0)
+  category    String?
+  barcode     String?  @unique
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  stockMovements StockMovement[]
 }
 
-model OutboxEvent {
-  id         String   @id @default(uuid())
-  aggregate  String
-  type       String
-  payload    Json
-  occurredAt DateTime @default(now())
-  sentAt     DateTime?
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?  @unique
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  appointments Appointment[]
 }
 
-model InboxCommand {
-  id        String  @id
-  type      String
-  payload   Json
-  appliedAt DateTime?
+model Appointment {
+  id          String   @id @default(uuid())
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  serviceType String
+  date        DateTime
+  duration    Int      // in minutes
+  status      String   @default("scheduled") // scheduled, confirmed, in_progress, completed, cancelled
+  notes       String?
+  price       Decimal?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
-model SyncState {
-  id             Int      @id @default(1)
-  lastCommandSeq Int?
-  lastEventId    String?
-  updatedAt      DateTime @default(now())
-}
-
-model PaymentMethodLocal {
-  code     String @id
-  label    String
-  active   Boolean @default(true)
-  position Int     @default(0)
+model StockMovement {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  type      String   // in, out, adjustment
+  quantity  Int
+  reason    String?
+  createdAt DateTime @default(now())
 }

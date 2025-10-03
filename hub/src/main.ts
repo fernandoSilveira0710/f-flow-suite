@@ -1,7 +1,7 @@
-﻿import { NestFactory } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
-import { AppModule } from './app.module.js';
-import { loadEnvConfig } from './common/env.js';
+import { AppModule } from './app.module';
+import { loadEnvConfig } from './common/env';
 
 async function bootstrap() {
   loadEnvConfig();

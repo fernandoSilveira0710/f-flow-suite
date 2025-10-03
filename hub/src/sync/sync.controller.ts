@@ -1,5 +1,5 @@
-﻿import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { SyncService } from './sync.service.js';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { SyncService, OutboxEvent } from './sync.service';
 
 @Controller('tenants/:tenantId/sync')
 export class SyncController {
@@ -8,7 +8,7 @@ export class SyncController {
   @Post('events')
   async pushEvents(
     @Param('tenantId') tenantId: string,
-    @Body('events') events: any[] = [],
+    @Body('events') events: OutboxEvent[] = [],
   ) {
     await this.syncService.ingestEvents(tenantId, events);
     return { accepted: events.length };
