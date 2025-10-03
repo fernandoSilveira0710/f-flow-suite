@@ -1,6 +1,6 @@
-﻿import { Module } from '@nestjs/common';
-import { SyncController } from './sync.controller.js';
-import { SyncService } from './sync.service.js';
+import { Module } from '@nestjs/common';
+import { SyncController } from './sync.controller';
+import { SyncService } from './sync.service';
 
 @Module({
   providers: [SyncService],

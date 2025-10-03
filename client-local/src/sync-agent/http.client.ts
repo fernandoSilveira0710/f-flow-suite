@@ -1,4 +1,4 @@
-﻿import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
@@ -13,10 +13,10 @@ export class SyncHttpClient {
   }
 
   post<T = unknown>(url: string, data?: unknown) {
-    return this.client.post<T>(url, data).then((res) => res.data);
+    return this.client.post<T>(url, data).then((res: AxiosResponse<T>) => res.data);
   }
 
   get<T = unknown>(url: string, params?: Record<string, unknown>) {
-    return this.client.get<T>(url, { params }).then((res) => res.data);
+    return this.client.get<T>(url, { params }).then((res: AxiosResponse<T>) => res.data);
   }
 }

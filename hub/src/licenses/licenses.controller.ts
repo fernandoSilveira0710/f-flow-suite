@@ -1,5 +1,5 @@
-﻿import { Body, Controller, Post } from '@nestjs/common';
-import { LicensesService } from './licenses.service.js';
+import { Body, Controller, Post } from '@nestjs/common';
+import { LicensesService } from './licenses.service';
 
 @Controller('licenses')
 export class LicensesController {

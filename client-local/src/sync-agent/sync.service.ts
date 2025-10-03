@@ -1,5 +1,5 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
-import { SyncHttpClient } from './http.client.js';
+import { Injectable, Logger } from '@nestjs/common';
+import { SyncHttpClient } from './http.client';
 
 @Injectable()
 export class SyncService {
@@ -7,7 +7,7 @@ export class SyncService {
 
   constructor(private readonly http: SyncHttpClient) {}
 
-  async pushOutbox(events: any[]) {
+  async pushOutbox(events: Record<string, unknown>[]) {
     if (events.length === 0) {
       return { accepted: 0 };
     }
