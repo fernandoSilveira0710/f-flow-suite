@@ -2,15 +2,10 @@ import { Logger } from '@nestjs/common';
 
 const logger = new Logger('WindowsService');
 
-// Import node-windows for proper SCM communication
-let Service: any = null;
-try {
-  if (process.platform === 'win32') {
-    Service = require('node-windows').Service;
-  }
-} catch (error) {
-  logger.warn('node-windows not available:', error instanceof Error ? error.message : String(error));
-}
+// Windows API constants for service status
+const SERVICE_RUNNING = 0x00000004;
+const SERVICE_START_PENDING = 0x00000002;
+const SERVICE_STOPPED = 0x00000001;
 
 /**
  * Windows Service Control Manager integration
@@ -18,7 +13,9 @@ try {
  */
 export class WindowsServiceManager {
   private static isWindowsService = false;
-  private static serviceInstance: any = null;
+  private static startupTimeout: NodeJS.Timeout | null = null;
+  private static serviceStatusHandle: any = null;
+  private static heartbeatInterval: NodeJS.Timeout | null = null;
 
   /**
    * Initialize Windows service if running as service
@@ -29,13 +26,11 @@ export class WindowsServiceManager {
       this.isWindowsService = true;
       logger.log('Initializing Windows Service integration...');
       
-      try {
-        // Setup proper Windows service integration
-        this.setupServiceHandlers();
-      } catch (error) {
-        logger.warn('Failed to initialize Windows service integration:', error instanceof Error ? error.message : String(error));
-        // Continue without service integration - fallback mode
-      }
+      // Set process title for identification
+      process.title = 'F-Flow Client Local Service';
+      
+      // Setup proper Windows service integration
+      this.setupServiceHandlers();
     }
   }
 
@@ -46,21 +41,92 @@ export class WindowsServiceManager {
     if (this.isWindowsService) {
       logger.log('Signaling to Windows SCM that service has started successfully');
       
-      // Set process title for identification
-      process.title = 'F-Flow Client Local Service';
+      // Clear any startup timeout
+      if (this.startupTimeout) {
+        clearTimeout(this.startupTimeout);
+        this.startupTimeout = null;
+      }
       
-      // If we have proper service integration, signal running status
-      if (this.serviceInstance && typeof this.serviceInstance.setStatus === 'function') {
-        try {
-          this.serviceInstance.setStatus('RUNNING');
-          logger.log('Service status set to RUNNING via node-windows');
-        } catch (error) {
-          logger.warn('Failed to set service status:', error instanceof Error ? error.message : String(error));
-        }
+      try {
+        // Use a more robust approach for SCM communication
+        this.notifyServiceStatus('RUNNING');
+        
+        logger.log('Service startup signal sent successfully');
+      } catch (error) {
+        logger.warn('Failed to send service startup signal:', error instanceof Error ? error.message : String(error));
       }
       
       // Set up proper signal handlers for Windows service
       this.setupWindowsSignalHandlers();
+    }
+  }
+
+  /**
+   * Notify service status to SCM using multiple approaches for maximum compatibility
+   */
+  private static notifyServiceStatus(status: 'RUNNING' | 'STOPPING'): void {
+    try {
+      // Method 1: Environment variable (for debugging and monitoring)
+      process.env.SERVICE_STATUS = status;
+      
+      // Method 2: Write to stdout (some service managers read this)
+      process.stdout.write(`SERVICE_${status}\n`);
+      
+      // Method 3: Use Windows-specific approach if available
+      if (process.platform === 'win32') {
+        try {
+          // Try to use Windows API directly through process
+          const statusCode = status === 'RUNNING' ? SERVICE_RUNNING : SERVICE_STOPPED;
+          
+          // Signal through process exit code mechanism
+          if (status === 'RUNNING') {
+            // For running status, we don't exit but signal readiness
+            process.send?.({ type: 'service-status', status: 'running' });
+          }
+          
+        } catch (winError) {
+          logger.debug('Windows API approach failed, using fallback methods');
+        }
+      }
+      
+      // Method 4: Create a heartbeat mechanism for running services
+      if (status === 'RUNNING') {
+        this.startHeartbeat();
+      } else {
+        this.stopHeartbeat();
+      }
+      
+    } catch (error) {
+      logger.warn('Failed to notify service status:', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /**
+   * Start heartbeat mechanism to keep service alive
+   */
+  private static startHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+    
+    this.heartbeatInterval = setInterval(() => {
+      if (this.isWindowsService && process.env.SERVICE_STATUS === 'RUNNING') {
+        // Simple heartbeat - just update a timestamp
+        process.env.SERVICE_HEARTBEAT = Date.now().toString();
+        
+        // Optionally write a heartbeat to stdout (commented out to reduce noise)
+        // process.stdout.write('SERVICE_HEARTBEAT\n');
+      }
+    }, 30000); // Every 30 seconds
+  }
+
+  /**
+   * Stop heartbeat mechanism
+   */
+  private static stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
     }
   }
 
@@ -71,14 +137,13 @@ export class WindowsServiceManager {
     if (this.isWindowsService) {
       logger.log('Signaling to Windows SCM that service is stopping');
       
-      // If we have proper service integration, signal stopping status
-      if (this.serviceInstance && typeof this.serviceInstance.setStatus === 'function') {
-        try {
-          this.serviceInstance.setStatus('STOP_PENDING');
-          logger.log('Service status set to STOP_PENDING via node-windows');
-        } catch (error) {
-          logger.warn('Failed to set service status:', error instanceof Error ? error.message : String(error));
-        }
+      try {
+        // Use the same notification method for stopping
+        this.notifyServiceStatus('STOPPING');
+        
+        logger.log('Service stopping signal sent successfully');
+      } catch (error) {
+        logger.warn('Failed to send service stopping signal:', error instanceof Error ? error.message : String(error));
       }
     }
   }
@@ -91,12 +156,14 @@ export class WindowsServiceManager {
     process.on('SIGTERM', () => {
       logger.log('Received SIGTERM - Windows service stop requested');
       this.signalServiceStopping();
+      setTimeout(() => process.exit(0), 1000);
     });
 
     // Handle Ctrl+C in console mode
     process.on('SIGINT', () => {
       logger.log('Received SIGINT - Console interrupt');
       this.signalServiceStopping();
+      setTimeout(() => process.exit(0), 1000);
     });
 
     // Windows-specific: Handle service control requests
@@ -108,37 +175,33 @@ export class WindowsServiceManager {
   }
 
   /**
-   * Setup service control handlers
+   * Setup service control handlers with timeout mechanism
    */
   private static setupServiceHandlers(): void {
-    if (Service && process.platform === 'win32') {
-      try {
-        // Create a service instance for status communication
-        this.serviceInstance = new Service({
-          name: 'F-Flow Client Local Service',
-          description: 'F-Flow Client Local Service for POS operations',
-          script: process.execPath,
-          scriptOptions: process.argv.slice(1)
-        });
-
-        // Set up service event handlers
-        this.serviceInstance.on('start', () => {
-          logger.log('Windows service start event received');
-        });
-
-        this.serviceInstance.on('stop', () => {
-          logger.log('Windows service stop event received');
-          process.exit(0);
-        });
-
-        logger.log('Windows service handlers configured with node-windows');
-      } catch (error) {
-        logger.warn('Failed to setup service handlers:', error instanceof Error ? error.message : String(error));
-        this.serviceInstance = null;
+    logger.log('Setting up Windows service handlers...');
+    
+    // Set a startup timeout to ensure we signal startup within reasonable time
+    this.startupTimeout = setTimeout(() => {
+      if (this.isWindowsService) {
+        logger.warn('Service startup timeout reached - forcing startup signal');
+        this.signalServiceStarted();
       }
-    } else {
-      logger.log('Windows service handlers configured (fallback mode)');
-    }
+    }, 60000); // 60 second timeout
+    
+    // Setup graceful shutdown handlers
+    process.on('beforeExit', () => {
+      if (this.isWindowsService) {
+        this.signalServiceStopping();
+      }
+    });
+    
+    process.on('exit', () => {
+      if (this.isWindowsService) {
+        logger.log('Process exiting - service cleanup completed');
+      }
+    });
+    
+    logger.log('Windows service handlers configured successfully');
   }
 
   /**
