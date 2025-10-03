@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { EventValidatorService } from '../common/validation/event-validator.service';
 import {
   AdjustInventoryDto,
   InventoryLevelDto,
@@ -9,7 +10,12 @@ import {
 
 @Injectable()
 export class InventoryService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly logger = new Logger(InventoryService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventValidator: EventValidatorService,
+  ) {}
 
   async adjustInventory(adjustInventoryDto: AdjustInventoryDto): Promise<AdjustInventoryResponseDto> {
     const { adjustments } = adjustInventoryDto;
@@ -53,6 +59,9 @@ export class InventoryService {
           reason: inventoryAdjustment.reason,
           createdAt: inventoryAdjustment.createdAt,
         });
+
+        // Generate inventory adjustment event
+        await this.generateInventoryEvent(inventoryAdjustment, product);
       }
     });
 
@@ -103,5 +112,39 @@ export class InventoryService {
       currentStock: product.stockQty,
       lastUpdated: product.updatedAt,
     }));
+  }
+
+  private async generateInventoryEvent(inventoryAdjustment: any, product: any): Promise<void> {
+    const eventPayload = {
+      id: inventoryAdjustment.id,
+      productId: inventoryAdjustment.productId,
+      productName: product.name,
+      productSku: product.sku,
+      delta: inventoryAdjustment.delta,
+      reason: inventoryAdjustment.reason,
+      previousStock: product.stockQty - inventoryAdjustment.delta,
+      newStock: product.stockQty,
+      adjustedAt: inventoryAdjustment.createdAt?.toISOString() || new Date().toISOString(),
+    };
+
+    // Validate event payload using Ajv
+    const validationResult = this.eventValidator.validateEvent('inventory.adjusted.v1', eventPayload);
+    if (!validationResult.valid) {
+      this.logger.error(`Event validation failed for inventory.adjusted.v1:`, validationResult.errors);
+      throw new Error(`Invalid event payload: ${validationResult.errors?.join(', ')}`);
+    }
+
+    // Persist event to OutboxEvent table
+    await this.prisma.outboxEvent.create({
+      data: {
+        aggregate: 'inventory',
+        aggregateId: inventoryAdjustment.id,
+        type: 'inventory.adjusted.v1',
+        payload: JSON.stringify(eventPayload),
+        occurredAt: new Date(),
+      },
+    });
+
+    this.logger.debug(`Generated inventory.adjusted.v1 event for adjustment ${inventoryAdjustment.id}`);
   }
 }

@@ -1,12 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from '../products/products.service';
 import { SalesService } from '../sales/sales.service';
 
-export interface OutboxEvent {
+interface OutboxEvent {
   id: string;
   aggregate: string;
   type: string;
-  payload: Record<string, unknown>;
+  payload: string;
   occurredAt: Date;
 }
 
@@ -20,23 +21,19 @@ export class SyncService {
   ) {}
 
   async ingestEvents(tenantId: string, events: OutboxEvent[]): Promise<void> {
-    this.logger.debug(`Received ${events.length} events from tenant ${tenantId}`);
-    
+    this.logger.debug(`Ingesting ${events.length} events for tenant ${tenantId}`);
+
     for (const event of events) {
-      try {
-        await this.processEvent(tenantId, event);
-        this.logger.debug(`Processed event ${event.id} of type ${event.type}`);
-      } catch (error) {
-        this.logger.error(`Failed to process event ${event.id}:`, error);
-        // In production, you might want to add the event to a DLQ
-      }
+      await this.processEvent(tenantId, event);
     }
   }
 
   private async processEvent(tenantId: string, event: OutboxEvent): Promise<void> {
+    const payload = JSON.parse(event.payload);
+
     switch (event.type) {
       case 'product.upserted.v1':
-        await this.productsService.upsertFromEvent(tenantId, event.payload);
+        await this.productsService.upsertFromEvent(tenantId, payload);
         break;
       case 'product.deleted.v1':
         await this.productsService.deleteFromEvent(tenantId, (event.payload as any).id);
