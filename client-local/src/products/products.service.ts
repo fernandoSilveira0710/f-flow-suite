@@ -1,12 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { EventValidatorService } from '../common/validation/event-validator.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly logger = new Logger(ProductsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventValidator: EventValidatorService,
+  ) {}
 
   async create(createProductDto: CreateProductDto): Promise<ProductResponseDto> {
     const product = await this.prisma.product.create({
@@ -117,18 +123,38 @@ export class ProductsService {
       category: product.category,
       barcode: product.barcode,
       active: product.active,
-      currentStock: product.stockQty,
-      // Fields not in current schema - set as undefined for optional fields
-      unit: undefined,
-      minStock: undefined,
-      maxStock: undefined,
-      trackStock: undefined,
+      stockQty: product.stockQty,
+      unit: product.unit,
+      minStock: product.minStock,
+      maxStock: product.maxStock,
+      trackStock: product.trackStock,
+      createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt: product.updatedAt?.toISOString() || new Date().toISOString(),
     };
 
-    // Note: OutboxEvent table needs to be created in the schema
-    // For now, we'll skip the actual database insert to avoid errors
-    // TODO: Add OutboxEvent model to schema.prisma
-    console.log(`Generated ${eventType} event for product ${product.id}:`, eventPayload);
+    // Add deletedAt for delete events
+    if (eventType === 'product.deleted.v1') {
+      (eventPayload as any).deletedAt = new Date().toISOString();
+    }
+
+    // Validate event payload using Ajv
+    const validationResult = this.eventValidator.validateEvent(eventType, eventPayload);
+    if (!validationResult.valid) {
+      this.logger.error(`Event validation failed for ${eventType}:`, validationResult.errors);
+      throw new Error(`Invalid event payload: ${validationResult.errors?.join(', ')}`);
+    }
+
+    // Persist event to OutboxEvent table for synchronization
+    await this.prisma.outboxEvent.create({
+      data: {
+        aggregate: 'product',
+        aggregateId: product.id,
+        type: eventType,
+        payload: JSON.stringify(eventPayload),
+      },
+    });
+
+    this.logger.debug(`Generated ${eventType} event for product ${product.id}`);
   }
 
   private mapToResponseDto(product: any): ProductResponseDto {
