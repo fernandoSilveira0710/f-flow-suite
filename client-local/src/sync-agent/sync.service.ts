@@ -11,6 +11,12 @@ export class SyncService {
     private readonly prisma: PrismaService
   ) {}
 
+  private getAggregateFromEventType(eventType: string): string {
+    // Extract aggregate from event type (e.g., 'sale.created.v1' -> 'sale')
+    const parts = eventType.split('.');
+    return parts[0] || 'unknown';
+  }
+
   async pushOutbox(events?: Record<string, unknown>[]) {
     // If no events provided, fetch from database
     if (!events) {
@@ -27,7 +33,7 @@ export class SyncService {
       // Transform database events to the format expected by hub
       events = outboxEvents.map(event => ({
         id: event.id,
-        aggregate: 'sale', // Assuming all events are sale-related for now
+        aggregate: this.getAggregateFromEventType(event.eventType),
         type: event.eventType,
         payload: JSON.parse(event.payload),
         occurredAt: event.createdAt.toISOString()
