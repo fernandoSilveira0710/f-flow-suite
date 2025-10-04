@@ -58,8 +58,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  getSession,
-  openSession,
+  getCurrentSession,
+  createSession,
   closeSession,
   addCashEntry,
   findProductByBarcode,
@@ -147,7 +147,7 @@ export default function PdvPage() {
   }, []);
 
   const loadSession = () => {
-    const currentSession = getSession();
+    const currentSession = getCurrentSession();
     setSession(currentSession);
   };
 
@@ -404,7 +404,7 @@ export default function PdvPage() {
     }
 
     try {
-      const newSession = await openSession(valor, { id: 'admin-1', nome: 'Admin Demo' });
+      const newSession = await createSession({ id: 'admin-1', nome: 'Admin Demo' }, valor);
       setSession(newSession);
       setShowOpenSession(false);
       toast.success('Caixa aberto com sucesso!');

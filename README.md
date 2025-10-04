@@ -336,7 +336,113 @@ curl http://localhost:3010/sync/events
 # Verificar se "processed": true
 ```
 
-## 4. Próximos Passos
+## 4. Funcionalidades Implementadas
+
+### Customers (Clientes)
+O sistema agora inclui funcionalidades completas para gerenciamento de clientes:
+
+#### Backend (Hub API)
+- **Endpoints disponíveis**:
+  - `GET /tenants/{tenantId}/customers` - Lista clientes com paginação, busca e filtros
+  - `GET /tenants/{tenantId}/customers/{id}` - Busca cliente por ID
+- **Funcionalidades**:
+  - Paginação com `page` e `limit`
+  - Busca por nome com parâmetro `search`
+  - Filtro por status ativo com parâmetro `active`
+  - Sincronização via eventos (`customer.created.v1`, `customer.updated.v1`, `customer.deleted.v1`)
+  - Suporte multi-tenant com RLS (Row Level Security)
+
+#### Frontend (React)
+- **API Client** (`src/lib/customers-api.ts`):
+  - `fetchCustomers()` - Lista com filtros opcionais
+  - `fetchCustomer(id)` - Busca por ID
+  - `createCustomer(data)` - Criação (mock)
+  - `updateCustomer(id, data)` - Atualização (mock)
+  - `deleteCustomer(id)` - Exclusão (mock)
+  - `searchCustomers(query)` - Busca por nome
+  - `fetchActiveCustomers()` - Lista apenas ativos
+
+### Pets (Animais de Estimação)
+Sistema completo para gerenciamento de pets e relacionamento com tutores:
+
+#### Backend (Hub API)
+- **Endpoints disponíveis**:
+  - `GET /tenants/{tenantId}/pets` - Lista pets com paginação, busca e filtros
+  - `GET /tenants/{tenantId}/pets/{id}` - Busca pet por ID
+  - `GET /tenants/{tenantId}/pets/tutor/{tutorId}` - Lista pets de um tutor específico
+- **Funcionalidades**:
+  - Paginação com `page` e `limit`
+  - Busca por nome com parâmetro `search`
+  - Filtro por tutor com parâmetro `tutorId`
+  - Filtro por status ativo com parâmetro `active`
+  - Sincronização via eventos (`pet.created.v1`, `pet.updated.v1`, `pet.deleted.v1`)
+  - Suporte multi-tenant com RLS
+
+#### Frontend (React)
+- **API Client** (`src/lib/pets-api.ts`):
+  - `fetchPets()` - Lista com filtros opcionais
+  - `fetchPet(id)` - Busca por ID
+  - `fetchPetsByTutor(tutorId)` - Lista pets de um tutor
+  - `createPet(data)` - Criação (mock)
+  - `updatePet(id, data)` - Atualização (mock)
+  - `deletePet(id)` - Exclusão (mock)
+  - `searchPets(query)` - Busca por nome
+  - `fetchActivePets()` - Lista apenas ativos
+  - `fetchPetSpecies()` - Lista espécies disponíveis
+
+### Estrutura do Banco de Dados
+```sql
+-- Customers (Clientes)
+model Customer {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relacionamentos
+  pets      Pet[]
+  
+  @@map("customers")
+}
+
+-- Pets (Animais)
+model Pet {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  species   String
+  breed     String?
+  birthDate DateTime?
+  tutorId   String   // Referência ao Customer
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relacionamentos
+  tutor     Customer @relation(fields: [tutorId], references: [id])
+  
+  @@map("pets")
+}
+```
+
+### Testes Implementados
+- **Backend**: Testes unitários para `CustomersService` e `PetsService`
+- **Frontend**: Testes unitários para APIs de customers e pets
+- **Postman**: Endpoints adicionados à collection para testes de integração
+
+### Sincronização de Dados
+Ambos os módulos (Customers e Pets) suportam sincronização bidirecional:
+- **Eventos de saída**: Criação, atualização e exclusão geram eventos para o Hub
+- **Comandos de entrada**: Hub pode enviar comandos para atualizar dados locais
+- **Idempotência**: Eventos são processados apenas uma vez
+- **Multi-tenant**: Dados isolados por tenant com RLS
+
+## 5. Próximos Passos
 1. **Backend real**: ligar Prisma nas services do Hub e do Cliente local, implementando queries de verdade (tenants, sync commands, etc.).
 2. **Segurança**: integrar OIDC real (Auth0/Keycloak/Cognito), validar token e substituir guard placeholder.
 3. **Sync**: finalizar pipelines de outbox/inbox (fila, retries, idempotência) e expandir policies RLS conforme novos domínios.

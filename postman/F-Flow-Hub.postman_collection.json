@@ -678,6 +678,286 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "List Customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{license_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{hub_url}}/tenants/{{tenant_id}}/customers?page=1&limit=10",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants",
+                "{{tenant_id}}",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "active",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna lista de customers', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('data');",
+                  "  pm.expect(body).to.have.property('total');",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Customer by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{license_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{hub_url}}/tenants/{{tenant_id}}/customers/{{customer_id}}",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants",
+                "{{tenant_id}}",
+                "customers",
+                "{{customer_id}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna customer', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('id');",
+                  "  pm.expect(body).to.have.property('name');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pets",
+      "item": [
+        {
+          "name": "List Pets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{license_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{hub_url}}/tenants/{{tenant_id}}/pets?page=1&limit=10",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants",
+                "{{tenant_id}}",
+                "pets"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "tutorId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "active",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna lista de pets', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('data');",
+                  "  pm.expect(body).to.have.property('total');",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Pet by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{license_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{hub_url}}/tenants/{{tenant_id}}/pets/{{pet_id}}",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants",
+                "{{tenant_id}}",
+                "pets",
+                "{{pet_id}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna pet', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('id');",
+                  "  pm.expect(body).to.have.property('name');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Pets by Tutor",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{license_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{hub_url}}/tenants/{{tenant_id}}/pets/tutor/{{tutor_id}}",
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "tenants",
+                "{{tenant_id}}",
+                "pets",
+                "tutor",
+                "{{tutor_id}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna pets do tutor', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
