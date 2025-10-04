@@ -137,11 +137,8 @@ export class InventoryService {
     // Persist event to OutboxEvent table
     await this.prisma.outboxEvent.create({
       data: {
-        aggregate: 'inventory',
-        aggregateId: inventoryAdjustment.id,
-        type: 'inventory.adjusted.v1',
+        eventType: 'inventory.adjusted.v1',
         payload: JSON.stringify(eventPayload),
-        occurredAt: new Date(),
       },
     });
 

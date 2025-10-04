@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PosModule } from './pos/pos.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { GroomingModule } from './grooming/grooming.module';
+import { AppointmentsModule } from './appointments/appointments.module';
 import { LicensingModule } from './licensing/licensing.module';
 import { SyncAgentModule } from './sync-agent/sync.module';
 import { ProductsModule } from './products/products.module';
@@ -20,6 +21,7 @@ import { HealthController } from './health/health.controller';
     PetsModule,
     InventoryModule,
     GroomingModule,
+    AppointmentsModule,
     SyncAgentModule,
   ],
   controllers: [HealthController],
