@@ -52,16 +52,49 @@ Este documento descreve a implementação da sincronização de entidades `Servi
 }
 ```
 
+## Padrões de Eventos no F-Flow
+
+O sistema F-Flow utiliza dois padrões principais para eventos de sincronização:
+
+### 1. Padrão Principal (Upserted)
+Usado pela maioria das entidades para simplificar a sincronização:
+- `{entity}.upserted.v1` - Para operações de criação e atualização
+- `{entity}.deleted.v1` - Para operações de deleção
+
+**Entidades que usam este padrão:**
+- `product.upserted.v1` / `product.deleted.v1`
+- `customer.upserted.v1` / `customer.deleted.v1`
+- `pet.upserted.v1` / `pet.deleted.v1`
+- `service.upserted.v1` / `service.deleted.v1`
+- `professional.upserted.v1` / `professional.deleted.v1`
+
+### 2. Padrão Específico (Created/Updated)
+Usado por módulos específicos que precisam distinguir entre criação e atualização:
+- `{entity}.created.v1` - Para criações
+- `{entity}.updated.v1` - Para atualizações
+- `{entity}.deleted.v1` - Para deleções
+
+**Entidades que usam este padrão:**
+- `sale.created.v1` (vendas são sempre criadas, nunca atualizadas)
+- `appointment.created.v1` / `appointment.updated.v1` / `appointment.deleted.v1`
+- `grooming.ticket.created.v1` / `grooming.ticket.updated.v1`
+
+### Vantagens do Padrão Upserted
+1. **Simplicidade**: Menos eventos para gerenciar
+2. **Idempotência**: Facilita reprocessamento de eventos
+3. **Sincronização**: Reduz complexidade na sincronização
+4. **Performance**: Menos processadores de eventos no Hub
+
 ## Eventos de Sincronização
 
 ### Service Events
-- `service.created.v1` - Quando um serviço é criado
-- `service.updated.v1` - Quando um serviço é atualizado
+- `service.upserted.v1` - Quando um serviço é criado ou atualizado
 - `service.deleted.v1` - Quando um serviço é deletado
 
+**Nota**: O sistema usa o padrão `upserted` para operações de criação e atualização, seguindo o padrão principal do F-Flow. Alguns módulos específicos (como grooming) podem usar eventos separados `created.v1` e `updated.v1` para necessidades específicas de negócio.
+
 ### Professional Events
-- `professional.created.v1` - Quando um profissional é criado
-- `professional.updated.v1` - Quando um profissional é atualizado
+- `professional.upserted.v1` - Quando um profissional é criado ou atualizado
 - `professional.deleted.v1` - Quando um profissional é deletado
 
 ## Implementação no Hub
@@ -80,11 +113,9 @@ Arquivo: `hub/sql/003-rls-business-entities.sql`
 
 ### 3. Processadores de Eventos
 Arquivo: `hub/src/sync/sync.service.ts`
-- `processServiceCreated()` - Processa criação de serviços
-- `processServiceUpdated()` - Processa atualização de serviços
+- `processServiceUpserted()` - Processa criação/atualização de serviços
 - `processServiceDeleted()` - Processa deleção de serviços
-- `processProfessionalCreated()` - Processa criação de profissionais
-- `processProfessionalUpdated()` - Processa atualização de profissionais
+- `processProfessionalUpserted()` - Processa criação/atualização de profissionais
 - `processProfessionalDeleted()` - Processa deleção de profissionais
 
 ### 4. APIs REST
@@ -151,20 +182,24 @@ Arquivo: `postman/F-Flow-Client-Local.postman_collection.json`
 
 ### Cenários de Teste
 
-1. **Criação no Client Local**
-   - Criar Service/Professional
-   - Verificar evento na outbox
+1. **Operações CRUD no Client Local**
+   - Criar Service/Professional (gera `service.upserted.v1` / `professional.upserted.v1`)
+   - Atualizar Service/Professional (gera `service.upserted.v1` / `professional.upserted.v1`)
+   - Deletar Service/Professional (gera `service.deleted.v1` / `professional.deleted.v1`)
+   - Verificar eventos na outbox
    - Sincronizar com Hub
    - Verificar dados no Hub
 
 2. **Isolamento por Tenant**
    - Criar dados em tenants diferentes
    - Verificar que cada tenant vê apenas seus dados
+   - Testar políticas RLS
 
 3. **Sincronização**
-   - Testar push de eventos
+   - Testar push de eventos (`service.upserted.v1`, `service.deleted.v1`)
    - Verificar processamento no Hub
    - Validar integridade dos dados
+   - Testar idempotência dos eventos `upserted`
 
 ## Monitoramento
 

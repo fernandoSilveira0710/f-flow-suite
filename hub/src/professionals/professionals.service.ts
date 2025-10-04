@@ -1,14 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
 import { ProfessionalResponseDto } from './dto';
 
 @Injectable()
 export class ProfessionalsService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAllByTenant(tenantId: string): Promise<ProfessionalResponseDto[]> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     const professionals = await this.prisma.professional.findMany({
       where: { tenantId },
@@ -20,7 +20,7 @@ export class ProfessionalsService {
 
   async findOneByTenant(tenantId: string, professionalId: string): Promise<ProfessionalResponseDto> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     const professional = await this.prisma.professional.findFirst({
       where: { 
@@ -38,7 +38,7 @@ export class ProfessionalsService {
 
   async upsertFromEvent(tenantId: string, eventPayload: any): Promise<ProfessionalResponseDto> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     const professional = await this.prisma.professional.upsert({
       where: { 
@@ -74,7 +74,7 @@ export class ProfessionalsService {
 
   async deleteFromEvent(tenantId: string, professionalId: string): Promise<void> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     await this.prisma.professional.delete({
       where: { 

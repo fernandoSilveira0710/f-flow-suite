@@ -328,6 +328,8 @@ model Appointment {
   service        Service      @relation(fields: [serviceId], references: [id])
   professionalId String
   professional   Professional @relation(fields: [professionalId], references: [id])
+  resourceId     String?
+  resource       Resource?    @relation(fields: [resourceId], references: [id])
   date           DateTime
   startTime      DateTime
   endTime        DateTime
@@ -341,6 +343,7 @@ model Appointment {
   @@index([tenantId, professionalId, date])
   @@index([tenantId, petId])
   @@index([tenantId, status])
+  @@index([tenantId, resourceId])
 }
 
 // ===== GROOMING ENTITIES =====
@@ -389,15 +392,16 @@ model GroomingItem {
 }
 
 model Resource {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name      String
-  type      String   // equipment, room, tool, etc.
-  description String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String        @id @default(uuid())
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  type         String        // equipment, room, tool, etc.
+  description  String?
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  appointments Appointment[]
 
   @@unique([tenantId, name])
   @@index([tenantId, type])

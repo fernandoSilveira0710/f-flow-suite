@@ -11,6 +11,7 @@ import { CustomersModule } from './customers/customers.module';
 import { PetsModule } from './pets/pets.module';
 import { ServicesModule } from './services/services.module';
 import { ProfessionalsModule } from './professionals/professionals.module';
+import { CheckInsModule } from './checkins/checkins.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -23,6 +24,7 @@ import { HealthController } from './health/health.controller';
     PetsModule,
     ServicesModule,
     ProfessionalsModule,
+    CheckInsModule,
     InventoryModule,
     GroomingModule,
     AppointmentsModule,

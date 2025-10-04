@@ -32,7 +32,7 @@ export class OidcJwtStrategy extends PassportStrategy(Strategy, 'oidc-jwt') {
 
     try {
       const jwksClientModule = await import('jwks-client');
-      const JwksClient = jwksClientModule.default;
+      const JwksClient = (jwksClientModule as any).default;
 
       const jwksUrl = process.env.OIDC_JWKS_URL;
       if (!jwksUrl) {

@@ -55,7 +55,26 @@ export class SyncController {
         id: '1',
         aggregate: 'sale',
         type: 'sale.created.v1',
-        payload: { saleId: '123', amount: 100.50 },
+        payload: { 
+          id: '123',
+          code: 'SALE-001',
+          operator: 'test-operator',
+          total: 100.50,
+          paymentMethod: 'cash',
+          status: 'completed',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          items: [
+            {
+              id: 'item-1',
+              productId: 'prod-1',
+              qty: 1,
+              unitPrice: 100.50,
+              subtotal: 100.50,
+              createdAt: new Date().toISOString()
+            }
+          ]
+        },
         occurredAt: new Date().toISOString()
       }
     ];

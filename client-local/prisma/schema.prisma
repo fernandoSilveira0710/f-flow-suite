@@ -117,6 +117,7 @@ model Service {
   description String?
   price       Decimal
   duration    Int      // in minutes
+  active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   appointments Appointment[]
@@ -127,6 +128,7 @@ model Professional {
   id        String   @id @default(uuid())
   name      String
   role      String
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   appointments Appointment[]
@@ -207,6 +209,8 @@ model CheckIn {
   checkInAt      DateTime     @default(now())
   checkOutAt     DateTime?
   notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([petId])
   @@index([professionalId])
