@@ -18,6 +18,14 @@ import {
   PetDeletedEventPayload,
   petUpsertedEventSchema,
   petDeletedEventSchema,
+  ServiceUpsertedEventPayload,
+  ServiceDeletedEventPayload,
+  serviceUpsertedEventSchema,
+  serviceDeletedEventSchema,
+  ProfessionalUpsertedEventPayload,
+  ProfessionalDeletedEventPayload,
+  professionalUpsertedEventSchema,
+  professionalDeletedEventSchema,
 } from './schemas';
 
 export interface ValidationResult {
@@ -78,6 +86,26 @@ export class EventValidatorService {
     this.validators.set(
       'pet.deleted.v1',
       this.ajv.compile(petDeletedEventSchema)
+    );
+
+    // Service event schemas
+    this.validators.set(
+      'service.upserted.v1',
+      this.ajv.compile(serviceUpsertedEventSchema)
+    );
+    this.validators.set(
+      'service.deleted.v1',
+      this.ajv.compile(serviceDeletedEventSchema)
+    );
+
+    // Professional event schemas
+    this.validators.set(
+      'professional.upserted.v1',
+      this.ajv.compile(professionalUpsertedEventSchema)
+    );
+    this.validators.set(
+      'professional.deleted.v1',
+      this.ajv.compile(professionalDeletedEventSchema)
     );
 
     this.logger.log('Event validation schemas initialized');
