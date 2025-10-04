@@ -77,35 +77,28 @@ export interface Staff {
 }
 
 export type AppointmentStatus = 
-  | 'AGENDADO' 
-  | 'CONFIRMADO' 
-  | 'CHECKIN' 
-  | 'CONCLUIDO' 
-  | 'CANCELADO' 
+  | 'SCHEDULED' 
+  | 'CONFIRMED' 
+  | 'CHECKED_IN' 
+  | 'COMPLETED' 
+  | 'CANCELLED' 
   | 'NO_SHOW';
 
 export interface Appointment {
   id: string;
   customerId: string;
-  customerNome: string;
-  customerContato?: string;
+  customerName: string;
+  customerContact?: string;
   petId?: string;
   serviceId: string;
-  serviceNome: string;
-  staffIds: string[];
-  resourceIds?: string[];
-  startISO: string;
-  endISO: string;
+  serviceName: string;
+  professionalId: string;
+  startTime: string;
+  endTime: string;
   status: AppointmentStatus;
-  origem?: 'WEB' | 'APP' | 'INTERNO';
-  notas?: string;
-  pagamento?: {
-    metodo?: 'PIX' | 'DEBIT' | 'CREDIT' | 'CASH' | 'OTHER';
-    sinal?: number;
-  };
-  vendaId?: string;
-  createdBy?: string;
-  updatedBy?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SchedulePrefs {
@@ -144,6 +137,24 @@ function uuid(): string {
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+// API Helper
+async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const baseUrl = 'http://localhost:3001';
+  const response = await fetch(`${baseUrl}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    throw new Error(`API call failed: ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
 function getStorage<T>(key: string, defaultValue: T): T {
@@ -361,42 +372,45 @@ export function deleteCustomer(id: string): boolean {
 
 // ============= APPOINTMENTS API =============
 
-export function getAppointments(): Appointment[] {
-  return getStorage<Appointment[]>(KEYS.APPOINTMENTS, []);
+export async function getAppointments(): Promise<Appointment[]> {
+  return apiCall<Appointment[]>('/appointments');
 }
 
-export function getAppointmentById(id: string): Appointment | null {
-  const appointments = getAppointments();
-  return appointments.find(a => a.id === id) || null;
+export async function getAppointmentById(id: string): Promise<Appointment | null> {
+  try {
+    return await apiCall<Appointment>(`/appointments/${id}`);
+  } catch (error) {
+    return null;
+  }
 }
 
-export function createAppointment(data: Omit<Appointment, 'id'>): Appointment {
-  const appointments = getAppointments();
-  const newAppointment: Appointment = {
-    ...data,
-    id: uuid(),
-  };
-  appointments.push(newAppointment);
-  setStorage(KEYS.APPOINTMENTS, appointments);
-  return newAppointment;
+export async function createAppointment(data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>): Promise<Appointment> {
+  return apiCall<Appointment>('/appointments', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
-export function updateAppointment(id: string, updates: Partial<Appointment>): Appointment | null {
-  const appointments = getAppointments();
-  const index = appointments.findIndex(a => a.id === id);
-  if (index === -1) return null;
-
-  appointments[index] = { ...appointments[index], ...updates };
-  setStorage(KEYS.APPOINTMENTS, appointments);
-  return appointments[index];
+export async function updateAppointment(id: string, updates: Partial<Appointment>): Promise<Appointment | null> {
+  try {
+    return await apiCall<Appointment>(`/appointments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  } catch (error) {
+    return null;
+  }
 }
 
-export function deleteAppointment(id: string): boolean {
-  const appointments = getAppointments();
-  const filtered = appointments.filter(a => a.id !== id);
-  if (filtered.length === appointments.length) return false;
-  setStorage(KEYS.APPOINTMENTS, filtered);
-  return true;
+export async function deleteAppointment(id: string): Promise<boolean> {
+  try {
+    await apiCall(`/appointments/${id}`, {
+      method: 'DELETE',
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 // ============= PREFERENCES API =============

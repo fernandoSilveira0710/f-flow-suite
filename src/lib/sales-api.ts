@@ -1,141 +1,181 @@
 /**
- * Sales Mock API
- * Reutiliza dados do PDV (pos-api) com camada de agregação
+ * Sales API - Real API Integration
+ * Connects to client-local server for sales operations
  */
 
-import { getSales, type Sale } from './pos-api';
-import { format, isWithinInterval, startOfDay, endOfDay, startOfMonth, subDays } from 'date-fns';
+import { Sale } from './pos-api';
 
+// Types and Interfaces
 export interface SaleFilters {
-  range?: 'today' | 'yesterday' | '7d' | 'month' | 'custom';
-  dateFrom?: string; // YYYY-MM-DD
-  dateTo?: string;   // YYYY-MM-DD
-  pay?: string[];    // ['PIX', 'CASH']
-  status?: string[]; // ['Paid', 'Canceled']
-  q?: string;        // search ID/operator
-  minTotal?: number;
-  maxTotal?: number;
+  startDate?: string;
+  endDate?: string;
+  operator?: string;
+  paymentMethod?: string;
+  status?: string;
 }
 
-export type SaleDetail = Sale;
-
-/**
- * Converte Sale do POS para SaleDetail (já é compatível)
- */
-function toSaleDetail(sale: Sale): SaleDetail {
-  return sale;
+export interface SaleDetail extends Sale {
+  // Additional fields for detailed view
 }
 
-/**
- * GET /api/sales - Lista vendas com filtros
- */
-export async function fetchSales(filters: SaleFilters = {}): Promise<SaleDetail[]> {
-  await new Promise(resolve => setTimeout(resolve, 300)); // simulate network
-  
-  let sales = (await getSales()).map(toSaleDetail);
-  const now = new Date();
+// API Configuration
+const API_BASE_URL = 'http://127.0.0.1:3010';
 
-  // Range filter
-  if (filters.range) {
-    let start: Date;
-    let end: Date = endOfDay(now);
+// API Helper function
+const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    ...options,
+  });
 
-    switch (filters.range) {
-      case 'today':
-        start = startOfDay(now);
-        break;
-      case 'yesterday':
-        start = startOfDay(subDays(now, 1));
-        end = endOfDay(subDays(now, 1));
-        break;
-      case '7d':
-        start = startOfDay(subDays(now, 7));
-        break;
-      case 'month':
-        start = startOfMonth(now);
-        break;
-      case 'custom':
-        if (filters.dateFrom) start = startOfDay(new Date(filters.dateFrom));
-        else start = startOfDay(subDays(now, 30));
-        if (filters.dateTo) end = endOfDay(new Date(filters.dateTo));
-        break;
-      default:
-        start = startOfDay(subDays(now, 30));
-    }
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+  }
 
-    sales = sales.filter(s => {
-      const saleDate = new Date(s.data);
-      return isWithinInterval(saleDate, { start, end });
+  return response.json();
+};
+
+// Sales API
+export const fetchSales = async (filters?: SaleFilters): Promise<Sale[]> => {
+  try {
+    // Build query parameters
+    const params = new URLSearchParams();
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.operator) params.append('operator', filters.operator);
+    if (filters?.paymentMethod) params.append('paymentMethod', filters.paymentMethod);
+    if (filters?.status) params.append('status', filters.status);
+
+    const queryString = params.toString();
+    const endpoint = queryString ? `/pos/sales?${queryString}` : '/pos/sales';
+    
+    const sales = await apiCall<any[]>(endpoint);
+    
+    return sales.map(sale => ({
+      id: sale.id,
+      code: sale.code,
+      operator: sale.operator,
+      paymentMethod: sale.paymentMethod,
+      status: sale.status,
+      total: sale.total,
+      customerId: sale.customerId,
+      createdAt: sale.createdAt,
+      updatedAt: sale.updatedAt,
+      items: sale.items,
+    }));
+  } catch (error) {
+    console.error('Error fetching sales:', error);
+    return [];
+  }
+};
+
+export const fetchSaleById = async (id: string): Promise<SaleDetail | null> => {
+  try {
+    const sale = await apiCall<any>(`/pos/sales/${id}`);
+    
+    return {
+      id: sale.id,
+      code: sale.code,
+      operator: sale.operator,
+      paymentMethod: sale.paymentMethod,
+      status: sale.status,
+      total: sale.total,
+      customerId: sale.customerId,
+      createdAt: sale.createdAt,
+      updatedAt: sale.updatedAt,
+      items: sale.items,
+    };
+  } catch (error) {
+    console.error('Error fetching sale by id:', error);
+    return null;
+  }
+};
+
+export const getSalesReport = async (filters?: SaleFilters): Promise<{
+  totalSales: number;
+  totalRevenue: number;
+  averageTicket: number;
+  salesByPaymentMethod: Record<string, number>;
+  salesByOperator: Record<string, number>;
+}> => {
+  try {
+    const sales = await fetchSales(filters);
+    
+    const totalSales = sales.length;
+    const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
+    const averageTicket = totalSales > 0 ? totalRevenue / totalSales : 0;
+    
+    const salesByPaymentMethod: Record<string, number> = {};
+    const salesByOperator: Record<string, number> = {};
+    
+    sales.forEach(sale => {
+      // Group by payment method
+      if (salesByPaymentMethod[sale.paymentMethod]) {
+        salesByPaymentMethod[sale.paymentMethod] += sale.total;
+      } else {
+        salesByPaymentMethod[sale.paymentMethod] = sale.total;
+      }
+      
+      // Group by operator
+      if (salesByOperator[sale.operator]) {
+        salesByOperator[sale.operator] += sale.total;
+      } else {
+        salesByOperator[sale.operator] = sale.total;
+      }
     });
+    
+    return {
+      totalSales,
+      totalRevenue,
+      averageTicket,
+      salesByPaymentMethod,
+      salesByOperator,
+    };
+  } catch (error) {
+    console.error('Error generating sales report:', error);
+    return {
+      totalSales: 0,
+      totalRevenue: 0,
+      averageTicket: 0,
+      salesByPaymentMethod: {},
+      salesByOperator: {},
+    };
   }
+};
 
-  // Payment method filter
-  if (filters.pay && filters.pay.length > 0) {
-    sales = sales.filter(s => 
-      filters.pay!.some(p => s.pagamento?.toUpperCase().includes(p.toUpperCase()))
-    );
-  }
-
-  // Status filter
-  if (filters.status && filters.status.length > 0) {
-    sales = sales.filter(s => filters.status!.includes(s.status));
-  }
-
-  // Search filter (ID or operator)
-  if (filters.q) {
-    const lower = filters.q.toLowerCase();
-    sales = sales.filter(s => 
-      s.id.toLowerCase().includes(lower) || 
-      s.operador?.toLowerCase().includes(lower)
-    );
-  }
-
-  // Min/Max total
-  if (filters.minTotal !== undefined) {
-    sales = sales.filter(s => s.total >= filters.minTotal!);
-  }
-  if (filters.maxTotal !== undefined) {
-    sales = sales.filter(s => s.total <= filters.maxTotal!);
-  }
-
-  return sales.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
-}
-
-/**
- * GET /api/sales/[id] - Detalhe da venda
- */
-export async function fetchSaleById(id: string): Promise<SaleDetail | null> {
-  const sales = await getSales();
-  const sale = sales.find(s => s.id === id);
-  return sale ? toSaleDetail(sale) : null;
-}
-
-/**
- * POST /api/sales/[id]/refund - Estornar venda (mock)
- */
-export async function refundSale(id: string): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  // Mock: apenas simula, não persiste
-  console.log(`[MOCK] Venda ${id} estornada`);
-}
-
-/**
- * POST /api/sales/export - Exportar vendas para CSV
- */
-export function exportSalesToCSV(sales: SaleDetail[]): string {
-  const headers = ['ID', 'Data', 'Operador', 'Itens', 'Total', 'Pagamento', 'Status'];
-  const rows = sales.map(s => [
-    s.id,
-    format(new Date(s.data), 'dd/MM/yyyy HH:mm'),
-    s.operador || '-',
-    s.itens.length,
-    s.total.toFixed(2),
-    s.pagamento || '-',
-    s.status
-  ]);
-
-  return [
-    headers.join(','),
-    ...rows.map(r => r.join(','))
+// Export functions
+export const exportSalesToCSV = async (sales: Sale[]): Promise<void> => {
+  const csvContent = [
+    // CSV Header
+    'ID,Código,Operador,Método de Pagamento,Status,Total,Cliente,Data de Criação',
+    // CSV Data
+    ...sales.map(sale => 
+      `${sale.id},${sale.code},${sale.operator},${sale.paymentMethod},${sale.status},${sale.total},${sale.customerId || ''},${sale.createdAt}`
+    )
   ].join('\n');
-}
+
+  // Create and download file
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `vendas_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+export const refundSale = async (saleId: string): Promise<void> => {
+  try {
+    await apiCall(`/sales/${saleId}/refund`, {
+      method: 'POST',
+    });
+  } catch (error) {
+    console.error('Error processing refund:', error);
+    throw error;
+  }
+};

@@ -1,8 +1,9 @@
 /**
- * API Mock para PDV (Ponto de Venda)
- * Futuramente apontará para 2F License Hub via VITE_LICENSE_HUB_URL
+ * POS API - Real API Integration
+ * Connects to client-local server for POS operations
  */
 
+// Types and Interfaces
 export interface Product {
   id: string;
   nome: string;
@@ -11,39 +12,43 @@ export interface Product {
   estoque: number;
   categoria?: string;
   barcode?: string;
-  imageUrl?: string;
 }
 
 export interface CartItem {
-  productId: string;
-  nome: string;
-  sku: string;
+  id: string;
+  produto: Product;
   qtd: number;
-  precoUnit: number;
-  descontoItem: number;
   subtotal: number;
-  imageUrl?: string;
 }
 
 export interface Sale {
   id: string;
-  data: string;
-  itens: CartItem[];
-  subtotal: number;
-  desconto: number;
+  code: string;
+  operator: string;
+  paymentMethod: string;
+  status: string;
   total: number;
-  pagamento: string;
-  parcelas?: number;
-  status: 'Pago' | 'Cancelado';
-  operador: string;
+  customerId?: string;
+  createdAt: string;
+  updatedAt: string;
+  items: SaleItem[];
+}
+
+export interface SaleItem {
+  id: string;
+  productId: string;
+  qty: number;
+  unitPrice: number;
+  subtotal: number;
+  createdAt: string;
 }
 
 export interface CashEntry {
   id: string;
-  tipo: 'SANGRIA' | 'SUPRIMENTO';
+  tipo: 'entrada' | 'saida';
   valor: number;
-  obs?: string;
-  dataISO: string;
+  descricao: string;
+  timestamp: string;
 }
 
 export interface Session {
@@ -68,14 +73,17 @@ export interface Session {
   };
 }
 
+// API Configuration
+const API_BASE_URL = 'http://127.0.0.1:3010';
+
+// Storage keys for cart and session (still needed for frontend state)
 const STORAGE_KEYS = {
-  products: '2f.pos.products',
   cart: '2f.pos.cart',
   session: '2f.pos.session.current',
   sessionsClosed: '2f.pos.sessions.closed',
-  sales: '2f.pos.sales',
 };
 
+// Utility functions
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const getFromStorage = <T>(key: string, defaultValue: T): T => {
@@ -89,376 +97,368 @@ const setInStorage = <T>(key: string, value: T): void => {
   localStorage.setItem(key, JSON.stringify(value));
 };
 
-// Mock Products
-const DEFAULT_PRODUCTS: Product[] = [
-  { id: '1', nome: 'Ração Premium 15kg', sku: 'RAC001', preco: 189.90, estoque: 45, categoria: 'Ração', barcode: '7891234567890' },
-  { id: '2', nome: 'Shampoo Pet 500ml', sku: 'SHP001', preco: 29.90, estoque: 120, categoria: 'Higiene', barcode: '7891234567891' },
-  { id: '3', nome: 'Coleira Ajustável', sku: 'COL001', preco: 24.90, estoque: 80, categoria: 'Acessórios', barcode: '7891234567892' },
-  { id: '4', nome: 'Brinquedo Mordedor', sku: 'BRI001', preco: 19.90, estoque: 150, categoria: 'Brinquedos', barcode: '7891234567893' },
-  { id: '5', nome: 'Areia Sanitária 4kg', sku: 'ARE001', preco: 32.90, estoque: 60, categoria: 'Higiene', barcode: '7891234567894' },
-  { id: '6', nome: 'Petiscos Variados', sku: 'PET001', preco: 15.90, estoque: 200, categoria: 'Petiscos', barcode: '7891234567895' },
-  { id: '7', nome: 'Cama Confort M', sku: 'CAM001', preco: 79.90, estoque: 30, categoria: 'Camas', barcode: '7891234567896' },
-  { id: '8', nome: 'Comedouro Duplo', sku: 'COM001', preco: 34.90, estoque: 50, categoria: 'Comedouros', barcode: '7891234567897' },
-  { id: '9', nome: 'Antipulgas 3ml', sku: 'ANT001', preco: 45.90, estoque: 90, categoria: 'Medicamentos', barcode: '7891234567898' },
-  { id: '10', nome: 'Osso Natural G', sku: 'OSS001', preco: 12.90, estoque: 180, categoria: 'Petiscos', barcode: '7891234567899' },
-];
+// API Helper function
+const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    ...options,
+  });
 
-// Initialize products if not exists
-if (typeof window !== 'undefined' && !localStorage.getItem(STORAGE_KEYS.products)) {
-  setInStorage(STORAGE_KEYS.products, DEFAULT_PRODUCTS);
-}
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+};
 
 // Products API
 export const searchProducts = async (query: string): Promise<Product[]> => {
-  await delay(300);
-  const products = getFromStorage<Product[]>(STORAGE_KEYS.products, DEFAULT_PRODUCTS);
-  
-  if (!query.trim()) return products;
-  
-  const lowerQuery = query.toLowerCase();
-  return products.filter(p => 
-    p.nome.toLowerCase().includes(lowerQuery) ||
-    p.sku.toLowerCase().includes(lowerQuery) ||
-    p.barcode?.toLowerCase().includes(lowerQuery) ||
-    p.categoria?.toLowerCase().includes(lowerQuery)
-  );
+  try {
+    const products = await apiCall<any[]>('/products');
+    
+    if (!query.trim()) {
+      return products.map(p => ({
+        id: p.id,
+        nome: p.name,
+        sku: p.sku,
+        preco: p.salePrice || p.price,
+        estoque: p.stockQty || 0,
+        categoria: p.category,
+        barcode: p.barcode,
+      }));
+    }
+    
+    const lowerQuery = query.toLowerCase();
+    return products
+      .filter(p => 
+        p.name?.toLowerCase().includes(lowerQuery) ||
+        p.sku?.toLowerCase().includes(lowerQuery) ||
+        p.barcode?.toLowerCase().includes(lowerQuery) ||
+        p.category?.toLowerCase().includes(lowerQuery)
+      )
+      .map(p => ({
+        id: p.id,
+        nome: p.name,
+        sku: p.sku,
+        preco: p.salePrice || p.price,
+        estoque: p.stockQty || 0,
+        categoria: p.category,
+        barcode: p.barcode,
+      }));
+  } catch (error) {
+    console.error('Error searching products:', error);
+    return [];
+  }
 };
 
 export const findProductByBarcode = async (barcode: string): Promise<Product | null> => {
-  await delay(200);
-  const products = getFromStorage<Product[]>(STORAGE_KEYS.products, DEFAULT_PRODUCTS);
-  return products.find(p => p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase()) || null;
+  try {
+    const products = await apiCall<any[]>('/products');
+    const product = products.find(p => p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase());
+    
+    if (!product) return null;
+    
+    return {
+      id: product.id,
+      nome: product.name,
+      sku: product.sku,
+      preco: product.salePrice || product.price,
+      estoque: product.stockQty || 0,
+      categoria: product.category,
+      barcode: product.barcode,
+    };
+  } catch (error) {
+    console.error('Error finding product by barcode:', error);
+    return null;
+  }
 };
 
 export const getProducts = async (): Promise<Product[]> => {
-  await delay(300);
-  return getFromStorage<Product[]>(STORAGE_KEYS.products, DEFAULT_PRODUCTS);
+  try {
+    const products = await apiCall<any[]>('/products');
+    return products.map(p => ({
+      id: p.id,
+      nome: p.name,
+      sku: p.sku,
+      preco: p.salePrice || p.price,
+      estoque: p.stockQty || 0,
+      categoria: p.category,
+      barcode: p.barcode,
+    }));
+  } catch (error) {
+    console.error('Error getting products:', error);
+    return [];
+  }
 };
 
 export const getProductById = async (id: string): Promise<Product | null> => {
-  await delay(200);
-  const products = getFromStorage<Product[]>(STORAGE_KEYS.products, DEFAULT_PRODUCTS);
-  return products.find(p => p.id === id) || null;
+  try {
+    const product = await apiCall<any>(`/products/${id}`);
+    return {
+      id: product.id,
+      nome: product.name,
+      sku: product.sku,
+      preco: product.salePrice || product.price,
+      estoque: product.stockQty || 0,
+      categoria: product.category,
+      barcode: product.barcode,
+    };
+  } catch (error) {
+    console.error('Error getting product by id:', error);
+    return null;
+  }
 };
 
-// Cart API
+// Cart API (still uses localStorage for frontend state)
 export const getCart = (): CartItem[] => {
   return getFromStorage<CartItem[]>(STORAGE_KEYS.cart, []);
 };
 
 export const addToCart = async (productId: string, qtd: number = 1): Promise<CartItem[]> => {
   await delay(200);
+  
   const product = await getProductById(productId);
-  if (!product) throw new Error('Produto não encontrado');
-  
-  if (product.estoque < qtd) {
-    throw new Error('Estoque insuficiente');
+  if (!product) {
+    throw new Error('Produto não encontrado');
   }
-  
+
   const cart = getCart();
-  const existingItem = cart.find(item => item.productId === productId);
-  
-  let updatedCart: CartItem[];
+  const existingItem = cart.find(item => item.produto.id === productId);
+
   if (existingItem) {
-    const newQtd = existingItem.qtd + qtd;
-    if (newQtd > product.estoque) {
-      throw new Error('Estoque insuficiente');
-    }
-    updatedCart = cart.map(item =>
-      item.productId === productId
-        ? { ...item, qtd: newQtd, subtotal: (newQtd * item.precoUnit) - item.descontoItem }
-        : item
-    );
+    existingItem.qtd += qtd;
+    existingItem.subtotal = existingItem.qtd * existingItem.produto.preco;
   } else {
     const newItem: CartItem = {
-      productId: product.id,
-      nome: product.nome,
-      sku: product.sku,
+      id: Date.now().toString(),
+      produto: product,
       qtd,
-      precoUnit: product.preco,
-      descontoItem: 0,
       subtotal: qtd * product.preco,
-      imageUrl: product.imageUrl,
     };
-    updatedCart = [...cart, newItem];
+    cart.push(newItem);
   }
-  
-  setInStorage(STORAGE_KEYS.cart, updatedCart);
-  return updatedCart;
+
+  setInStorage(STORAGE_KEYS.cart, cart);
+  return cart;
 };
 
-export const updateCartItem = async (productId: string, qtd: number): Promise<CartItem[]> => {
+export const updateCartItem = async (itemId: string, qtd: number): Promise<CartItem[]> => {
   await delay(200);
-  const product = await getProductById(productId);
-  if (!product) throw new Error('Produto não encontrado');
-  
-  if (qtd < 1) throw new Error('Quantidade inválida');
-  if (qtd > product.estoque) throw new Error('Estoque insuficiente');
   
   const cart = getCart();
-  const updatedCart = cart.map(item =>
-    item.productId === productId
-      ? { ...item, qtd, subtotal: (qtd * item.precoUnit) - item.descontoItem }
-      : item
-  );
+  const item = cart.find(item => item.id === itemId);
   
-  setInStorage(STORAGE_KEYS.cart, updatedCart);
-  return updatedCart;
-};
-
-export const applyItemDiscount = async (productId: string, discount: number): Promise<CartItem[]> => {
-  await delay(200);
-  const cart = getCart();
-  const item = cart.find(i => i.productId === productId);
-  if (!item) throw new Error('Item não encontrado no carrinho');
-  
-  const maxDiscount = item.qtd * item.precoUnit;
-  if (discount < 0 || discount > maxDiscount) {
-    throw new Error('Desconto inválido');
+  if (item) {
+    if (qtd <= 0) {
+      const index = cart.indexOf(item);
+      cart.splice(index, 1);
+    } else {
+      item.qtd = qtd;
+      item.subtotal = qtd * item.produto.preco;
+    }
   }
-  
-  const updatedCart = cart.map(i =>
-    i.productId === productId
-      ? { ...i, descontoItem: discount, subtotal: (i.qtd * i.precoUnit) - discount }
-      : i
-  );
-  
-  setInStorage(STORAGE_KEYS.cart, updatedCart);
-  return updatedCart;
+
+  setInStorage(STORAGE_KEYS.cart, cart);
+  return cart;
 };
 
-export const removeFromCart = async (productId: string): Promise<CartItem[]> => {
+export const removeFromCart = async (itemId: string): Promise<CartItem[]> => {
   await delay(200);
+  
   const cart = getCart();
-  const updatedCart = cart.filter(item => item.productId !== productId);
-  setInStorage(STORAGE_KEYS.cart, updatedCart);
-  return updatedCart;
+  const index = cart.findIndex(item => item.id === itemId);
+  
+  if (index !== -1) {
+    cart.splice(index, 1);
+  }
+
+  setInStorage(STORAGE_KEYS.cart, cart);
+  return cart;
 };
 
-export const clearCart = (): void => {
+export const clearCart = async (): Promise<void> => {
+  await delay(200);
   setInStorage(STORAGE_KEYS.cart, []);
 };
 
-export const applyDiscount = (cart: CartItem[], couponCode: string): number => {
-  // Mock: apenas o cupom "PROMO10" aplica 10% de desconto
-  if (couponCode.toUpperCase() === 'PROMO10') {
-    const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
-    return subtotal * 0.1;
+// Sales API
+export const createSale = async (saleData: {
+  operator: string;
+  paymentMethod: string;
+  customerId?: string;
+  items: { productId: string; qty: number; unitPrice: number }[];
+}): Promise<Sale> => {
+  try {
+    const sale = await apiCall<any>('/pos/sales', {
+      method: 'POST',
+      body: JSON.stringify(saleData),
+    });
+
+    // Clear cart after successful sale
+    await clearCart();
+
+    return {
+      id: sale.id,
+      code: sale.code,
+      operator: sale.operator,
+      paymentMethod: sale.paymentMethod,
+      status: sale.status,
+      total: sale.total,
+      customerId: sale.customerId,
+      createdAt: sale.createdAt,
+      updatedAt: sale.updatedAt,
+      items: sale.items,
+    };
+  } catch (error) {
+    console.error('Error creating sale:', error);
+    throw error;
   }
-  return 0;
 };
 
-// Session API
-export const getSession = (): Session | null => {
+export const getSales = async (): Promise<Sale[]> => {
+  try {
+    const sales = await apiCall<any[]>('/pos/sales');
+    return sales.map(sale => ({
+      id: sale.id,
+      code: sale.code,
+      operator: sale.operator,
+      paymentMethod: sale.paymentMethod,
+      status: sale.status,
+      total: sale.total,
+      customerId: sale.customerId,
+      createdAt: sale.createdAt,
+      updatedAt: sale.updatedAt,
+      items: sale.items,
+    }));
+  } catch (error) {
+    console.error('Error getting sales:', error);
+    return [];
+  }
+};
+
+export const getSaleById = async (id: string): Promise<Sale | null> => {
+  try {
+    const sale = await apiCall<any>(`/pos/sales/${id}`);
+    return {
+      id: sale.id,
+      code: sale.code,
+      operator: sale.operator,
+      paymentMethod: sale.paymentMethod,
+      status: sale.status,
+      total: sale.total,
+      customerId: sale.customerId,
+      createdAt: sale.createdAt,
+      updatedAt: sale.updatedAt,
+      items: sale.items,
+    };
+  } catch (error) {
+    console.error('Error getting sale by id:', error);
+    return null;
+  }
+};
+
+// Session API (still uses localStorage for now - can be enhanced later)
+export const getCurrentSession = (): Session | null => {
   return getFromStorage<Session | null>(STORAGE_KEYS.session, null);
 };
 
-export const openSession = async (
-  saldoInicial: number,
-  operador: { id: string; nome: string }
-): Promise<Session> => {
-  await delay(500);
-  const existingSession = getSession();
-  if (existingSession?.status === 'Aberto') {
-    throw new Error('Já existe uma sessão aberta');
-  }
+export const createSession = async (operador: { id: string; nome: string }, saldoInicial: number): Promise<Session> => {
+  await delay(300);
   
-  const newSession: Session = {
-    id: `SES-${Date.now()}`,
+  const session: Session = {
+    id: Date.now().toString(),
+    operador,
     abertoEm: new Date().toISOString(),
     saldoInicial,
     status: 'Aberto',
-    operador,
     cash: [],
     vendasIds: [],
   };
-  
-  setInStorage(STORAGE_KEYS.session, newSession);
-  return newSession;
+
+  setInStorage(STORAGE_KEYS.session, session);
+  return session;
 };
 
-export const addCashEntry = async (
-  tipo: 'SANGRIA' | 'SUPRIMENTO',
-  valor: number,
-  obs?: string
-): Promise<Session> => {
+export const closeSession = async (resumoFechamento: Session['resumoFechamento']): Promise<Session> => {
   await delay(300);
-  const session = getSession();
-  if (!session || session.status !== 'Aberto') {
-    throw new Error('Nenhuma sessão aberta');
+  
+  const session = getCurrentSession();
+  if (!session) {
+    throw new Error('Nenhuma sessão ativa encontrada');
   }
 
-  const entry: CashEntry = {
-    id: `CASH-${Date.now()}`,
-    tipo,
-    valor,
-    obs,
-    dataISO: new Date().toISOString(),
-  };
+  session.status = 'Fechado';
+  session.fechadoEm = new Date().toISOString();
+  session.resumoFechamento = resumoFechamento;
 
-  const updatedSession: Session = {
-    ...session,
-    cash: [...session.cash, entry],
-  };
-
-  setInStorage(STORAGE_KEYS.session, updatedSession);
-  return updatedSession;
-};
-
-export const closeSession = async (observacao?: string): Promise<Session> => {
-  await delay(500);
-  const session = getSession();
-  if (!session || session.status === 'Fechado') {
-    throw new Error('Nenhuma sessão aberta');
-  }
-
-  // Calculate resumo
-  const sales = getFromStorage<Sale[]>(STORAGE_KEYS.sales, []);
-  const sessionSales = sales.filter(s => session.vendasIds.includes(s.id) && s.status === 'Pago');
-
-  const totalVendas = sessionSales.reduce((sum, s) => sum + s.total, 0);
-  const totalDinheiro = sessionSales
-    .filter(s => s.pagamento === 'Dinheiro')
-    .reduce((sum, s) => sum + s.total, 0);
-  const totalCartao = sessionSales
-    .filter(s => s.pagamento.includes('Cartão'))
-    .reduce((sum, s) => sum + s.total, 0);
-  const totalPix = sessionSales
-    .filter(s => s.pagamento === 'PIX')
-    .reduce((sum, s) => sum + s.total, 0);
-  const totalOutros = sessionSales
-    .filter(s => !['Dinheiro', 'PIX'].includes(s.pagamento) && !s.pagamento.includes('Cartão'))
-    .reduce((sum, s) => sum + s.total, 0);
-
-  const totalSangria = session.cash
-    .filter(c => c.tipo === 'SANGRIA')
-    .reduce((sum, c) => sum + c.valor, 0);
-  const totalSuprimento = session.cash
-    .filter(c => c.tipo === 'SUPRIMENTO')
-    .reduce((sum, c) => sum + c.valor, 0);
-
-  const saldoFinalCalculado =
-    session.saldoInicial + totalSuprimento - totalSangria + totalDinheiro;
-
-  const closedSession: Session = {
-    ...session,
-    fechadoEm: new Date().toISOString(),
-    status: 'Fechado',
-    resumoFechamento: {
-      totalVendas,
-      totalDinheiro,
-      totalCartao,
-      totalPix,
-      totalOutros,
-      totalSangria,
-      totalSuprimento,
-      saldoFinalCalculado,
-      observacao,
-    },
-  };
-
-  // Save to closed sessions
+  // Move to closed sessions
   const closedSessions = getFromStorage<Session[]>(STORAGE_KEYS.sessionsClosed, []);
-  setInStorage(STORAGE_KEYS.sessionsClosed, [closedSession, ...closedSessions]);
+  closedSessions.push(session);
+  setInStorage(STORAGE_KEYS.sessionsClosed, closedSessions);
 
   // Clear current session
   setInStorage(STORAGE_KEYS.session, null);
 
-  return closedSession;
+  return session;
 };
 
-// Sales API
-export const getSales = async (): Promise<Sale[]> => {
-  await delay(300);
-  return getFromStorage<Sale[]>(STORAGE_KEYS.sales, []);
-};
-
-export const createSale = async (
-  cart: CartItem[],
-  pagamento: string,
-  parcelas?: number,
-  desconto: number = 0
-): Promise<Sale> => {
-  await delay(500);
-  
-  const session = getSession();
-  if (!session || session.status !== 'Aberto') {
-    throw new Error('Nenhuma sessão aberta');
-  }
-  
-  const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
-  const total = subtotal - desconto;
-  
-  const newSale: Sale = {
-    id: `VND-${Date.now()}`,
-    data: new Date().toISOString(),
-    itens: cart,
-    subtotal,
-    desconto,
-    total,
-    pagamento,
-    parcelas,
-    status: 'Pago',
-    operador: session.operador.nome,
-  };
-  
-  // Save sale
-  const sales = await getSales();
-  const updatedSales = [newSale, ...sales];
-  setInStorage(STORAGE_KEYS.sales, updatedSales);
-  
-  // Update session
-  const updatedSession: Session = {
-    ...session,
-    vendasIds: [...session.vendasIds, newSale.id],
-  };
-  setInStorage(STORAGE_KEYS.session, updatedSession);
-  
-  // Update product stock
-  const products = getFromStorage<Product[]>(STORAGE_KEYS.products, DEFAULT_PRODUCTS);
-  const updatedProducts = products.map(product => {
-    const cartItem = cart.find(item => item.productId === product.id);
-    if (cartItem) {
-      return { ...product, estoque: product.estoque - cartItem.qtd };
-    }
-    return product;
-  });
-  setInStorage(STORAGE_KEYS.products, updatedProducts);
-  
-  // Clear cart
-  clearCart();
-  
-  return newSale;
-};
-
-export const getSaleById = async (id: string): Promise<Sale | null> => {
+export const addCashEntry = async (entry: Omit<CashEntry, 'id' | 'timestamp'>): Promise<Session> => {
   await delay(200);
-  const sales = await getSales();
-  return sales.find(s => s.id === id) || null;
+  
+  const session = getCurrentSession();
+  if (!session) {
+    throw new Error('Nenhuma sessão ativa encontrada');
+  }
+
+  const cashEntry: CashEntry = {
+    ...entry,
+    id: Date.now().toString(),
+    timestamp: new Date().toISOString(),
+  };
+
+  session.cash.push(cashEntry);
+  setInStorage(STORAGE_KEYS.session, session);
+
+  return session;
 };
 
-export const refundSale = async (saleId: string): Promise<Sale> => {
+export const getClosedSessions = async (): Promise<Session[]> => {
+  await delay(200);
+  return getFromStorage<Session[]>(STORAGE_KEYS.sessionsClosed, []);
+};
+
+// Discount functions
+export const applyDiscount = (cart: CartItem[], couponCode: string): number => {
+  // Simple coupon validation - in real app this would call an API
+  const validCoupons: Record<string, number> = {
+    'DESC10': 0.10,
+    'DESC20': 0.20,
+    'FIDELIDADE': 0.15,
+    'PROMO5': 0.05,
+  };
+
+  const discountPercent = validCoupons[couponCode.toUpperCase()];
+  if (!discountPercent) return 0;
+
+  const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
+  return total * discountPercent;
+};
+
+export const applyItemDiscount = (item: CartItem, discountPercent: number): CartItem => {
+  const discountAmount = item.subtotal * (discountPercent / 100);
+  return {
+    ...item,
+    subtotal: item.subtotal - discountAmount,
+  };
+};
+
+// Refund function
+export const refundSale = async (saleId: string): Promise<void> => {
   await delay(500);
-  const sales = await getSales();
-  const sale = sales.find(s => s.id === saleId);
-  if (!sale) throw new Error('Venda não encontrada');
-  if (sale.status === 'Cancelado') throw new Error('Venda já cancelada');
-  
-  // Update sale status
-  const updatedSale = { ...sale, status: 'Cancelado' as const };
-  const updatedSales = sales.map(s => s.id === saleId ? updatedSale : s);
-  setInStorage(STORAGE_KEYS.sales, updatedSales);
-  
-  // Restore product stock
-  const products = getFromStorage<Product[]>(STORAGE_KEYS.products, DEFAULT_PRODUCTS);
-  const updatedProducts = products.map(product => {
-    const cartItem = sale.itens.find(item => item.productId === product.id);
-    if (cartItem) {
-      return { ...product, estoque: product.estoque + cartItem.qtd };
-    }
-    return product;
-  });
-  setInStorage(STORAGE_KEYS.products, updatedProducts);
-  
-  return updatedSale;
+  // In a real app, this would call the API to process the refund
+  // For now, we'll just simulate the operation
+  console.log(`Processing refund for sale ${saleId}`);
 };

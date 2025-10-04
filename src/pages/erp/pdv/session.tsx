@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { openSession } from '@/lib/pos-api';
+import { createSession } from '@/lib/pos-api';
 
 export default function SessionPage() {
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ export default function SessionPage() {
 
     setLoading(true);
     try {
-      await openSession(valor, { id: 'admin-1', nome: 'Admin Demo' });
+      await createSession({ id: 'admin-1', nome: 'Admin Demo' }, valor);
       toast.success('Caixa aberto com sucesso!');
       navigate('/erp/pdv');
     } catch (error) {

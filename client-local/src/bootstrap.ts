@@ -1,216 +1,192 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
-import * as path from 'path';
-import * as fs from 'fs-extra';
-import * as os from 'os';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { createLogger, StructuredLogger } from './common/logger';
-
-const execAsync = promisify(exec);
+import { loadEnvConfig } from './common/env';
+import { PrismaClient } from '@prisma/client';
+import { spawn } from 'child_process';
+import { existsSync, copyFileSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
+import { homedir, platform } from 'os';
 
 export interface BootstrapConfig {
   dataDir: string;
   logDir: string;
   databaseUrl: string;
   port: number;
-  isService: boolean;
+  host: string;
 }
 
-/**
- * Resolve paths based on operating system
- */
-export function resolvePaths(): { dataDir: string; logDir: string } {
-  const platform = os.platform();
-  const homeDir = os.homedir();
+function resolvePaths(): { dataDir: string; logDir: string } {
+  const isWindows = platform() === 'win32';
+  const home = homedir();
   
-  let dataDir: string;
-  let logDir: string;
-
-  switch (platform) {
-    case 'win32':
-      // Windows: %LOCALAPPDATA%/F-Flow Suite/
-      const localAppData = process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local');
-      dataDir = path.join(localAppData, 'F-Flow Suite', 'data');
-      logDir = path.join(localAppData, 'F-Flow Suite', 'logs');
-      break;
-    
-    case 'darwin':
-      // macOS: ~/Library/Application Support/F-Flow Suite/
-      dataDir = path.join(homeDir, 'Library', 'Application Support', 'F-Flow Suite', 'data');
-      logDir = path.join(homeDir, 'Library', 'Application Support', 'F-Flow Suite', 'logs');
-      break;
-    
-    default:
-      // Linux: ~/.local/share/f-flow-suite/
-      dataDir = path.join(homeDir, '.local', 'share', 'f-flow-suite', 'data');
-      logDir = path.join(homeDir, '.local', 'share', 'f-flow-suite', 'logs');
-      break;
-  }
-
-  // Allow override via environment variables
-  if (process.env.LOCAL_DATA_DIR) {
-    dataDir = process.env.LOCAL_DATA_DIR;
-  }
-  
-  if (process.env.LOCAL_LOG_DIR) {
-    logDir = process.env.LOCAL_LOG_DIR;
-  }
-
-  return { dataDir, logDir };
-}
-
-/**
- * Ensure directories exist
- */
-export function ensureDirectories(dataDir: string, logDir: string): void {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-  
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
+  if (isWindows) {
+    const localAppData = process.env.LOCALAPPDATA || join(home, 'AppData', 'Local');
+    const baseDir = join(localAppData, 'F-Flow Suite');
+    return {
+      dataDir: join(baseDir, 'data'),
+      logDir: join(baseDir, 'logs'),
+    };
+  } else {
+    const baseDir = join(home, '.f-flow-suite');
+    return {
+      dataDir: join(baseDir, 'data'),
+      logDir: join(baseDir, 'logs'),
+    };
   }
 }
 
-/**
- * Setup database URL
- */
-export function setupDatabase(dataDir: string): string {
-  const logger = new Logger('Bootstrap');
-  const dbPath = path.join(dataDir, 'local.db');
+function ensureDirectories(dataDir: string, logDir: string): void {
+  if (!existsSync(dataDir)) {
+    mkdirSync(dataDir, { recursive: true });
+  }
+  if (!existsSync(logDir)) {
+    mkdirSync(logDir, { recursive: true });
+  }
+}
+
+function setupDatabase(dataDir: string): string {
+  const dbPath = join(dataDir, 'local.db');
+  const databaseUrl = `file:${dbPath}`;
   
-  // Se estiver rodando em binário (pkg) e o banco não existir, copiar do semente
-  if ((process as any).pkg && !fs.existsSync(dbPath)) {
-    const seedDbPath = path.join(__dirname, '..', 'prisma', 'local.db');
-    if (fs.existsSync(seedDbPath)) {
-      fs.copySync(seedDbPath, dbPath);
-      logger.log('Copied seed database to data directory');
+  // Set the DATABASE_URL environment variable for Prisma
+  process.env.DATABASE_URL = databaseUrl;
+  
+  // Copy seed database if running as binary and database doesn't exist
+  if ((process as any).pkg && !existsSync(dbPath)) {
+    const seedDbPath = join(dirname(process.execPath), 'seed.db');
+    if (existsSync(seedDbPath)) {
+      copyFileSync(seedDbPath, dbPath);
     }
   }
   
-  return `file:${dbPath}`;
+  return databaseUrl;
 }
 
-/**
- * Run Prisma migrations
- */
-export async function runMigrations(databaseUrl: string): Promise<void> {
+async function runMigrations(): Promise<void> {
   const logger = new Logger('Bootstrap');
   
-  // Se estiver rodando em binário (pkg), não execute migrations
-  if ((process as any).pkg) {
-    logger.warn('Running in packaged mode; skipping Prisma migrations');
-    return;
-  }
+  logger.log('Running Prisma migrations...');
   
-  try {
-    // Set DATABASE_URL for Prisma
-    process.env.DATABASE_URL = databaseUrl;
+  return new Promise((resolve, reject) => {
+    // Generate Prisma client first
+    const generateProcess = spawn('npx', ['prisma', 'generate'], {
+      stdio: 'pipe',
+      shell: true,
+      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL }
+    });
     
-    logger.log('Running Prisma migrations...');
+    generateProcess.on('close', (code) => {
+      if (code === 0) {
+        logger.log('Prisma client generated successfully');
+        
+        // Run migrations
+        const migrateProcess = spawn('npx', ['prisma', 'migrate', 'deploy'], {
+          stdio: 'pipe',
+          shell: true,
+          env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL }
+        });
+        
+        migrateProcess.on('close', (migrateCode) => {
+          if (migrateCode === 0) {
+            logger.log('Database migrations completed successfully');
+            resolve();
+          } else {
+            reject(new Error(`Migration failed with code ${migrateCode}`));
+          }
+        });
+        
+        migrateProcess.on('error', (error) => {
+          reject(error);
+        });
+      } else {
+        reject(new Error(`Prisma generate failed with code ${code}`));
+      }
+    });
     
-    // Generate Prisma client
-    await execAsync('npx prisma generate');
-    logger.log('Prisma client generated successfully');
-    
-    // Run migrations
-    await execAsync('npx prisma migrate deploy');
-    logger.log('Database migrations completed successfully');
-    
-  } catch (error) {
-    logger.error('Failed to run migrations:', error);
-    throw error;
-  }
+    generateProcess.on('error', (error) => {
+      reject(error);
+    });
+  });
 }
 
-/**
- * Bootstrap the application
- */
 export async function bootstrap(): Promise<void> {
-  const logger = new Logger('Bootstrap');
-  
   try {
-    // Check if LOCAL_SERVER_ENABLED is set to false
+    const logger = new Logger('Bootstrap');
+    
+    // Check if LOCAL_SERVER_ENABLED is false
     if (process.env.LOCAL_SERVER_ENABLED === 'false') {
-      logger.warn('LOCAL_SERVER_ENABLED is set to false. Server will not start.');
-      process.exit(0);
+      logger.log('Local server is disabled. Exiting...');
+      return;
     }
-
-    // Resolve paths
+    
+    // Resolve and ensure directories
     const { dataDir, logDir } = resolvePaths();
     logger.log(`Data directory: ${dataDir}`);
     logger.log(`Log directory: ${logDir}`);
-
-    // Ensure directories exist
     ensureDirectories(dataDir, logDir);
-
+    
     // Setup database
     const databaseUrl = setupDatabase(dataDir);
     logger.log(`Database URL: ${databaseUrl}`);
-
+    
     // Run migrations
-    await runMigrations(databaseUrl);
-
-    // Initialize logger
+    await runMigrations();
+    
+    // Initialize application logger
+    logger.log('Initializing application logger...');
     const appLogger = createLogger(logDir);
+    logger.log('Application logger initialized successfully');
     
     // Create NestJS application
-  const app = await NestFactory.create(AppModule, {
-    logger: false, // Disable default logger, we'll use our custom one
-  });
-  
-  // Use our custom logger
-  app.useLogger(new StructuredLogger(logDir, 'NestApplication'));
-
-    // Get port from environment or default to 3010
-    const port = parseInt(process.env.PORT || '3010', 10);
-
-    // Check if running as service
-    const isService = process.argv.includes('--service');
+    logger.log('Creating NestJS application...');
+    const app = await NestFactory.create(AppModule, {
+      bufferLogs: true,
+    });
     
-    if (isService) {
-      logger.log('Starting in service mode...');
-    }
-
-    // Start the server
-    await app.listen(port, '127.0.0.1');
-    logger.log(`F-Flow Client Local server started on http://127.0.0.1:${port}`);
-
-    // Handle graceful shutdown
+    // Configure structured logger for NestJS
+  app.useLogger(new StructuredLogger(logDir));
+    logger.log('Structured logger configured successfully');
+    
+    // Start server
+    const port = process.env.PORT ? Number(process.env.PORT) : 3010;
+    const host = '127.0.0.1';
+    
+    await app.listen(port, host);
+    logger.log(`F-Flow Client Local server started on http://${host}:${port}`);
+    
+    // Graceful shutdown handlers
     process.on('SIGTERM', async () => {
-      logger.log('Received SIGTERM, shutting down gracefully...');
+      logger.log('SIGTERM received, shutting down gracefully...');
       await app.close();
       process.exit(0);
     });
-
+    
     process.on('SIGINT', async () => {
-      logger.log('Received SIGINT, shutting down gracefully...');
+      logger.log('SIGINT received, shutting down gracefully...');
       await app.close();
       process.exit(0);
     });
-
+    
   } catch (error) {
-    logger.error('Failed to bootstrap application:', error);
+    const logger = new Logger('Bootstrap');
+    logger.error('Failed to start F-Flow Client Local server', error);
     process.exit(1);
   }
 }
 
-/**
- * Get bootstrap configuration
- */
 export function getBootstrapConfig(): BootstrapConfig {
   const { dataDir, logDir } = resolvePaths();
   const databaseUrl = setupDatabase(dataDir);
-  const port = parseInt(process.env.PORT || '3010', 10);
-  const isService = process.argv.includes('--service');
-
+  const port = process.env.PORT ? Number(process.env.PORT) : 3010;
+  const host = '127.0.0.1';
+  
   return {
     dataDir,
     logDir,
     databaseUrl,
     port,
-    isService,
+    host,
   };
 }

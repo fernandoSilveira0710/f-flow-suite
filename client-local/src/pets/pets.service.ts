@@ -114,14 +114,14 @@ export class PetsService {
     const pet = await this.prisma.pet.update({
       where: { id },
       data: {
-        tutorId: updatePetDto.tutorId,
-        name: updatePetDto.name,
-        species: updatePetDto.species,
-        breed: updatePetDto.breed,
-        weight: updatePetDto.weight,
-        birthDate: updatePetDto.birthDate,
-        observations: updatePetDto.observations,
-        active: updatePetDto.active,
+        ...(updatePetDto.tutorId && { tutorId: updatePetDto.tutorId }),
+        ...(updatePetDto.name && { name: updatePetDto.name }),
+        ...(updatePetDto.species && { species: updatePetDto.species }),
+        ...(updatePetDto.breed !== undefined && { breed: updatePetDto.breed }),
+        ...(updatePetDto.weight !== undefined && { weight: updatePetDto.weight }),
+        ...(updatePetDto.birthDate !== undefined && { birthDate: updatePetDto.birthDate }),
+        ...(updatePetDto.observations !== undefined && { observations: updatePetDto.observations }),
+        ...(updatePetDto.active !== undefined && { active: updatePetDto.active }),
       },
     });
 
