@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaClient } from '@prisma/client';
 import { ProductsService } from '../products/products.service';
 import { SalesService } from '../sales/sales.service';
 import { CustomersService } from '../customers/customers.service';
 import { PetsService } from '../pets/pets.service';
+import { InventoryService } from '../inventory/inventory.service';
 
 interface OutboxEvent {
   id: string;
@@ -18,10 +19,12 @@ export class SyncService {
   private readonly logger = new Logger(SyncService.name);
 
   constructor(
+    private readonly prisma: PrismaClient,
     private readonly productsService: ProductsService,
     private readonly salesService: SalesService,
     private readonly customersService: CustomersService,
     private readonly petsService: PetsService,
+    private readonly inventoryService: InventoryService,
   ) {}
 
   async ingestEvents(tenantId: string, events: OutboxEvent[]): Promise<void> {
@@ -46,16 +49,19 @@ export class SyncService {
         await this.customersService.upsertFromEvent(tenantId, payload);
         break;
       case 'customer.deleted.v1':
-        await this.customersService.deleteFromEvent(tenantId, payload.id, new Date(payload.deletedAt));
+        await this.customersService.deleteFromEvent(tenantId, payload.id);
         break;
       case 'pet.upserted.v1':
         await this.petsService.upsertFromEvent(tenantId, payload);
         break;
       case 'pet.deleted.v1':
-        await this.petsService.deleteFromEvent(tenantId, payload.id, new Date(payload.deletedAt));
+        await this.petsService.deleteFromEvent(tenantId, payload.id);
         break;
       case 'sale.created.v1':
-        await this.processSaleCreatedEvent(tenantId, event.payload);
+        await this.processSaleCreatedEvent(tenantId, payload);
+        break;
+      case 'inventory.adjusted.v1':
+        await this.inventoryService.processInventoryAdjustmentEvent(tenantId, payload);
         break;
       default:
         this.logger.warn(`Unknown event type: ${event.type}`);

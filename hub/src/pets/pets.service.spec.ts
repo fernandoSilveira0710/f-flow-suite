@@ -73,7 +73,7 @@ describe('PetsService', () => {
       expect(mockPrismaClient.pet.findMany).toHaveBeenCalledWith({
         where: { 
           tenantId,
-          deletedAt: null 
+          active: true
         },
         include: {
           tutor: {
@@ -130,7 +130,7 @@ describe('PetsService', () => {
         where: { 
           tenantId,
           tutorId,
-          deletedAt: null 
+          active: true
         },
         include: {
           tutor: {
@@ -185,7 +185,7 @@ describe('PetsService', () => {
         where: { 
           id: petId,
           tenantId,
-          deletedAt: null 
+          active: true
         },
         include: {
           tutor: {
@@ -298,12 +298,11 @@ describe('PetsService', () => {
     it('should soft delete a pet', async () => {
       const tenantId = 'tenant-1';
       const petId = 'pet-1';
-      const deletedAt = new Date();
 
       mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
       mockPrismaClient.pet.update.mockResolvedValue({});
 
-      await service.deleteFromEvent(tenantId, petId, deletedAt);
+      await service.deleteFromEvent(tenantId, petId);
 
       expect(mockPrismaClient.$executeRaw).toHaveBeenCalledWith(
         expect.anything()
@@ -314,13 +313,9 @@ describe('PetsService', () => {
           tenantId 
         },
         data: {
-          deletedAt,
           active: false,
         },
       });
     });
   });
-});
-
-
 });
