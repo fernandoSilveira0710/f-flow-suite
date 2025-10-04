@@ -9,6 +9,8 @@ import { SyncAgentModule } from './sync-agent/sync.module';
 import { ProductsModule } from './products/products.module';
 import { CustomersModule } from './customers/customers.module';
 import { PetsModule } from './pets/pets.module';
+import { ServicesModule } from './services/services.module';
+import { ProfessionalsModule } from './professionals/professionals.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -19,6 +21,8 @@ import { HealthController } from './health/health.controller';
     ProductsModule,
     CustomersModule,
     PetsModule,
+    ServicesModule,
+    ProfessionalsModule,
     InventoryModule,
     GroomingModule,
     AppointmentsModule,

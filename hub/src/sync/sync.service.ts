@@ -5,6 +5,8 @@ import { SalesService } from '../sales/sales.service';
 import { CustomersService } from '../customers/customers.service';
 import { PetsService } from '../pets/pets.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { ServicesService } from '../services/services.service';
+import { ProfessionalsService } from '../professionals/professionals.service';
 
 interface OutboxEvent {
   id: string;
@@ -25,6 +27,8 @@ export class SyncService {
     private readonly customersService: CustomersService,
     private readonly petsService: PetsService,
     private readonly inventoryService: InventoryService,
+    private readonly servicesService: ServicesService,
+    private readonly professionalsService: ProfessionalsService,
   ) {}
 
   async ingestEvents(tenantId: string, events: OutboxEvent[]): Promise<void> {
@@ -62,6 +66,18 @@ export class SyncService {
         break;
       case 'inventory.adjusted.v1':
         await this.inventoryService.processInventoryAdjustmentEvent(tenantId, payload);
+        break;
+      case 'service.upserted.v1':
+        await this.servicesService.upsertFromEvent(tenantId, payload);
+        break;
+      case 'service.deleted.v1':
+        await this.servicesService.deleteFromEvent(tenantId, payload.id);
+        break;
+      case 'professional.upserted.v1':
+        await this.professionalsService.upsertFromEvent(tenantId, payload);
+        break;
+      case 'professional.deleted.v1':
+        await this.professionalsService.deleteFromEvent(tenantId, payload.id);
         break;
       default:
         this.logger.warn(`Unknown event type: ${event.type}`);
