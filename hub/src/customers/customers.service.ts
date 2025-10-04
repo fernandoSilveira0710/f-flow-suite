@@ -13,13 +13,12 @@ export class CustomersService {
     const customers = await this.prisma.customer.findMany({
       where: { 
         tenantId,
-        deletedAt: null 
+        active: true 
       },
       include: {
         pets: {
           where: { 
-            active: true,
-            deletedAt: null 
+            active: true
           },
           select: {
             id: true,
@@ -44,13 +43,12 @@ export class CustomersService {
       where: { 
         id: customerId,
         tenantId,
-        deletedAt: null 
+        active: true 
       },
       include: {
         pets: {
           where: { 
-            active: true,
-            deletedAt: null 
+            active: true
           },
           select: {
             id: true,
@@ -108,8 +106,7 @@ export class CustomersService {
       include: {
         pets: {
           where: { 
-            active: true,
-            deletedAt: null 
+            active: true
           },
           select: {
             id: true,
@@ -125,7 +122,7 @@ export class CustomersService {
     return this.mapToResponseDto(customer);
   }
 
-  async deleteFromEvent(tenantId: string, customerId: string, deletedAt: Date): Promise<void> {
+  async deleteFromEvent(tenantId: string, customerId: string): Promise<void> {
     // Set tenant context for RLS
     await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
 
@@ -135,7 +132,6 @@ export class CustomersService {
         tenantId 
       },
       data: {
-        deletedAt,
         active: false,
       },
     });

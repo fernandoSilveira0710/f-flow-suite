@@ -267,7 +267,7 @@ describe('CustomersService', () => {
       mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
       mockPrismaClient.customer.update.mockResolvedValue({});
 
-      await service.deleteFromEvent(tenantId, customerId, deletedAt);
+      await service.deleteFromEvent(tenantId, customerId);
 
       expect(mockPrismaClient.$executeRaw).toHaveBeenCalledWith(
         expect.anything()
@@ -278,7 +278,6 @@ describe('CustomersService', () => {
           tenantId 
         },
         data: {
-          deletedAt,
           active: false,
         },
       });

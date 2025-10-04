@@ -12,12 +12,7 @@ import { apiClient } from './api-client';
 
 // Mock the api-client
 vi.mock('./api-client', () => ({
-  apiClient: {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-  },
+  apiClient: vi.fn(),
 }));
 
 const mockApiClient = vi.mocked(apiClient);

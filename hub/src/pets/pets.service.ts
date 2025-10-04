@@ -13,7 +13,7 @@ export class PetsService {
     const pets = await this.prisma.pet.findMany({
       where: { 
         tenantId,
-        deletedAt: null 
+        active: true
       },
       include: {
         tutor: {
@@ -39,7 +39,7 @@ export class PetsService {
       where: { 
         tenantId,
         tutorId,
-        deletedAt: null 
+        active: true
       },
       include: {
         tutor: {
@@ -65,7 +65,7 @@ export class PetsService {
       where: { 
         id: petId,
         tenantId,
-        deletedAt: null 
+        active: true
       },
       include: {
         tutor: {
@@ -134,7 +134,7 @@ export class PetsService {
     return this.mapToResponseDto(pet);
   }
 
-  async deleteFromEvent(tenantId: string, petId: string, deletedAt: Date): Promise<void> {
+  async deleteFromEvent(tenantId: string, petId: string): Promise<void> {
     // Set tenant context for RLS
     await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
 
@@ -144,7 +144,6 @@ export class PetsService {
         tenantId 
       },
       data: {
-        deletedAt,
         active: false,
       },
     });
