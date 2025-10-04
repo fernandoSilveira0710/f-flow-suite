@@ -18,11 +18,7 @@ export class ProfessionalsService {
     const professional = await this.prisma.professional.create({
       data: {
         name: createProfessionalDto.name,
-        email: createProfessionalDto.email,
-        phone: createProfessionalDto.phone,
-        document: createProfessionalDto.document,
-        specialty: createProfessionalDto.specialty,
-        services: createProfessionalDto.services || [],
+        role: createProfessionalDto.role || 'Professional',
         active: createProfessionalDto.active ?? true,
       },
     });
@@ -67,11 +63,7 @@ export class ProfessionalsService {
       where: { id },
       data: {
         ...(updateProfessionalDto.name && { name: updateProfessionalDto.name }),
-        ...(updateProfessionalDto.email !== undefined && { email: updateProfessionalDto.email }),
-        ...(updateProfessionalDto.phone !== undefined && { phone: updateProfessionalDto.phone }),
-        ...(updateProfessionalDto.document !== undefined && { document: updateProfessionalDto.document }),
-        ...(updateProfessionalDto.specialty !== undefined && { specialty: updateProfessionalDto.specialty }),
-        ...(updateProfessionalDto.services !== undefined && { services: updateProfessionalDto.services }),
+        ...(updateProfessionalDto.role !== undefined && { role: updateProfessionalDto.role }),
         ...(updateProfessionalDto.active !== undefined && { active: updateProfessionalDto.active }),
       },
     });
@@ -102,14 +94,10 @@ export class ProfessionalsService {
   }
 
   private async generateProfessionalEvent(professional: any, eventType: string): Promise<void> {
-    const eventPayload = {
+    const eventData = {
       id: professional.id,
       name: professional.name,
-      email: professional.email,
-      phone: professional.phone,
-      document: professional.document,
-      specialty: professional.specialty,
-      services: professional.services,
+      role: professional.role,
       active: professional.active,
       createdAt: professional.createdAt?.toISOString() || new Date().toISOString(),
       updatedAt: professional.updatedAt?.toISOString(),
@@ -119,7 +107,7 @@ export class ProfessionalsService {
     await this.prisma.outboxEvent.create({
       data: {
         eventType,
-        payload: JSON.stringify(eventPayload),
+        payload: JSON.stringify(eventData),
         processed: false,
       },
     });
@@ -129,11 +117,7 @@ export class ProfessionalsService {
     return {
       id: professional.id,
       name: professional.name,
-      email: professional.email,
-      phone: professional.phone,
-      document: professional.document,
-      specialty: professional.specialty,
-      services: professional.services || [],
+      role: professional.role,
       active: professional.active ?? true,
       createdAt: professional.createdAt,
       updatedAt: professional.updatedAt,

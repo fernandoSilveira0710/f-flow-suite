@@ -561,6 +561,424 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Appointments",
+      "item": [
+        {
+          "name": "List Appointments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/appointments",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna lista de appointments', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Appointment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"petId\": \"{{pet_id}}\",\n  \"professionalId\": \"{{professional_id}}\",\n  \"serviceId\": \"{{service_id}}\",\n  \"scheduledAt\": \"2024-12-31T10:00:00.000Z\",\n  \"notes\": \"Consulta de rotina\"\n}"
+            },
+            "url": {
+              "raw": "{{client_local_url}}/appointments",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "appointments"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Retorna appointment criado', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('id');",
+                  "  pm.expect(body).to.have.property('petId');",
+                  "  pm.expect(body).to.have.property('professionalId');",
+                  "  pm.expect(body).to.have.property('serviceId');",
+                  "  pm.expect(body).to.have.property('scheduledAt');",
+                  "  pm.collectionVariables.set('appointment_id', body.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Appointment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/appointments/{{appointment_id}}",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "appointments",
+                "{{appointment_id}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna appointment específico', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('id');",
+                  "  pm.expect(body.id).to.eql(pm.collectionVariables.get('appointment_id'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Appointment",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scheduledAt\": \"2024-12-31T14:00:00.000Z\",\n  \"notes\": \"Consulta reagendada\",\n  \"status\": \"CONFIRMED\"\n}"
+            },
+            "url": {
+              "raw": "{{client_local_url}}/appointments/{{appointment_id}}",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "appointments",
+                "{{appointment_id}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna appointment atualizado', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('id');",
+                  "  pm.expect(body.status).to.eql('CONFIRMED');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Appointment",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/appointments/{{appointment_id}}",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "appointments",
+                "{{appointment_id}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Check-Ins",
+      "item": [
+        {
+          "name": "List Check-Ins",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/checkins",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "checkins"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna lista de check-ins', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check-In Pet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"petId\": \"{{pet_id}}\",\n  \"professionalId\": \"{{professional_id}}\",\n  \"notes\": \"Pet chegou para consulta\"\n}"
+            },
+            "url": {
+              "raw": "{{client_local_url}}/checkins",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "checkins"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Retorna check-in criado', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('id');",
+                  "  pm.expect(body).to.have.property('petId');",
+                  "  pm.expect(body).to.have.property('professionalId');",
+                  "  pm.expect(body).to.have.property('checkInAt');",
+                  "  pm.expect(body.checkOutAt).to.be.null;",
+                  "  pm.collectionVariables.set('checkin_id', body.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Check-In",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/checkins/{{checkin_id}}",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "checkins",
+                "{{checkin_id}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna check-in específico', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('id');",
+                  "  pm.expect(body.id).to.eql(pm.collectionVariables.get('checkin_id'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check-Out Pet",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Pet saiu após consulta\"\n}"
+            },
+            "url": {
+              "raw": "{{client_local_url}}/checkins/{{checkin_id}}/checkout",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "checkins",
+                "{{checkin_id}}",
+                "checkout"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna check-out realizado', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('id');",
+                  "  pm.expect(body).to.have.property('checkOutAt');",
+                  "  pm.expect(body.checkOutAt).to.not.be.null;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Active Check-In by Pet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/checkins/active/{{pet_id}}",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "checkins",
+                "active",
+                "{{pet_id}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 ou 404', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('Retorna check-in ativo', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('id');",
+                  "    pm.expect(body).to.have.property('petId');",
+                  "    pm.expect(body.checkOutAt).to.be.null;",
+                  "  });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
