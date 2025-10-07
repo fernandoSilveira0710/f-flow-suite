@@ -20,8 +20,7 @@ export class ServicesService {
         name: createServiceDto.name,
         description: createServiceDto.description,
         price: createServiceDto.price,
-        duration: createServiceDto.duration,
-        category: createServiceDto.category,
+        duration: createServiceDto.duration || 0,
         active: createServiceDto.active ?? true,
       },
     });

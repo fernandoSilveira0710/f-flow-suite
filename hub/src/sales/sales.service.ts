@@ -1,5 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
 import { SaleResponseDto } from './dto';
 
 export interface SaleCreatedEventPayload {
@@ -26,13 +26,46 @@ export interface SaleCreatedEventPayload {
 export class SalesService {
   private readonly logger = new Logger(SalesService.name);
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async upsertFromEvent(tenantId: string, eventPayload: SaleCreatedEventPayload): Promise<void> {
     this.logger.log(`Upserting sale ${eventPayload.id} for tenant: ${tenantId}`);
 
+    // Verify tenant exists
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantId }
+    });
+    
+    if (!tenant) {
+      this.logger.error(`Tenant not found: ${tenantId}`);
+      throw new Error(`Tenant not found: ${tenantId}`);
+    }
+    
+    this.logger.log(`Found tenant: ${tenant.id} (slug: ${tenant.slug})`);
+
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenant.id}'`;
+
+    // Validate required fields
+    if (!eventPayload.createdAt || !eventPayload.code || !eventPayload.operator || 
+        eventPayload.total === undefined || !eventPayload.paymentMethod) {
+      this.logger.error('Missing required fields in sale event payload', eventPayload);
+      throw new Error('Missing required fields in sale event payload');
+    }
+
+    // Validate dates
+    const createdAt = new Date(eventPayload.createdAt);
+    const updatedAt = eventPayload.updatedAt ? new Date(eventPayload.updatedAt) : createdAt;
+    
+    if (isNaN(createdAt.getTime())) {
+      this.logger.error('Invalid createdAt date in sale event payload', eventPayload);
+      throw new Error('Invalid createdAt date in sale event payload');
+    }
+    
+    if (eventPayload.updatedAt && isNaN(updatedAt.getTime())) {
+      this.logger.error('Invalid updatedAt date in sale event payload', eventPayload);
+      throw new Error('Invalid updatedAt date in sale event payload');
+    }
 
     await this.prisma.$transaction(async (tx: any) => {
       // Upsert the sale
@@ -42,15 +75,15 @@ export class SalesService {
         },
         create: {
           id: eventPayload.id,
-          tenantId,
+          tenantId: tenant.id,
           code: eventPayload.code,
-          date: new Date(eventPayload.createdAt),
+          date: createdAt,
           operator: eventPayload.operator,
           total: eventPayload.total,
           paymentMethod: eventPayload.paymentMethod,
           status: eventPayload.status || 'completed',
-          createdAt: new Date(eventPayload.createdAt),
-          updatedAt: eventPayload.updatedAt ? new Date(eventPayload.updatedAt) : new Date(eventPayload.createdAt),
+          createdAt: createdAt,
+          updatedAt: updatedAt,
         },
         update: {
           code: eventPayload.code,
@@ -58,7 +91,7 @@ export class SalesService {
           total: eventPayload.total,
           paymentMethod: eventPayload.paymentMethod,
           status: eventPayload.status || 'completed',
-          updatedAt: eventPayload.updatedAt ? new Date(eventPayload.updatedAt) : new Date(),
+          updatedAt: new Date(),
         },
       });
 
@@ -66,7 +99,7 @@ export class SalesService {
       await tx.saleItem.deleteMany({
         where: {
           saleId: sale.id,
-          tenantId,
+          tenantId: tenant.id,
         },
       });
 
@@ -75,7 +108,7 @@ export class SalesService {
         await tx.saleItem.create({
           data: {
             id: item.id,
-            tenantId,
+            tenantId: tenant.id,
             saleId: sale.id,
             productId: item.productId,
             qty: item.qty,

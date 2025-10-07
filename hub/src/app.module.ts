@@ -1,6 +1,7 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from './common/prisma.service';
+import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { LicensesModule } from './licenses/licenses.module';
@@ -13,6 +14,9 @@ import { PetsModule } from './pets/pets.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { ServicesModule } from './services/services.module';
 import { ProfessionalsModule } from './professionals/professionals.module';
+import { AppointmentsModule } from './appointments/appointments.module';
+import { CheckInsModule } from './checkins/checkins.module';
+import { ResourcesModule } from './resources/resources.module';
 import { HealthController } from './health/health.controller';
 import { JwksController } from './auth/jwks.controller';
 import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
@@ -20,6 +24,7 @@ import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    CommonModule,
     AuthModule,
     TenantsModule,
     LicensesModule,
@@ -32,12 +37,15 @@ import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
     InventoryModule,
     ServicesModule,
     ProfessionalsModule,
+    AppointmentsModule,
+    CheckInsModule,
+    ResourcesModule,
   ],
   controllers: [HealthController, JwksController],
-  providers: [PrismaClient],
+  providers: [PrismaService],
 })
 export class AppModule implements NestModule {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   configure(consumer: MiddlewareConsumer) {
     consumer

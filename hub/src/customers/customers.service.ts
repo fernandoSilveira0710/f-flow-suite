@@ -1,14 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
 import { CustomerResponseDto } from './dto';
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAllByTenant(tenantId: string): Promise<CustomerResponseDto[]> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     const customers = await this.prisma.customer.findMany({
       where: { 
