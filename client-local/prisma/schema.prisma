@@ -145,6 +145,8 @@ model Appointment {
   service        Service?     @relation(fields: [serviceId], references: [id])
   professionalId String?
   professional   Professional? @relation(fields: [professionalId], references: [id])
+  resourceId     String?
+  resource       Resource?    @relation(fields: [resourceId], references: [id])
   serviceType    String       // kept for backward compatibility
   date           DateTime
   startTime      String?
@@ -160,6 +162,7 @@ model Appointment {
   @@index([petId])
   @@index([serviceId])
   @@index([professionalId])
+  @@index([resourceId])
 }
 
 model GroomingTicket {
@@ -194,10 +197,14 @@ model GroomingItem {
 }
 
 model Resource {
-  id        String   @id @default(uuid())
-  name      String
-  type      String   // equipment, room, tool, etc.
-  createdAt DateTime @default(now())
+  id           String        @id @default(uuid())
+  name         String
+  type         String        // equipment, room, tool, etc.
+  description  String?
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  appointments Appointment[]
 }
 
 model CheckIn {

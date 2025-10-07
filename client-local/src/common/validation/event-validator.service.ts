@@ -26,6 +26,10 @@ import {
   ProfessionalDeletedEventPayload,
   professionalUpsertedEventSchema,
   professionalDeletedEventSchema,
+  ResourceUpsertedEventPayload,
+  ResourceDeletedEventPayload,
+  resourceUpsertedEventSchema,
+  resourceDeletedEventSchema,
 } from './schemas';
 
 export interface ValidationResult {
@@ -106,6 +110,16 @@ export class EventValidatorService {
     this.validators.set(
       'professional.deleted.v1',
       this.ajv.compile(professionalDeletedEventSchema)
+    );
+
+    // Resource event schemas
+    this.validators.set(
+      'resource.upserted.v1',
+      this.ajv.compile(resourceUpsertedEventSchema)
+    );
+    this.validators.set(
+      'resource.deleted.v1',
+      this.ajv.compile(resourceDeletedEventSchema)
     );
 
     this.logger.log('Event validation schemas initialized');
