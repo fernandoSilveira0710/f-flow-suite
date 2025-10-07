@@ -1,46 +1,307 @@
 /**
- * Stock Management Mock API
- * Persistência via localStorage
+ * Stock/Inventory API - Real API Integration
+ * Connects to client-local server for inventory operations
  */
 
-// Types
-export type UnidadeMedida = 'UN' | 'KG' | 'L' | 'CX';
-export type TipoMovimento = 'ENTRADA' | 'SAIDA' | 'AJUSTE';
-export type OrigemMovimento = 'COMPRA' | 'VENDA' | 'PERDA' | 'TRANSFERENCIA' | 'INVENTARIO';
-export type StatusPO = 'RASCUNHO' | 'EM_ABERTO' | 'RECEBIDO' | 'CANCELADO';
-export type TipoInventario = 'CEGA' | 'PARCIAL';
-export type StatusInventario = 'ABERTA' | 'EM_CONTAGEM' | 'FINALIZADA' | 'CANCELADA';
+export interface StockMovement {
+  id: string;
+  tipo: 'ENTRADA' | 'SAIDA' | 'AJUSTE';
+  produtoId: string;
+  produtoNome: string;
+  sku: string;
+  quantidade: number;
+  custoUnit?: number;
+  valorTotal?: number;
+  origem: string;
+  motivo?: string;
+  documento?: string;
+  data: string;
+  usuario: string;
+}
 
+export interface CreateMovementDto {
+  tipo: 'ENTRADA' | 'SAIDA' | 'AJUSTE';
+  produtoId: string;
+  sku: string;
+  quantidade: number;
+  custoUnit?: number;
+  origem: string;
+  motivo?: string;
+  documento?: string;
+}
+
+// Types and Interfaces
+export interface StockItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  currentStock: number;
+  minStock: number;
+  maxStock: number;
+  unit: string;
+  lastUpdated: string;
+}
+
+export interface StockAdjustment {
+  id: string;
+  productId: string;
+  type: 'IN' | 'OUT' | 'ADJUSTMENT';
+  quantity: number;
+  reason: string;
+  notes?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface CreateStockAdjustmentDto {
+  productId: string;
+  type: 'IN' | 'OUT' | 'ADJUSTMENT';
+  quantity: number;
+  reason: string;
+  notes?: string;
+}
+
+export interface BulkStockAdjustmentDto {
+  adjustments: CreateStockAdjustmentDto[];
+}
+
+// API Configuration
+const API_BASE_URL = 'http://127.0.0.1:3010';
+
+// API Helper function
+const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    ...options,
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+};
+
+// Stock/Inventory API
+export const getStockLevels = async (): Promise<StockItem[]> => {
+  try {
+    const inventory = await apiCall<any[]>('/inventory');
+    
+    return inventory.map(item => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.product?.name || 'Unknown Product',
+      productSku: item.product?.sku || '',
+      currentStock: item.currentStock,
+      minStock: item.product?.minStock || 0,
+      maxStock: item.product?.maxStock || 0,
+      unit: item.product?.unit || 'un',
+      lastUpdated: item.updatedAt,
+    }));
+  } catch (error) {
+    console.error('Error fetching stock levels:', error);
+    return [];
+  }
+};
+
+export const getStockByProductId = async (productId: string): Promise<StockItem | null> => {
+  try {
+    const inventory = await apiCall<any>(`/inventory/${productId}`);
+    
+    return {
+      id: inventory.id,
+      productId: inventory.productId,
+      productName: inventory.product?.name || 'Unknown Product',
+      productSku: inventory.product?.sku || '',
+      currentStock: inventory.currentStock,
+      minStock: inventory.product?.minStock || 0,
+      maxStock: inventory.product?.maxStock || 0,
+      unit: inventory.product?.unit || 'un',
+      lastUpdated: inventory.updatedAt,
+    };
+  } catch (error) {
+    console.error('Error fetching stock by product id:', error);
+    return null;
+  }
+};
+
+export const adjustStock = async (adjustment: CreateStockAdjustmentDto): Promise<StockAdjustment> => {
+  try {
+    const result = await apiCall<any>('/inventory/adjust', {
+      method: 'POST',
+      body: JSON.stringify({
+        adjustments: [adjustment]
+      }),
+    });
+    
+    // Return the first adjustment from the result
+    const adjustmentResult = result.adjustments[0];
+    
+    return {
+      id: adjustmentResult.id,
+      productId: adjustmentResult.productId,
+      type: adjustmentResult.type,
+      quantity: adjustmentResult.quantity,
+      reason: adjustmentResult.reason,
+      notes: adjustmentResult.notes,
+      createdAt: adjustmentResult.createdAt,
+      createdBy: adjustmentResult.createdBy || 'System',
+    };
+  } catch (error) {
+    console.error('Error adjusting stock:', error);
+    throw error;
+  }
+};
+
+export const bulkAdjustStock = async (bulkAdjustment: BulkStockAdjustmentDto): Promise<StockAdjustment[]> => {
+  try {
+    const result = await apiCall<any>('/inventory/adjust', {
+      method: 'POST',
+      body: JSON.stringify(bulkAdjustment),
+    });
+    
+    return result.adjustments.map((adj: any) => ({
+      id: adj.id,
+      productId: adj.productId,
+      type: adj.type,
+      quantity: adj.quantity,
+      reason: adj.reason,
+      notes: adj.notes,
+      createdAt: adj.createdAt,
+      createdBy: adj.createdBy || 'System',
+    }));
+  } catch (error) {
+    console.error('Error bulk adjusting stock:', error);
+    throw error;
+  }
+};
+
+export const getLowStockItems = async (): Promise<StockItem[]> => {
+  try {
+    const stockLevels = await getStockLevels();
+    
+    return stockLevels.filter(item => 
+      item.currentStock <= item.minStock && item.minStock > 0
+    );
+  } catch (error) {
+    console.error('Error fetching low stock items:', error);
+    return [];
+  }
+};
+
+export const getStockMovements = async (productId?: string): Promise<StockAdjustment[]> => {
+  try {
+    // Note: This would require a new endpoint in client-local to get stock movements/adjustments history
+    // For now, we'll return an empty array as this functionality needs to be implemented in client-local
+    console.warn('Stock movements endpoint not yet implemented in client-local');
+    return [];
+  } catch (error) {
+    console.error('Error fetching stock movements:', error);
+    return [];
+  }
+};
+
+// Mock data and functions for frontend compatibility
+const mockMovements: StockMovement[] = [];
+
+export const getMovements = (): StockMovement[] => {
+  return mockMovements;
+};
+
+export const createMovement = (data: CreateMovementDto): StockMovement => {
+  const movement: StockMovement = {
+    id: Date.now().toString(),
+    tipo: data.tipo,
+    produtoId: data.produtoId,
+    produtoNome: `Produto ${data.produtoId}`, // In real app, would fetch product name
+    sku: data.sku,
+    quantidade: data.quantidade,
+    custoUnit: data.custoUnit,
+    valorTotal: data.custoUnit ? data.custoUnit * data.quantidade : undefined,
+    origem: data.origem,
+    motivo: data.motivo,
+    documento: data.documento,
+    data: new Date().toISOString(),
+    usuario: 'Admin Demo',
+  };
+
+  mockMovements.unshift(movement);
+  return movement;
+};
+
+export interface StockPrefs {
+  alertaEstoqueBaixo: boolean;
+  limiteMinimo: number;
+  controlarLotes: boolean;
+  controlarValidade: boolean;
+}
+
+const mockStockPrefs: StockPrefs = {
+  alertaEstoqueBaixo: true,
+  limiteMinimo: 5,
+  controlarLotes: false,
+  controlarValidade: false,
+};
+
+export const getStockPrefs = (): StockPrefs => {
+  return mockStockPrefs;
+};
+
+export const saveStockPrefs = (prefs: StockPrefs): void => {
+  Object.assign(mockStockPrefs, prefs);
+};
+
+// Product interface for compatibility
 export interface Product {
   id: string;
   nome: string;
   sku: string;
+  preco: number;
+  estoque: number;
   categoria?: string;
-  unidade: UnidadeMedida;
-  precoCusto?: number;
-  precoVenda?: number;
-  estoqueAtual: number;
-  estoqueMinimo?: number;
-  validade?: string;
   barcode?: string;
 }
 
-export interface StockMovement {
-  id: string;
-  data: string;
-  tipo: TipoMovimento;
-  produtoId: string;
-  sku: string;
-  nomeProduto: string;
-  quantidade: number;
-  custoUnit?: number;
-  origem?: OrigemMovimento;
-  motivo?: string;
-  documento?: string;
-  observacao?: string;
-  usuario?: string;
-}
+// Mock products data
+const mockProducts: Product[] = [
+  {
+    id: '1',
+    nome: 'Ração Premium Cães',
+    sku: 'RAC001',
+    preco: 89.90,
+    estoque: 25,
+    categoria: 'Alimentação',
+    barcode: '7891234567890',
+  },
+  {
+    id: '2',
+    nome: 'Shampoo Antipulgas',
+    sku: 'SHP001',
+    preco: 24.50,
+    estoque: 15,
+    categoria: 'Higiene',
+    barcode: '7891234567891',
+  },
+  {
+    id: '3',
+    nome: 'Brinquedo Mordedor',
+    sku: 'BRQ001',
+    preco: 12.90,
+    estoque: 8,
+    categoria: 'Brinquedos',
+    barcode: '7891234567892',
+  },
+];
 
+export const getProducts = (): Product[] => {
+  return mockProducts;
+};
+
+// Supplier interface and functions
 export interface Supplier {
   id: string;
   nome: string;
@@ -53,457 +314,117 @@ export interface Supplier {
     cep?: string;
   };
   ativo: boolean;
+  createdAt: string;
 }
 
-export interface PurchaseOrderItem {
-  produtoId: string;
-  sku: string;
+export interface CreateSupplierDto {
   nome: string;
-  qtd: number;
-  custoUnit: number;
+  cnpjCpf?: string;
+  email?: string;
+  telefone?: string;
+  endereco?: {
+    cidade?: string;
+    uf?: string;
+    cep?: string;
+  };
+  ativo: boolean;
 }
 
-export interface PurchaseOrder {
-  id: string;
-  fornecedorId: string;
-  fornecedorNome: string;
-  status: StatusPO;
-  criadoEm: string;
-  atualizadoEm: string;
-  itens: PurchaseOrderItem[];
-  total: number;
-  previsaoEntrega?: string;
-  numero?: string;
-}
+// Mock suppliers data
+const mockSuppliers: Supplier[] = [
+  {
+    id: '1',
+    nome: 'Pet Distribuidora Ltda',
+    cnpjCpf: '12.345.678/0001-90',
+    email: 'contato@petdistribuidora.com',
+    telefone: '(11) 9999-8888',
+    endereco: {
+      cidade: 'São Paulo',
+      uf: 'SP',
+      cep: '01234-567',
+    },
+    ativo: true,
+    createdAt: new Date().toISOString(),
+  },
+];
 
-export interface InventoryCountItem {
-  produtoId: string;
-  sku: string;
-  nome: string;
-  contagem?: number;
-  sistemaNaAbertura: number;
-}
-
-export interface InventoryCount {
-  id: string;
-  tipo: TipoInventario;
-  status: StatusInventario;
-  criadoEm: string;
-  finalizadaEm?: string;
-  itens: InventoryCountItem[];
-  observacao?: string;
-}
-
-export interface StockPrefs {
-  estoqueMinimoPadrao?: number;
-  bloquearVendaSemEstoque?: boolean;
-  habilitarCodigoBarras?: boolean;
-  considerarValidade?: boolean;
-}
-
-export interface StockAlert {
-  tipo: 'RUPTURA' | 'ABAIXO_MINIMO' | 'VALIDADE_PROXIMA';
-  produto: Product;
-  mensagem: string;
-}
-
-// Storage keys
-const KEYS = {
-  PRODUCTS: '2f.stock.products',
-  MOVEMENTS: '2f.stock.movements',
-  SUPPLIERS: '2f.stock.suppliers',
-  PURCHASE_ORDERS: '2f.stock.purchaseOrders',
-  INVENTORY_COUNTS: '2f.stock.inventoryCounts',
-  PREFS: '2f.stock.prefs',
+export const getSuppliers = (): Supplier[] => {
+  return mockSuppliers;
 };
 
-// Helper: UUID v4
-function uuid(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-// Storage helpers
-function getStorage<T>(key: string, defaultValue: T): T {
-  if (typeof window === 'undefined') return defaultValue;
-  const item = localStorage.getItem(key);
-  return item ? JSON.parse(item) : defaultValue;
-}
-
-function setStorage<T>(key: string, value: T): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-// Initialize mock data
-function initMockData() {
-  const products = getStorage<Product[]>(KEYS.PRODUCTS, []);
-  if (products.length === 0) {
-    const mockProducts: Product[] = [
-      {
-        id: uuid(),
-        nome: 'Ração Premium 15kg',
-        sku: 'RAC-PREM-15',
-        categoria: 'Alimentação',
-        unidade: 'UN',
-        precoCusto: 120,
-        precoVenda: 180,
-        estoqueAtual: 25,
-        estoqueMinimo: 10,
-        barcode: '7891234567890',
-      },
-      {
-        id: uuid(),
-        nome: 'Shampoo Pet 500ml',
-        sku: 'SHP-PET-500',
-        categoria: 'Higiene',
-        unidade: 'UN',
-        precoCusto: 15,
-        precoVenda: 25,
-        estoqueAtual: 5,
-        estoqueMinimo: 15,
-        validade: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-        barcode: '7891234567891',
-      },
-      {
-        id: uuid(),
-        nome: 'Coleira M',
-        sku: 'COL-M-01',
-        categoria: 'Acessórios',
-        unidade: 'UN',
-        precoCusto: 8,
-        precoVenda: 15,
-        estoqueAtual: 0,
-        estoqueMinimo: 5,
-      },
-    ];
-    setStorage(KEYS.PRODUCTS, mockProducts);
-  }
-
-  const suppliers = getStorage<Supplier[]>(KEYS.SUPPLIERS, []);
-  if (suppliers.length === 0) {
-    const mockSuppliers: Supplier[] = [
-      {
-        id: uuid(),
-        nome: 'Pet Distribuidora Ltda',
-        cnpjCpf: '12.345.678/0001-90',
-        email: 'vendas@petdistribuidora.com',
-        telefone: '(11) 98765-4321',
-        endereco: { cidade: 'São Paulo', uf: 'SP', cep: '01234-567' },
-        ativo: true,
-      },
-    ];
-    setStorage(KEYS.SUPPLIERS, mockSuppliers);
-  }
-}
-
-// API Functions
-
-// Products
-export function getProducts(): Product[] {
-  initMockData();
-  return getStorage<Product[]>(KEYS.PRODUCTS, []);
-}
-
-export function getProductById(id: string): Product | undefined {
-  return getProducts().find((p) => p.id === id);
-}
-
-export function updateProduct(id: string, updates: Partial<Product>): Product {
-  const products = getProducts();
-  const index = products.findIndex((p) => p.id === id);
-  if (index === -1) throw new Error('Produto não encontrado');
-  products[index] = { ...products[index], ...updates };
-  setStorage(KEYS.PRODUCTS, products);
-  return products[index];
-}
-
-// Movements
-export function getMovements(): StockMovement[] {
-  return getStorage<StockMovement[]>(KEYS.MOVEMENTS, []);
-}
-
-export function createMovement(data: Omit<StockMovement, 'id' | 'data' | 'nomeProduto'>): StockMovement {
-  const movements = getMovements();
-  const product = getProductById(data.produtoId);
-  if (!product) throw new Error('Produto não encontrado');
-
-  const movement: StockMovement = {
-    id: uuid(),
-    data: new Date().toISOString(),
-    nomeProduto: product.nome,
+export const createSupplier = (data: CreateSupplierDto): Supplier => {
+  const supplier: Supplier = {
+    id: Date.now().toString(),
     ...data,
+    createdAt: new Date().toISOString(),
   };
-
-  movements.unshift(movement);
-  setStorage(KEYS.MOVEMENTS, movements);
-
-  // Update product stock
-  let newStock = product.estoqueAtual;
-  if (data.tipo === 'ENTRADA') {
-    newStock += data.quantidade;
-  } else if (data.tipo === 'SAIDA') {
-    newStock -= data.quantidade;
-  } else if (data.tipo === 'AJUSTE') {
-    newStock = data.quantidade;
-  }
-
-  updateProduct(product.id, { estoqueAtual: Math.max(0, newStock) });
-
-  return movement;
-}
-
-// Suppliers
-export function getSuppliers(): Supplier[] {
-  initMockData();
-  return getStorage<Supplier[]>(KEYS.SUPPLIERS, []);
-}
-
-export function getSupplierById(id: string): Supplier | undefined {
-  return getSuppliers().find((s) => s.id === id);
-}
-
-export function createSupplier(data: Omit<Supplier, 'id'>): Supplier {
-  const suppliers = getSuppliers();
-  const supplier: Supplier = { id: uuid(), ...data };
-  suppliers.push(supplier);
-  setStorage(KEYS.SUPPLIERS, suppliers);
+  
+  mockSuppliers.push(supplier);
   return supplier;
+};
+
+export const updateSupplier = (id: string, data: Partial<CreateSupplierDto>): Supplier => {
+  const index = mockSuppliers.findIndex(s => s.id === id);
+  if (index === -1) throw new Error('Supplier not found');
+  
+  mockSuppliers[index] = { ...mockSuppliers[index], ...data };
+  return mockSuppliers[index];
+};
+
+export const toggleSupplierStatus = (id: string): Supplier => {
+  const index = mockSuppliers.findIndex(s => s.id === id);
+  if (index === -1) throw new Error('Supplier not found');
+  
+  mockSuppliers[index].ativo = !mockSuppliers[index].ativo;
+  return mockSuppliers[index];
+};
+
+// Stock alerts interface and function
+export interface StockAlert {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  currentStock: number;
+  minStock: number;
+  alertType: 'LOW_STOCK' | 'OUT_OF_STOCK';
+  severity: 'warning' | 'critical';
+  createdAt: string;
 }
 
-export function updateSupplier(id: string, updates: Partial<Supplier>): Supplier {
-  const suppliers = getSuppliers();
-  const index = suppliers.findIndex((s) => s.id === id);
-  if (index === -1) throw new Error('Fornecedor não encontrado');
-  suppliers[index] = { ...suppliers[index], ...updates };
-  setStorage(KEYS.SUPPLIERS, suppliers);
-  return suppliers[index];
-}
-
-export function toggleSupplierStatus(id: string): Supplier {
-  const supplier = getSupplierById(id);
-  if (!supplier) throw new Error('Fornecedor não encontrado');
-  return updateSupplier(id, { ativo: !supplier.ativo });
-}
-
-// Purchase Orders
-export function getPurchaseOrders(): PurchaseOrder[] {
-  return getStorage<PurchaseOrder[]>(KEYS.PURCHASE_ORDERS, []);
-}
-
-export function getPurchaseOrderById(id: string): PurchaseOrder | undefined {
-  return getPurchaseOrders().find((po) => po.id === id);
-}
-
-export function createPurchaseOrder(data: {
-  fornecedorId: string;
-  itens: PurchaseOrderItem[];
-  previsaoEntrega?: string;
-  numero?: string;
-}): PurchaseOrder {
-  const supplier = getSupplierById(data.fornecedorId);
-  if (!supplier) throw new Error('Fornecedor não encontrado');
-
-  const total = data.itens.reduce((sum, item) => sum + item.qtd * item.custoUnit, 0);
-  const now = new Date().toISOString();
-
-  const po: PurchaseOrder = {
-    id: uuid(),
-    fornecedorId: data.fornecedorId,
-    fornecedorNome: supplier.nome,
-    status: 'RASCUNHO',
-    criadoEm: now,
-    atualizadoEm: now,
-    itens: data.itens,
-    total,
-    previsaoEntrega: data.previsaoEntrega,
-    numero: data.numero,
-  };
-
-  const orders = getPurchaseOrders();
-  orders.unshift(po);
-  setStorage(KEYS.PURCHASE_ORDERS, orders);
-  return po;
-}
-
-export function updatePurchaseOrder(id: string, updates: Partial<PurchaseOrder>): PurchaseOrder {
-  const orders = getPurchaseOrders();
-  const index = orders.findIndex((po) => po.id === id);
-  if (index === -1) throw new Error('Pedido não encontrado');
-
-  const updated = {
-    ...orders[index],
-    ...updates,
-    atualizadoEm: new Date().toISOString(),
-  };
-
-  if (updates.itens) {
-    updated.total = updates.itens.reduce((sum, item) => sum + item.qtd * item.custoUnit, 0);
-  }
-
-  orders[index] = updated;
-  setStorage(KEYS.PURCHASE_ORDERS, orders);
-  return updated;
-}
-
-export function receivePurchaseOrder(id: string, receivedItems: { produtoId: string; qtd: number }[]): PurchaseOrder {
-  const po = getPurchaseOrderById(id);
-  if (!po) throw new Error('Pedido não encontrado');
-  if (po.status === 'RECEBIDO') throw new Error('Pedido já foi recebido');
-
-  // Create movements for each received item
-  receivedItems.forEach((received) => {
-    const item = po.itens.find((i) => i.produtoId === received.produtoId);
-    if (!item) return;
-
-    createMovement({
-      tipo: 'ENTRADA',
-      produtoId: received.produtoId,
-      sku: item.sku,
-      quantidade: received.qtd,
-      custoUnit: item.custoUnit,
-      origem: 'COMPRA',
-      documento: `PO-${po.numero || po.id}`,
-      observacao: `Recebimento PO ${po.numero || po.id}`,
-    });
-  });
-
-  return updatePurchaseOrder(id, { status: 'RECEBIDO' });
-}
-
-// Inventory Counts
-export function getInventoryCounts(): InventoryCount[] {
-  return getStorage<InventoryCount[]>(KEYS.INVENTORY_COUNTS, []);
-}
-
-export function getInventoryCountById(id: string): InventoryCount | undefined {
-  return getInventoryCounts().find((ic) => ic.id === id);
-}
-
-export function createInventoryCount(data: {
-  tipo: TipoInventario;
-  produtosIds?: string[];
-  observacao?: string;
-}): InventoryCount {
-  const allProducts = getProducts();
-  const products = data.produtosIds
-    ? allProducts.filter((p) => data.produtosIds!.includes(p.id))
-    : allProducts;
-
-  const itens: InventoryCountItem[] = products.map((p) => ({
-    produtoId: p.id,
-    sku: p.sku,
-    nome: p.nome,
-    sistemaNaAbertura: p.estoqueAtual,
-  }));
-
-  const count: InventoryCount = {
-    id: uuid(),
-    tipo: data.tipo,
-    status: 'ABERTA',
-    criadoEm: new Date().toISOString(),
-    itens,
-    observacao: data.observacao,
-  };
-
-  const counts = getInventoryCounts();
-  counts.unshift(count);
-  setStorage(KEYS.INVENTORY_COUNTS, counts);
-  return count;
-}
-
-export function updateInventoryCount(id: string, updates: Partial<InventoryCount>): InventoryCount {
-  const counts = getInventoryCounts();
-  const index = counts.findIndex((ic) => ic.id === id);
-  if (index === -1) throw new Error('Inventário não encontrado');
-  counts[index] = { ...counts[index], ...updates };
-  setStorage(KEYS.INVENTORY_COUNTS, counts);
-  return counts[index];
-}
-
-export function finalizeInventoryCount(id: string): InventoryCount {
-  const count = getInventoryCountById(id);
-  if (!count) throw new Error('Inventário não encontrado');
-  if (count.status === 'FINALIZADA') throw new Error('Inventário já finalizado');
-
-  // Generate adjustments
-  count.itens.forEach((item) => {
-    if (item.contagem === undefined) return;
-    const diff = item.contagem - item.sistemaNaAbertura;
-    if (diff === 0) return;
-
-    createMovement({
-      tipo: 'AJUSTE',
-      produtoId: item.produtoId,
-      sku: item.sku,
-      quantidade: item.contagem,
-      origem: 'INVENTARIO',
-      documento: `INV-${id}`,
-      observacao: `Inventário ${count.tipo} - Ajuste: ${diff > 0 ? '+' : ''}${diff}`,
-    });
-  });
-
-  return updateInventoryCount(id, {
-    status: 'FINALIZADA',
-    finalizadaEm: new Date().toISOString(),
-  });
-}
-
-// Preferences
-export function getStockPrefs(): StockPrefs {
-  return getStorage<StockPrefs>(KEYS.PREFS, {
-    estoqueMinimoPadrao: 10,
-    bloquearVendaSemEstoque: true,
-    habilitarCodigoBarras: true,
-    considerarValidade: true,
-  });
-}
-
-export function saveStockPrefs(prefs: StockPrefs): StockPrefs {
-  setStorage(KEYS.PREFS, prefs);
-  return prefs;
-}
-
-// Alerts
-export function getStockAlerts(): StockAlert[] {
-  const products = getProducts();
-  const prefs = getStockPrefs();
+export const getStockAlerts = (): StockAlert[] => {
+  // Generate alerts based on current stock levels vs minimum stock
   const alerts: StockAlert[] = [];
-
-  products.forEach((product) => {
-    // Ruptura
-    if (product.estoqueAtual <= 0) {
+  
+  mockProducts.forEach(product => {
+    const minStock = 10; // Default minimum stock level
+    
+    if (product.estoque === 0) {
       alerts.push({
-        tipo: 'RUPTURA',
-        produto: product,
-        mensagem: 'Produto sem estoque',
+        id: `alert-${product.id}`,
+        productId: product.id,
+        productName: product.nome,
+        sku: product.sku,
+        currentStock: product.estoque,
+        minStock,
+        alertType: 'OUT_OF_STOCK',
+        severity: 'critical',
+        createdAt: new Date().toISOString(),
       });
-    }
-    // Abaixo do mínimo
-    else if (product.estoqueAtual < (product.estoqueMinimo || prefs.estoqueMinimoPadrao || 0)) {
+    } else if (product.estoque <= minStock) {
       alerts.push({
-        tipo: 'ABAIXO_MINIMO',
-        produto: product,
-        mensagem: `Estoque abaixo do mínimo (${product.estoqueMinimo || prefs.estoqueMinimoPadrao})`,
+        id: `alert-${product.id}`,
+        productId: product.id,
+        productName: product.nome,
+        sku: product.sku,
+        currentStock: product.estoque,
+        minStock,
+        alertType: 'LOW_STOCK',
+        severity: 'warning',
+        createdAt: new Date().toISOString(),
       });
-    }
-
-    // Validade próxima (30 dias)
-    if (prefs.considerarValidade && product.validade) {
-      const validadeDate = new Date(product.validade);
-      const diffDays = Math.ceil((validadeDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-      if (diffDays > 0 && diffDays <= 30) {
-        alerts.push({
-          tipo: 'VALIDADE_PROXIMA',
-          produto: product,
-          mensagem: `Validade em ${diffDays} dia(s)`,
-        });
-      }
     }
   });
-
+  
   return alerts;
-}
+};

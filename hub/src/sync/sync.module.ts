@@ -3,9 +3,14 @@ import { SyncController } from './sync.controller';
 import { SyncService } from './sync.service';
 import { ProductsModule } from '../products/products.module';
 import { SalesModule } from '../sales/sales.module';
+import { CustomersModule } from '../customers/customers.module';
+import { PetsModule } from '../pets/pets.module';
+import { InventoryModule } from '../inventory/inventory.module';
+import { ServicesModule } from '../services/services.module';
+import { ProfessionalsModule } from '../professionals/professionals.module';
 
 @Module({
-  imports: [ProductsModule, SalesModule],
+  imports: [ProductsModule, SalesModule, CustomersModule, PetsModule, InventoryModule, ServicesModule, ProfessionalsModule],
   providers: [SyncService],
   controllers: [SyncController],
 })

@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaClient } from '@prisma/client';
 import { InventoryAdjustmentResponseDto, InventoryLevelResponseDto } from './dto';
 
 @Injectable()
 export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   async processInventoryAdjustmentEvent(tenantId: string, payload: any): Promise<void> {
     this.logger.debug(`Processing inventory adjustment event for tenant ${tenantId}`);
@@ -74,18 +74,18 @@ export class InventoryService {
         id: true,
         name: true,
         sku: true,
-        currentStock: true,
+        stockQty: true,
         updatedAt: true,
       },
       orderBy: { name: 'asc' },
     });
 
-    return products.map(product => ({
+    return products.map((product: any) => ({
       productId: product.id,
       tenantId,
       productName: product.name,
       productSku: product.sku,
-      currentStock: product.currentStock,
+      currentStock: product.stockQty,
       lastUpdated: product.updatedAt,
     }));
   }

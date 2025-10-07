@@ -219,17 +219,20 @@ model InventoryAdjustment {
 // ===== CUSTOMER & PET ENTITIES =====
 
 model Customer {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name      String
-  phone     String?
-  email     String?
-  address   String?
-  notes     String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  documento    String?  // CPF/CNPJ
+  email        String?
+  phone        String?
+  dataNascISO  DateTime? // Data de nascimento
+  tags         String?  // JSON string for tags
+  notes        String?  // Notas/observações
+  address      String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
   
   // Relations
   pets             Pet[]
@@ -242,21 +245,21 @@ model Customer {
 }
 
 model Pet {
-  id        String    @id @default(uuid())
-  tenantId  String
-  tutorId   String
-  tutor     Customer  @relation(fields: [tutorId], references: [id])
-  name      String
-  species   String    // dog, cat, etc.
-  breed     String?
-  weight    Decimal?
-  birthDate DateTime?
-  gender    String?   // male, female
-  color     String?
-  notes     String?
-  active    Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id           String    @id @default(uuid())
+  tenantId     String
+  tutorId      String
+  tutor        Customer  @relation(fields: [tutorId], references: [id])
+  name         String
+  species      String    // dog, cat, etc.
+  breed        String?   // raça
+  weight       Decimal?  // peso
+  birthDate    DateTime? // dataNascimento
+  observations String?   // observações
+  gender       String?   // male, female
+  color        String?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   
   // Relations
   appointments     Appointment[]

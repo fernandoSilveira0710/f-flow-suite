@@ -42,14 +42,18 @@ export async function apiClient<T = any>(
     body: options.body ? JSON.stringify(options.body) : undefined,
   };
 
-  // Por enquanto, não faz fetch real, retorna mock
-  // Quando tiver backend: const response = await fetch(`${BASE_URL}${endpoint}`, config);
-  
-  console.log('[API Mock]', options.method || 'GET', endpoint, options.body);
-  
-  // Simular delay de rede
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
-  // Retornar mock vazio por enquanto
-  return {} as T;
+  // Fazer requisição real para o Hub
+  try {
+    const response = await fetch(`${BASE_URL}${endpoint}`, config);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('[API Error]', error);
+    throw error;
+  }
 }
