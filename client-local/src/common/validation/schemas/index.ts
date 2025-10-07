@@ -5,3 +5,4 @@ export * from './customer-events.schema';
 export * from './pet-events.schema';
 export * from './service-events.schema';
 export * from './professional-events.schema';
+export * from './resource-events.schema';

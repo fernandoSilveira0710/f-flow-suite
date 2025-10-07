@@ -27,6 +27,10 @@ export class CreateAppointmentDto {
   @IsString()
   professionalId?: string;
 
+  @IsOptional()
+  @IsString()
+  resourceId?: string;
+
   @IsDateString()
   date: string;
 
