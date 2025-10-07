@@ -132,6 +132,7 @@ model Professional {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   appointments Appointment[]
+  groomingTickets GroomingTicket[]
   checkIns  CheckIn[]
 }
 
@@ -166,17 +167,24 @@ model Appointment {
 }
 
 model GroomingTicket {
-  id        String   @id @default(uuid())
-  petId     String
-  pet       Pet      @relation(fields: [petId], references: [id])
-  tutorId   String
-  tutor     Customer @relation(fields: [tutorId], references: [id])
-  status    String   @default("pending") // pending, in_progress, completed, cancelled
-  createdAt DateTime @default(now())
-  items     GroomingItem[]
+  id             String   @id @default(uuid())
+  petId          String
+  pet            Pet      @relation(fields: [petId], references: [id])
+  tutorId        String
+  tutor          Customer @relation(fields: [tutorId], references: [id])
+  professionalId String?
+  professional   Professional? @relation(fields: [professionalId], references: [id])
+  code           String   @unique // ticket number for identification
+  status         String   @default("aberto") // aberto, em_atendimento, concluido, cancelado
+  total          Decimal  @default(0)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  items          GroomingItem[]
 
   @@index([petId])
   @@index([tutorId])
+  @@index([professionalId])
 }
 
 model GroomingItem {
@@ -190,6 +198,7 @@ model GroomingItem {
   name      String
   price     Decimal
   qty       Int            @default(1)
+  createdAt DateTime       @default(now())
 
   @@index([ticketId])
   @@index([serviceId])
