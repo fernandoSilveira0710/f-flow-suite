@@ -349,7 +349,7 @@ O sistema agora inclui funcionalidades completas para gerenciamento de clientes:
   - Paginação com `page` e `limit`
   - Busca por nome com parâmetro `search`
   - Filtro por status ativo com parâmetro `active`
-  - Sincronização via eventos (`customer.created.v1`, `customer.updated.v1`, `customer.deleted.v1`)
+  - Sincronização via eventos (`customer.upserted.v1`, `customer.deleted.v1`)
   - Suporte multi-tenant com RLS (Row Level Security)
 
 #### Frontend (React)
@@ -375,7 +375,7 @@ Sistema completo para gerenciamento de pets e relacionamento com tutores:
   - Busca por nome com parâmetro `search`
   - Filtro por tutor com parâmetro `tutorId`
   - Filtro por status ativo com parâmetro `active`
-  - Sincronização via eventos (`pet.created.v1`, `pet.updated.v1`, `pet.deleted.v1`)
+  - Sincronização via eventos (`pet.upserted.v1`, `pet.deleted.v1`)
   - Suporte multi-tenant com RLS
 
 #### Frontend (React)

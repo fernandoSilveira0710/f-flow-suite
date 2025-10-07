@@ -1,14 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
 import { ServiceResponseDto } from './dto';
 
 @Injectable()
 export class ServicesService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAllByTenant(tenantId: string): Promise<ServiceResponseDto[]> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     const services = await this.prisma.service.findMany({
       where: { tenantId },
@@ -20,7 +20,7 @@ export class ServicesService {
 
   async findOneByTenant(tenantId: string, serviceId: string): Promise<ServiceResponseDto> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     const service = await this.prisma.service.findFirst({
       where: { 
@@ -38,7 +38,7 @@ export class ServicesService {
 
   async upsertFromEvent(tenantId: string, eventPayload: any): Promise<ServiceResponseDto> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     const service = await this.prisma.service.upsert({
       where: { 
@@ -72,7 +72,7 @@ export class ServicesService {
 
   async deleteFromEvent(tenantId: string, serviceId: string): Promise<void> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     await this.prisma.service.delete({
       where: { 

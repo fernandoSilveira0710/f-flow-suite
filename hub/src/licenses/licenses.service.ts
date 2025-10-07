@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
 import * as jose from 'jose';
 
 @Injectable()
 export class LicensesService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async issue(tenantId: string, deviceId: string) {
     const license = await this.prisma.license.findFirst({

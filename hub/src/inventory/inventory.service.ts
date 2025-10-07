@@ -1,18 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
 import { InventoryAdjustmentResponseDto, InventoryLevelResponseDto } from './dto';
 
 @Injectable()
 export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async processInventoryAdjustmentEvent(tenantId: string, payload: any): Promise<void> {
     this.logger.debug(`Processing inventory adjustment event for tenant ${tenantId}`);
 
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     // Create inventory adjustment record
     await this.prisma.inventoryAdjustment.create({
@@ -35,7 +35,7 @@ export class InventoryService {
 
   async findAllByTenant(tenantId: string): Promise<InventoryAdjustmentResponseDto[]> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     const adjustments = await this.prisma.inventoryAdjustment.findMany({
       where: { tenantId },
@@ -47,7 +47,7 @@ export class InventoryService {
 
   async findByProduct(tenantId: string, productId: string): Promise<InventoryAdjustmentResponseDto[]> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     const adjustments = await this.prisma.inventoryAdjustment.findMany({
       where: { 
@@ -62,7 +62,7 @@ export class InventoryService {
 
   async getInventoryLevels(tenantId: string): Promise<InventoryLevelResponseDto[]> {
     // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
 
     // Get latest stock levels from products table
     const products = await this.prisma.product.findMany({

@@ -1,10 +1,10 @@
 import { Injectable, NestMiddleware, ForbiddenException } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from './common/prisma.service';
 
 @Injectable()
 export class PrismaTenantMiddleware implements NestMiddleware {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async use(req: Request, _res: Response, next: NextFunction) {
     // Excluir endpoints públicos da verificação de tenant

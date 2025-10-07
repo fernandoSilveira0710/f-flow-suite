@@ -8,9 +8,11 @@ import { PetsModule } from '../pets/pets.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { ServicesModule } from '../services/services.module';
 import { ProfessionalsModule } from '../professionals/professionals.module';
+import { AppointmentsModule } from '../appointments/appointments.module';
+import { CheckInsModule } from '../checkins/checkins.module';
 
 @Module({
-  imports: [ProductsModule, SalesModule, CustomersModule, PetsModule, InventoryModule, ServicesModule, ProfessionalsModule],
+  imports: [ProductsModule, SalesModule, CustomersModule, PetsModule, InventoryModule, ServicesModule, ProfessionalsModule, AppointmentsModule, CheckInsModule],
   providers: [SyncService],
   controllers: [SyncController],
 })
