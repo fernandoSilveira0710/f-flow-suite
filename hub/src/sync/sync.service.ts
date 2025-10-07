@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaClient } from '@prisma/client';
 import { ProductsService } from '../products/products.service';
 import { SalesService } from '../sales/sales.service';
+import { CustomersService } from '../customers/customers.service';
+import { PetsService } from '../pets/pets.service';
+import { InventoryService } from '../inventory/inventory.service';
+import { ServicesService } from '../services/services.service';
+import { ProfessionalsService } from '../professionals/professionals.service';
 
 interface OutboxEvent {
   id: string;
@@ -16,8 +21,14 @@ export class SyncService {
   private readonly logger = new Logger(SyncService.name);
 
   constructor(
+    private readonly prisma: PrismaClient,
     private readonly productsService: ProductsService,
     private readonly salesService: SalesService,
+    private readonly customersService: CustomersService,
+    private readonly petsService: PetsService,
+    private readonly inventoryService: InventoryService,
+    private readonly servicesService: ServicesService,
+    private readonly professionalsService: ProfessionalsService,
   ) {}
 
   async ingestEvents(tenantId: string, events: OutboxEvent[]): Promise<void> {
@@ -38,8 +49,35 @@ export class SyncService {
       case 'product.deleted.v1':
         await this.productsService.deleteFromEvent(tenantId, (event.payload as any).id);
         break;
+      case 'customer.upserted.v1':
+        await this.customersService.upsertFromEvent(tenantId, payload);
+        break;
+      case 'customer.deleted.v1':
+        await this.customersService.deleteFromEvent(tenantId, payload.id);
+        break;
+      case 'pet.upserted.v1':
+        await this.petsService.upsertFromEvent(tenantId, payload);
+        break;
+      case 'pet.deleted.v1':
+        await this.petsService.deleteFromEvent(tenantId, payload.id);
+        break;
       case 'sale.created.v1':
-        await this.processSaleCreatedEvent(tenantId, event.payload);
+        await this.processSaleCreatedEvent(tenantId, payload);
+        break;
+      case 'inventory.adjusted.v1':
+        await this.inventoryService.processInventoryAdjustmentEvent(tenantId, payload);
+        break;
+      case 'service.upserted.v1':
+        await this.servicesService.upsertFromEvent(tenantId, payload);
+        break;
+      case 'service.deleted.v1':
+        await this.servicesService.deleteFromEvent(tenantId, payload.id);
+        break;
+      case 'professional.upserted.v1':
+        await this.professionalsService.upsertFromEvent(tenantId, payload);
+        break;
+      case 'professional.deleted.v1':
+        await this.professionalsService.deleteFromEvent(tenantId, payload.id);
         break;
       default:
         this.logger.warn(`Unknown event type: ${event.type}`);
