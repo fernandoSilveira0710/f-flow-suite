@@ -30,8 +30,8 @@ export class ResourcesService {
       },
     });
 
-    // Generate resource.created.v1 event
-    await this.generateResourceEvent('resource.created.v1', resource);
+    // Generate resource.upserted.v1 event
+    await this.generateResourceEvent('resource.upserted.v1', resource);
 
     return resource;
   }
@@ -89,8 +89,8 @@ export class ResourcesService {
       data: updateResourceDto,
     });
 
-    // Generate resource.updated.v1 event
-    await this.generateResourceEvent('resource.updated.v1', resource);
+    // Generate resource.upserted.v1 event
+    await this.generateResourceEvent('resource.upserted.v1', resource);
 
     return resource;
   }
@@ -126,6 +126,46 @@ export class ResourcesService {
       entityType: 'resource',
       entityId: resource.id,
       data: resource,
+    });
+  }
+
+  async upsertFromEvent(tenantId: string, payload: any): Promise<void> {
+    const existingResource = await this.prisma.resource.findFirst({
+      where: { id: payload.id, tenantId },
+    });
+
+    if (existingResource) {
+      // Update existing resource
+      await this.prisma.resource.update({
+        where: { id: payload.id },
+        data: {
+          name: payload.name,
+          type: payload.type,
+          description: payload.description,
+          active: payload.active,
+          updatedAt: new Date(payload.updatedAt || payload.createdAt),
+        },
+      });
+    } else {
+      // Create new resource
+      await this.prisma.resource.create({
+        data: {
+          id: payload.id,
+          tenantId,
+          name: payload.name,
+          type: payload.type,
+          description: payload.description,
+          active: payload.active,
+          createdAt: new Date(payload.createdAt),
+          updatedAt: new Date(payload.updatedAt || payload.createdAt),
+        },
+      });
+    }
+  }
+
+  async deleteFromEvent(tenantId: string, resourceId: string): Promise<void> {
+    await this.prisma.resource.deleteMany({
+      where: { id: resourceId, tenantId },
     });
   }
 }
