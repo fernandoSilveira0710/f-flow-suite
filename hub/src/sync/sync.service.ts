@@ -10,6 +10,7 @@ import { ProfessionalsService } from '../professionals/professionals.service';
 import { AppointmentsService } from '../appointments/appointments.service';
 import { CheckInsService } from '../checkins/checkins.service';
 import { ResourcesService } from '../resources/resources.service';
+import { GroomingService } from '../grooming/grooming.service';
 import { ResourceUpsertedEventDto, ResourceDeletedEventDto } from '../resources/dto';
 
 interface OutboxEvent {
@@ -36,6 +37,7 @@ export class SyncService {
     private readonly appointmentsService: AppointmentsService,
     private readonly checkInsService: CheckInsService,
     private readonly resourcesService: ResourcesService,
+    private readonly groomingService: GroomingService,
   ) {}
 
   async ingestEvents(tenantId: string, events: OutboxEvent[]): Promise<void> {
@@ -87,12 +89,16 @@ export class SyncService {
         await this.inventoryService.processInventoryAdjustmentEvent(tenantId, payload);
         break;
       case 'service.upserted.v1':
+      case 'service.created.v1':
+      case 'service.updated.v1':
         await this.servicesService.upsertFromEvent(tenantId, payload);
         break;
       case 'service.deleted.v1':
         await this.servicesService.deleteFromEvent(tenantId, payload.id);
         break;
       case 'professional.upserted.v1':
+      case 'professional.created.v1':
+      case 'professional.updated.v1':
         await this.professionalsService.upsertFromEvent(tenantId, payload);
         break;
       case 'professional.deleted.v1':
@@ -118,8 +124,20 @@ export class SyncService {
       case 'checkin.created.v1':
         await this.processCheckInEvent(tenantId, 'checkin', payload);
         break;
+      case 'grooming.ticket.created.v1':
+        await this.groomingService.upsertTicketFromEvent(tenantId, payload);
+        break;
+      case 'grooming.ticket.updated.v1':
+        await this.groomingService.upsertTicketFromEvent(tenantId, payload);
+        break;
       case 'checkout.created.v1':
         await this.processCheckInEvent(tenantId, 'checkout', payload);
+        break;
+      case 'configuration.upserted.v1':
+        await this.processConfigurationEvent(tenantId, 'upserted', payload);
+        break;
+      case 'configuration.deleted.v1':
+        await this.processConfigurationEvent(tenantId, 'deleted', payload);
         break;
       default:
         this.logger.warn(`Unknown event type: ${event.type}`);
@@ -164,6 +182,21 @@ export class SyncService {
       this.logger.log(`Successfully processed ${action}.created.v1 event for tenant ${tenantId}`, payload);
     } catch (error) {
       this.logger.error(`Failed to process ${action}.created.v1 event for tenant ${tenantId}:`, error);
+      throw error;
+    }
+  }
+
+  private async processConfigurationEvent(tenantId: string, action: string, payload: Record<string, unknown>): Promise<void> {
+    this.logger.debug(`Processing configuration.${action}.v1 event for tenant ${tenantId}`);
+    
+    try {
+      // For now, just log the event - in a real implementation, you might want to:
+      // - Store configuration data in a centralized configurations table
+      // - Send notifications to other clients
+      // - Update analytics/reporting data
+      this.logger.log(`Successfully processed configuration.${action}.v1 event for tenant ${tenantId}`, payload);
+    } catch (error) {
+      this.logger.error(`Failed to process configuration.${action}.v1 event for tenant ${tenantId}:`, error);
       throw error;
     }
   }

@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { createStaff, getServices, type StaffType } from '@/lib/schedule-api';
+import { createProfessional, type CreateProfessionalDto } from '@/lib/professionals-api';
+import { getServices, type StaffType } from '@/lib/schedule-api';
 import { ArrowLeft, User, Box } from 'lucide-react';
 
 const colorOptions = [
@@ -63,18 +64,17 @@ export default function NovoProfissional() {
       return;
     }
 
-    const staff = createStaff({
-      nome: nome.trim(),
-      tipo,
-      funcoes: funcoes.length > 0 ? funcoes : undefined,
-      cores: { agenda: cor },
-      capacidadeSimultanea: parseInt(capacidade) || 1,
-      ativo,
-    });
+    const professionalData: CreateProfessionalDto = {
+      name: nome.trim(),
+      role: tipo === 'PROFISSIONAL' ? 'Professional' : 'Resource',
+      active: ativo,
+    };
+
+    const professional = createProfessional(professionalData);
 
     toast({
       title: `${tipo === 'PROFISSIONAL' ? 'Profissional' : 'Recurso'} criado`,
-      description: `${staff.nome} foi cadastrado com sucesso`,
+      description: `${professional.name} foi cadastrado com sucesso`,
     });
 
     navigate('/erp/agenda/profissionais');

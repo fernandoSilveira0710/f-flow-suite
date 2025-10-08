@@ -233,7 +233,8 @@ export function initGroomingMockData(): void {
 
 // ============ TUTORS API (Local for now) ============
 export function getTutors(): Tutor[] {
-  return getStorage<Tutor[]>(STORAGE_KEYS.TUTORS, []);
+  const tutors = getStorage<Tutor[]>(STORAGE_KEYS.TUTORS, []);
+  return Array.isArray(tutors) ? tutors : [];
 }
 
 export function getTutorById(id: string): Tutor | undefined {
@@ -264,7 +265,8 @@ export function deleteTutor(id: string): void {
 
 // ============ PETS API (Local for now) ============
 export function getPets(): Pet[] {
-  return getStorage<Pet[]>(STORAGE_KEYS.PETS, []);
+  const pets = getStorage<Pet[]>(STORAGE_KEYS.PETS, []);
+  return Array.isArray(pets) ? pets : [];
 }
 
 export function getPetById(id: string): Pet | undefined {
@@ -293,90 +295,168 @@ export function deletePet(id: string): void {
   setStorage(STORAGE_KEYS.PETS, pets);
 }
 
-// ============ SERVICES API (Real API) ============
-export async function getGroomServices(): Promise<GroomService[]> {
-  return apiCall<GroomService[]>('/grooming/services');
+// ============ SERVICES API (Local for now) ============
+export function getGroomServices(): GroomService[] {
+  const services = getStorage<GroomService[]>('grooming_services', [
+    {
+      id: uuid(),
+      name: 'Banho Simples',
+      description: 'Banho básico com shampoo neutro',
+      price: 35.00,
+      duration: 60,
+      category: 'BANHO',
+      active: true,
+    },
+    {
+      id: uuid(),
+      name: 'Tosa Higiênica',
+      description: 'Tosa das partes íntimas e patas',
+      price: 25.00,
+      duration: 30,
+      category: 'HIGIENE',
+      active: true,
+    },
+    {
+      id: uuid(),
+      name: 'Banho + Tosa',
+      description: 'Banho completo com tosa',
+      price: 65.00,
+      duration: 120,
+      category: 'COMBO',
+      active: true,
+    },
+  ]);
+  return Array.isArray(services) ? services : [];
 }
 
-export async function getGroomServiceById(id: string): Promise<GroomService | undefined> {
-  try {
-    return await apiCall<GroomService>(`/grooming/services/${id}`);
-  } catch {
-    return undefined;
+export function getGroomServiceById(id: string): GroomService | undefined {
+  return getGroomServices().find((s) => s.id === id);
+}
+
+export function createGroomService(data: Omit<GroomService, 'id' | 'createdAt' | 'updatedAt'>): GroomService {
+  const service: GroomService = { 
+    id: uuid(), 
+    ...data,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const services = getGroomServices();
+  services.push(service);
+  setStorage('grooming_services', services);
+  return service;
+}
+
+export function updateGroomService(id: string, data: Partial<Omit<GroomService, 'id' | 'createdAt' | 'updatedAt'>>): GroomService | undefined {
+  const services = getGroomServices();
+  const index = services.findIndex((s) => s.id === id);
+  if (index !== -1) {
+    services[index] = { 
+      ...services[index], 
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+    setStorage('grooming_services', services);
+    return services[index];
   }
+  return undefined;
 }
 
-export async function createGroomService(data: Omit<GroomService, 'id' | 'createdAt' | 'updatedAt'>): Promise<GroomService> {
-  return apiCall<GroomService>('/grooming/services', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+export function deleteGroomService(id: string): GroomService | undefined {
+  const services = getGroomServices();
+  const service = services.find((s) => s.id === id);
+  if (service) {
+    const filteredServices = services.filter((s) => s.id !== id);
+    setStorage('grooming_services', filteredServices);
+    return service;
+  }
+  return undefined;
 }
 
-export async function updateGroomService(id: string, data: Partial<Omit<GroomService, 'id' | 'createdAt' | 'updatedAt'>>): Promise<GroomService> {
-  return apiCall<GroomService>(`/grooming/services/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
-}
-
-export async function deleteGroomService(id: string): Promise<GroomService> {
-  return apiCall<GroomService>(`/grooming/services/${id}`, {
-    method: 'DELETE',
-  });
-}
-
-export async function duplicateGroomService(id: string): Promise<GroomService | undefined> {
-  const service = await getGroomServiceById(id);
+export function duplicateGroomService(id: string): GroomService | undefined {
+  const service = getGroomServiceById(id);
   if (!service) return undefined;
-  const duplicated = await createGroomService({
+  const duplicated = createGroomService({
     ...service,
     name: `${service.name} (Cópia)`,
   });
   return duplicated;
 }
 
-// ============ PROFESSIONALS API (Real API) ============
-export async function getProfessionals(): Promise<Professional[]> {
-  return apiCall<Professional[]>('/grooming/professionals');
+// ============ PROFESSIONALS API (Local for now) ============
+export function getProfessionals(): Professional[] {
+  const professionals = getStorage<Professional[]>('grooming_professionals', [
+    {
+      id: uuid(),
+      name: 'Ana Silva',
+      role: 'Tosadora',
+      phone: '(11) 99999-3333',
+      email: 'ana@petshop.com',
+      active: true,
+    },
+    {
+      id: uuid(),
+      name: 'Carlos Santos',
+      role: 'Banhista',
+      phone: '(11) 99999-4444',
+      email: 'carlos@petshop.com',
+      active: true,
+    },
+  ]);
+  return Array.isArray(professionals) ? professionals : [];
 }
 
-export async function getProfessionalById(id: string): Promise<Professional | undefined> {
-  try {
-    return await apiCall<Professional>(`/grooming/professionals/${id}`);
-  } catch {
-    return undefined;
+export function getProfessionalById(id: string): Professional | undefined {
+  return getProfessionals().find((p) => p.id === id);
+}
+
+export function createProfessional(data: Omit<Professional, 'id' | 'createdAt' | 'updatedAt'>): Professional {
+  const professional: Professional = { 
+    id: uuid(), 
+    ...data,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const professionals = getProfessionals();
+  professionals.push(professional);
+  setStorage('grooming_professionals', professionals);
+  return professional;
+}
+
+export function updateProfessional(id: string, data: Partial<Omit<Professional, 'id' | 'createdAt' | 'updatedAt'>>): Professional | undefined {
+  const professionals = getProfessionals();
+  const index = professionals.findIndex((p) => p.id === id);
+  if (index !== -1) {
+    professionals[index] = { 
+      ...professionals[index], 
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+    setStorage('grooming_professionals', professionals);
+    return professionals[index];
   }
+  return undefined;
 }
 
-export async function createProfessional(data: Omit<Professional, 'id' | 'createdAt' | 'updatedAt'>): Promise<Professional> {
-  return apiCall<Professional>('/grooming/professionals', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
-
-export async function updateProfessional(id: string, data: Partial<Omit<Professional, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Professional> {
-  return apiCall<Professional>(`/grooming/professionals/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
-}
-
-export async function deleteProfessional(id: string): Promise<Professional> {
-  return apiCall<Professional>(`/grooming/professionals/${id}`, {
-    method: 'DELETE',
-  });
+export function deleteProfessional(id: string): Professional | undefined {
+  const professionals = getProfessionals();
+  const professional = professionals.find((p) => p.id === id);
+  if (professional) {
+    const filteredProfessionals = professionals.filter((p) => p.id !== id);
+    setStorage('grooming_professionals', filteredProfessionals);
+    return professional;
+  }
+  return undefined;
 }
 
 // ============ RESOURCES API (Local for now - could be moved to API) ============
 export function getGroomResources(): GroomResource[] {
-  return getStorage<GroomResource[]>('grooming_resources', [
+  const resources = getStorage<GroomResource[]>('grooming_resources', [
     { id: uuid(), tipo: 'BOX', nome: 'Box 1', capacidadeSimultanea: 1, ativo: true },
     { id: uuid(), tipo: 'BOX', nome: 'Box 2', capacidadeSimultanea: 1, ativo: true },
     { id: uuid(), tipo: 'MESA', nome: 'Mesa 1', capacidadeSimultanea: 1, ativo: true },
     { id: uuid(), tipo: 'SECADOR', nome: 'Secador 1', capacidadeSimultanea: 2, ativo: true },
   ]);
+  return Array.isArray(resources) ? resources : [];
 }
 
 export function getGroomResourceById(id: string): GroomResource | undefined {
@@ -405,37 +485,54 @@ export function deleteGroomResource(id: string): void {
   setStorage('grooming_resources', resources);
 }
 
-// ============ TICKETS API (Real API) ============
-export async function getGroomTickets(): Promise<GroomTicket[]> {
-  return apiCall<GroomTicket[]>('/grooming/tickets');
+// ============ TICKETS API (Local for now) ============
+export function getGroomTickets(): GroomTicket[] {
+  const tickets = getStorage<GroomTicket[]>('grooming_tickets', []);
+  return Array.isArray(tickets) ? tickets : [];
 }
 
-export async function getGroomTicketById(id: string): Promise<GroomTicket | undefined> {
-  try {
-    return await apiCall<GroomTicket>(`/grooming/tickets/${id}`);
-  } catch {
-    return undefined;
+export function getGroomTicketById(id: string): GroomTicket | undefined {
+  return getGroomTickets().find((t) => t.id === id);
+}
+
+export function createGroomTicket(data: Omit<GroomTicket, 'id' | 'code' | 'createdAt' | 'updatedAt'>): GroomTicket {
+  const ticket: GroomTicket = {
+    id: uuid(),
+    code: `GT${Date.now().toString().slice(-6)}`,
+    ...data,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const tickets = getGroomTickets();
+  tickets.push(ticket);
+  setStorage('grooming_tickets', tickets);
+  return ticket;
+}
+
+export function updateGroomTicket(id: string, data: Partial<Omit<GroomTicket, 'id' | 'code' | 'createdAt' | 'updatedAt'>>): GroomTicket | undefined {
+  const tickets = getGroomTickets();
+  const index = tickets.findIndex((t) => t.id === id);
+  if (index !== -1) {
+    tickets[index] = {
+      ...tickets[index],
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+    setStorage('grooming_tickets', tickets);
+    return tickets[index];
   }
+  return undefined;
 }
 
-export async function createGroomTicket(data: Omit<GroomTicket, 'id' | 'code' | 'createdAt' | 'updatedAt'>): Promise<GroomTicket> {
-  return apiCall<GroomTicket>('/grooming/tickets', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
-
-export async function updateGroomTicket(id: string, data: Partial<Omit<GroomTicket, 'id' | 'code' | 'createdAt' | 'updatedAt'>>): Promise<GroomTicket> {
-  return apiCall<GroomTicket>(`/grooming/tickets/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
-}
-
-export async function deleteGroomTicket(id: string): Promise<GroomTicket> {
-  return apiCall<GroomTicket>(`/grooming/tickets/${id}`, {
-    method: 'DELETE',
-  });
+export function deleteGroomTicket(id: string): GroomTicket | undefined {
+  const tickets = getGroomTickets();
+  const ticket = tickets.find((t) => t.id === id);
+  if (ticket) {
+    const filteredTickets = tickets.filter((t) => t.id !== id);
+    setStorage('grooming_tickets', filteredTickets);
+    return ticket;
+  }
+  return undefined;
 }
 
 // ============ PREFS API (Local) ============

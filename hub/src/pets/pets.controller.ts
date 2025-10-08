@@ -1,6 +1,10 @@
 import {
   Controller,
   Get,
+  Post,
+  Put,
+  Delete,
+  Body,
   Param,
   Query,
   UseGuards,
@@ -8,7 +12,7 @@ import {
 import { OidcGuard } from '../auth/oidc.guard';
 import { LicenseGuard } from '../auth/license.guard';
 import { PetsService } from './pets.service';
-import { PetResponseDto } from './dto';
+import { CreatePetDto, UpdatePetDto, PetResponseDto } from './dto';
 
 @Controller('tenants/:tenantId/pets')
 @UseGuards(OidcGuard, LicenseGuard)
@@ -32,5 +36,30 @@ export class PetsController {
     @Param('id') id: string,
   ): Promise<PetResponseDto> {
     return this.petsService.findOneByTenant(tenantId, id);
+  }
+
+  @Post()
+  async create(
+    @Param('tenantId') tenantId: string,
+    @Body() createPetDto: CreatePetDto,
+  ): Promise<PetResponseDto> {
+    return this.petsService.create(tenantId, createPetDto);
+  }
+
+  @Put(':id')
+  async update(
+    @Param('tenantId') tenantId: string,
+    @Param('id') id: string,
+    @Body() updatePetDto: UpdatePetDto,
+  ): Promise<PetResponseDto> {
+    return this.petsService.update(tenantId, id, updatePetDto);
+  }
+
+  @Delete(':id')
+  async remove(
+    @Param('tenantId') tenantId: string,
+    @Param('id') id: string,
+  ): Promise<void> {
+    return this.petsService.remove(tenantId, id);
   }
 }

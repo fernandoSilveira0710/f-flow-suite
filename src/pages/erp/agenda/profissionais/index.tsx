@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreVertical, Pencil, Trash2, User, Box } from 'lucide-react';
 import { PageHeader } from '@/components/erp/page-header';
 import { EmptyState } from '@/components/erp/empty-state';
@@ -32,40 +32,45 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { getStaff, deleteStaff, getServices, type Staff } from '@/lib/schedule-api';
+import { getProfessionals, deleteProfessional, type ProfessionalResponseDto } from '@/lib/professionals-api';
+import { getServices } from '@/lib/schedule-api';
 
 export default function ProfissionaisIndex() {
-  const [staff, setStaff] = useState<Staff[]>(getStaff());
+  const navigate = useNavigate();
+  const [professionals, setProfessionals] = useState<ProfessionalResponseDto[]>(() => {
+    const professionalsData = getProfessionals();
+    return Array.isArray(professionalsData) ? professionalsData : [];
+  });
   const [search, setSearch] = useState('');
-  const [staffToDelete, setStaffToDelete] = useState<Staff | null>(null);
-  const [filterType, setFilterType] = useState<'all' | 'PROFISSIONAL' | 'RECURSO'>('all');
+  const [professionalToDelete, setProfessionalToDelete] = useState<ProfessionalResponseDto | null>(null);
+  const [filterType, setFilterType] = useState<'all' | 'Professional' | 'Resource'>('all');
   const { toast } = useToast();
   const services = getServices();
 
-  const filteredStaff = useMemo(() => {
-    let result = staff;
+  const filteredProfessionals = useMemo(() => {
+    let result = Array.isArray(professionals) ? professionals : [];
 
     if (search) {
       const lower = search.toLowerCase();
-      result = result.filter(s => s.nome.toLowerCase().includes(lower));
+      result = result.filter(s => s.name.toLowerCase().includes(lower));
     }
 
     if (filterType !== 'all') {
-      result = result.filter(s => s.tipo === filterType);
+      result = result.filter(s => s.role === filterType);
     }
 
     return result;
-  }, [staff, search, filterType]);
+  }, [professionals, search, filterType]);
 
-  const handleDelete = (staffMember: Staff) => {
-    if (deleteStaff(staffMember.id)) {
-      setStaff(getStaff());
+  const handleDelete = (professional: ProfessionalResponseDto) => {
+    if (deleteProfessional(professional.id)) {
+      setProfessionals(getProfessionals());
       toast({
-        title: `${staffMember.tipo === 'PROFISSIONAL' ? 'Profissional' : 'Recurso'} excluído`,
-        description: `${staffMember.nome} foi removido com sucesso`,
+        title: `${professional.role === 'Professional' ? 'Profissional' : 'Recurso'} excluído`,
+        description: `${professional.name} foi removido com sucesso`,
       });
     }
-    setStaffToDelete(null);
+    setProfessionalToDelete(null);
   };
 
   const getServiceNames = (serviceIds?: string[]) => {
@@ -76,10 +81,10 @@ export default function ProfissionaisIndex() {
     return names.length > 0 ? names.join(', ') : 'Nenhum';
   };
 
-  const profissionais = filteredStaff.filter(s => s.tipo === 'PROFISSIONAL');
-  const recursos = filteredStaff.filter(s => s.tipo === 'RECURSO');
+  const profissionais = filteredProfessionals.filter(s => s.role === 'Professional');
+  const recursos = filteredProfessionals.filter(s => s.role === 'Resource');
 
-  if (staff.length === 0) {
+  if (professionals.length === 0) {
     return (
       <>
         <PageHeader
@@ -91,7 +96,7 @@ export default function ProfissionaisIndex() {
           title="Nenhum profissional ou recurso cadastrado"
           description="Comece criando seu primeiro profissional ou recurso"
           actionLabel="Novo Profissional/Recurso"
-          onAction={() => {}}
+          onAction={() => navigate('/erp/agenda/profissionais/novo')}
         />
       </>
     );
@@ -127,12 +132,12 @@ export default function ProfissionaisIndex() {
       {/* Tabs */}
       <Tabs value={filterType} onValueChange={(v: any) => setFilterType(v)}>
         <TabsList>
-          <TabsTrigger value="all">Todos ({staff.length})</TabsTrigger>
-          <TabsTrigger value="PROFISSIONAL">
+          <TabsTrigger value="all">Todos ({professionals.length})</TabsTrigger>
+          <TabsTrigger value="Professional">
             <User className="mr-2 h-4 w-4" />
             Profissionais ({profissionais.length})
           </TabsTrigger>
-          <TabsTrigger value="RECURSO">
+          <TabsTrigger value="Resource">
             <Box className="mr-2 h-4 w-4" />
             Recursos ({recursos.length})
           </TabsTrigger>
@@ -145,62 +150,53 @@ export default function ProfissionaisIndex() {
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Serviços</TableHead>
-                  <TableHead>Capacidade</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Criado em</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStaff.length === 0 ? (
+                {filteredProfessionals.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
                       Nenhum resultado encontrado
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredStaff.map(staffMember => (
-                    <TableRow key={staffMember.id}>
+                  filteredProfessionals.map(professional => (
+                    <TableRow key={professional.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div
-                            className="h-10 w-10 rounded-full flex items-center justify-center text-white"
-                            style={{
-                              backgroundColor: staffMember.cores?.agenda || '#6B7280',
-                            }}
+                            className="h-10 w-10 rounded-full flex items-center justify-center text-white bg-gray-500"
                           >
-                            {staffMember.tipo === 'PROFISSIONAL' ? (
+                            {professional.role === 'Professional' ? (
                               <User className="h-5 w-5" />
                             ) : (
                               <Box className="h-5 w-5" />
                             )}
                           </div>
                           <div>
-                            <p className="font-medium">{staffMember.nome}</p>
+                            <p className="font-medium">{professional.name}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <Badge
                           variant={
-                            staffMember.tipo === 'PROFISSIONAL' ? 'default' : 'secondary'
+                            professional.role === 'Professional' ? 'default' : 'secondary'
                           }
                         >
-                          {staffMember.tipo === 'PROFISSIONAL' ? 'Profissional' : 'Recurso'}
+                          {professional.role === 'Professional' ? 'Profissional' : 'Recurso'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                        {getServiceNames(staffMember.funcoes)}
-                      </TableCell>
                       <TableCell>
-                        {staffMember.capacidadeSimultanea
-                          ? `${staffMember.capacidadeSimultanea}x`
-                          : '1x'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={staffMember.ativo ? 'default' : 'secondary'}>
-                          {staffMember.ativo ? 'Ativo' : 'Inativo'}
+                        <Badge variant={professional.active ? 'default' : 'secondary'}>
+                          {professional.active ? 'Ativo' : 'Inativo'}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(professional.createdAt).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -211,13 +207,13 @@ export default function ProfissionaisIndex() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                              <Link to={`/erp/agenda/profissionais/${staffMember.id}/editar`}>
+                              <Link to={`/erp/agenda/profissionais/${professional.id}/editar`}>
                                 <Pencil className="mr-2 h-4 w-4" />
                                 Editar
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => setStaffToDelete(staffMember)}
+                              onClick={() => setProfessionalToDelete(professional)}
                               className="text-destructive"
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
@@ -236,21 +232,21 @@ export default function ProfissionaisIndex() {
       </Tabs>
 
       {/* Delete confirmation */}
-      <AlertDialog open={!!staffToDelete} onOpenChange={() => setStaffToDelete(null)}>
+      <AlertDialog open={!!professionalToDelete} onOpenChange={() => setProfessionalToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Excluir {staffToDelete?.tipo === 'PROFISSIONAL' ? 'Profissional' : 'Recurso'}
+              Excluir {professionalToDelete?.role === 'Professional' ? 'Profissional' : 'Recurso'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir "{staffToDelete?.nome}"? Esta ação não pode ser
+              Tem certeza que deseja excluir "{professionalToDelete?.name}"? Esta ação não pode ser
               desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => staffToDelete && handleDelete(staffToDelete)}
+              onClick={() => professionalToDelete && handleDelete(professionalToDelete)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Excluir
