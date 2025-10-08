@@ -1,96 +1,388 @@
 /**
- * Sales API - Real API Integration
- * Connects to client-local server for sales operations
+ * Sales API - LocalStorage Integration
+ * Uses browser LocalStorage for sales operations
  */
 
 import { Sale } from './pos-api';
 
 // Types and Interfaces
 export interface SaleFilters {
+  range?: 'today' | 'yesterday' | '7d' | 'month' | 'custom';
+  dateFrom?: string;
+  dateTo?: string;
+  q?: string;
+  pay?: string[];
+  status?: string[];
+  // Legacy support
   startDate?: string;
   endDate?: string;
   operator?: string;
   paymentMethod?: string;
-  status?: string;
 }
 
 export interface SaleDetail extends Sale {
   // Additional fields for detailed view
 }
 
-// API Configuration
-const API_BASE_URL = 'http://127.0.0.1:3010';
+// LocalStorage Configuration
+const SALES_STORAGE_KEY = '2f.pos.sales';
 
-// API Helper function
-const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    ...options,
-  });
-
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status} ${response.statusText}`);
-  }
-
-  return response.json();
-};
-
-// Sales API
-export const fetchSales = async (filters?: SaleFilters): Promise<Sale[]> => {
+// LocalStorage Helper functions
+const getSalesFromStorage = (): Sale[] => {
   try {
-    // Build query parameters
-    const params = new URLSearchParams();
-    if (filters?.startDate) params.append('startDate', filters.startDate);
-    if (filters?.endDate) params.append('endDate', filters.endDate);
-    if (filters?.operator) params.append('operator', filters.operator);
-    if (filters?.paymentMethod) params.append('paymentMethod', filters.paymentMethod);
-    if (filters?.status) params.append('status', filters.status);
-
-    const queryString = params.toString();
-    const endpoint = queryString ? `/pos/sales?${queryString}` : '/pos/sales';
-    
-    const sales = await apiCall<any[]>(endpoint);
-    
-    return sales.map(sale => ({
-      id: sale.id,
-      code: sale.code,
-      operator: sale.operator,
-      paymentMethod: sale.paymentMethod,
-      status: sale.status,
-      total: sale.total,
-      customerId: sale.customerId,
-      createdAt: sale.createdAt,
-      updatedAt: sale.updatedAt,
-      items: sale.items,
-    }));
+    const salesData = localStorage.getItem(SALES_STORAGE_KEY);
+    return salesData ? JSON.parse(salesData) : [];
   } catch (error) {
-    console.error('Error fetching sales:', error);
+    console.error('Error reading sales from localStorage:', error);
     return [];
   }
 };
 
-export const fetchSaleById = async (id: string): Promise<SaleDetail | null> => {
+const saveSalesToStorage = (sales: Sale[]): void => {
   try {
-    const sale = await apiCall<any>(`/pos/sales/${id}`);
-    
-    return {
-      id: sale.id,
-      code: sale.code,
-      operator: sale.operator,
-      paymentMethod: sale.paymentMethod,
-      status: sale.status,
-      total: sale.total,
-      customerId: sale.customerId,
-      createdAt: sale.createdAt,
-      updatedAt: sale.updatedAt,
-      items: sale.items,
-    };
+    localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(sales));
   } catch (error) {
-    console.error('Error fetching sale by id:', error);
+    console.error('Error saving sales to localStorage:', error);
+  }
+};
+
+// Initialize with sample data if empty
+const initializeSampleData = (): void => {
+  const existingSales = getSalesFromStorage();
+  if (existingSales.length === 0) {
+    const sampleSales: Sale[] = [
+      {
+        id: 'sale_175',
+        code: 'SALE-175',
+        operator: 'Admin Demo',
+        paymentMethod: 'Cartão Débito',
+        status: 'completed',
+        total: 65.00,
+        customerId: 'customer-1',
+        createdAt: new Date('2025-10-08T12:38:00').toISOString(),
+        updatedAt: new Date('2025-10-08T12:38:00').toISOString(),
+        items: [
+          {
+            id: 'item-1',
+            productId: 'product-1',
+            qty: 1,
+            unitPrice: 65.00,
+            subtotal: 65.00,
+            createdAt: new Date('2025-10-08T12:38:00').toISOString(),
+          }
+        ]
+      },
+      {
+        id: 'sale_176',
+        code: 'SALE-176',
+        operator: 'Admin Demo',
+        paymentMethod: 'PIX',
+        status: 'completed',
+        total: 162.50,
+        customerId: 'customer-2',
+        createdAt: new Date('2025-10-08T12:07:00').toISOString(),
+        updatedAt: new Date('2025-10-08T12:07:00').toISOString(),
+        items: [
+          {
+            id: 'item-2',
+            productId: 'product-2',
+            qty: 1,
+            unitPrice: 162.50,
+            subtotal: 162.50,
+            createdAt: new Date('2025-10-08T12:07:00').toISOString(),
+          }
+        ]
+      },
+      {
+        id: 'sale_177',
+        code: 'SALE-177',
+        operator: 'Sistema',
+        paymentMethod: 'Dinheiro',
+        status: 'completed',
+        total: 379.80,
+        customerId: 'customer-3',
+        createdAt: new Date('2025-10-08T11:29:00').toISOString(),
+        updatedAt: new Date('2025-10-08T11:29:00').toISOString(),
+        items: [
+          {
+            id: 'item-3',
+            productId: 'product-3',
+            qty: 1,
+            unitPrice: 379.80,
+            subtotal: 379.80,
+            createdAt: new Date('2025-10-08T11:29:00').toISOString(),
+          }
+        ]
+      },
+      {
+        id: 'sale_178',
+        code: 'SALE-178',
+        operator: 'João Silva',
+        paymentMethod: 'Cartão Crédito',
+        status: 'cancelled',
+        total: 125.00,
+        customerId: 'customer-4',
+        createdAt: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+        updatedAt: new Date(Date.now() - 7200000).toISOString(),
+        items: [
+          {
+            id: 'item-4',
+            productId: 'product-4',
+            qty: 1,
+            unitPrice: 125.00,
+            subtotal: 125.00,
+            createdAt: new Date(Date.now() - 7200000).toISOString(),
+          }
+        ]
+      },
+      {
+        id: 'sale_179',
+        code: 'SALE-179',
+        operator: 'Maria Santos',
+        paymentMethod: 'PIX',
+        status: 'refunded',
+        total: 89.90,
+        customerId: 'customer-5',
+        createdAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        updatedAt: new Date(Date.now() - 3600000).toISOString(),
+        items: [
+          {
+            id: 'item-5',
+            productId: 'product-5',
+            qty: 1,
+            unitPrice: 89.90,
+            subtotal: 89.90,
+            createdAt: new Date(Date.now() - 3600000).toISOString(),
+          }
+        ]
+      }
+    ];
+    saveSalesToStorage(sampleSales);
+  }
+};
+
+// Initialize sample data on module load
+initializeSampleData();
+
+// Sales API
+export const fetchSales = async (filters?: SaleFilters): Promise<Sale[]> => {
+  try {
+    let sales = getSalesFromStorage();
+    
+    // Apply filters
+    if (filters) {
+      // Handle range filter
+      if (filters.range) {
+        const now = new Date();
+        let startDate: Date;
+        let endDate: Date = new Date(now);
+        endDate.setHours(23, 59, 59, 999);
+
+        switch (filters.range) {
+          case 'today':
+            startDate = new Date(now);
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case 'yesterday':
+            startDate = new Date(now);
+            startDate.setDate(now.getDate() - 1);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(now);
+            endDate.setDate(now.getDate() - 1);
+            endDate.setHours(23, 59, 59, 999);
+            break;
+          case '7d':
+            startDate = new Date(now);
+            startDate.setDate(now.getDate() - 7);
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+          case 'custom':
+            if (filters.dateFrom) {
+              startDate = new Date(filters.dateFrom);
+            } else {
+              startDate = new Date(0); // Beginning of time
+            }
+            if (filters.dateTo) {
+              endDate = new Date(filters.dateTo);
+              endDate.setHours(23, 59, 59, 999);
+            }
+            break;
+          default:
+            startDate = new Date(0);
+        }
+
+        if (startDate) {
+          sales = sales.filter(sale => new Date(sale.createdAt) >= startDate);
+        }
+        if (endDate) {
+          sales = sales.filter(sale => new Date(sale.createdAt) <= endDate);
+        }
+      }
+
+      // Handle custom date range (legacy support)
+      if (filters.startDate || filters.dateFrom) {
+        const startDate = new Date(filters.startDate || filters.dateFrom!);
+        sales = sales.filter(sale => new Date(sale.createdAt) >= startDate);
+      }
+      
+      if (filters.endDate || filters.dateTo) {
+        const endDate = new Date(filters.endDate || filters.dateTo!);
+        endDate.setHours(23, 59, 59, 999); // End of day
+        sales = sales.filter(sale => new Date(sale.createdAt) <= endDate);
+      }
+      
+      // Handle search query
+      if (filters.q) {
+        const query = filters.q.toLowerCase();
+        sales = sales.filter(sale => 
+          sale.operator.toLowerCase().includes(query) ||
+          sale.id.toLowerCase().includes(query) ||
+          sale.code?.toLowerCase().includes(query)
+        );
+      }
+
+      // Handle operator filter (legacy support)
+      if (filters.operator) {
+        sales = sales.filter(sale => 
+          sale.operator.toLowerCase().includes(filters.operator!.toLowerCase())
+        );
+      }
+      
+      // Handle payment method filters
+      if (filters.pay && filters.pay.length > 0) {
+        sales = sales.filter(sale => {
+          const paymentMethod = sale.paymentMethod.toLowerCase();
+          return filters.pay!.some(filterPayment => {
+            const filterLower = filterPayment.toLowerCase();
+            // Map filter values to actual payment methods
+            switch (filterLower) {
+              case 'pix':
+                return paymentMethod.includes('pix');
+              case 'debit':
+              case 'débito':
+                return paymentMethod.includes('débito') || paymentMethod.includes('debit');
+              case 'credit':
+              case 'crédito':
+                return paymentMethod.includes('crédito') || paymentMethod.includes('credit');
+              case 'cash':
+              case 'dinheiro':
+                return paymentMethod.includes('dinheiro') || paymentMethod.includes('cash');
+              default:
+                return paymentMethod.includes(filterLower);
+            }
+          });
+        });
+      }
+
+      // Handle single payment method filter (legacy support)
+      if (filters.paymentMethod) {
+        sales = sales.filter(sale => sale.paymentMethod === filters.paymentMethod);
+      }
+      
+      // Handle status filters
+      if (filters.status && filters.status.length > 0) {
+        sales = sales.filter(sale => {
+          const saleStatus = sale.status.toLowerCase();
+          return filters.status!.some(filterStatus => {
+            const filterLower = filterStatus.toLowerCase();
+            // Map filter values to actual statuses
+            switch (filterLower) {
+              case 'pago':
+              case 'completed':
+                return saleStatus === 'completed' || saleStatus === 'pago';
+              case 'cancelado':
+              case 'cancelled':
+              case 'refunded':
+                return saleStatus === 'cancelled' || saleStatus === 'refunded' || saleStatus === 'cancelado';
+              default:
+                return saleStatus.includes(filterLower);
+            }
+          });
+        });
+      }
+    }
+    
+    // Sort by creation date (newest first)
+    sales.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    return sales;
+  } catch (error) {
+    console.error('Error fetching sales from localStorage:', error);
+    return [];
+  }
+};
+
+export const fetchSaleById = async (saleId: string): Promise<SaleDetail | null> => {
+  try {
+    const sales = getSalesFromStorage();
+    const sale = sales.find(s => s.id === saleId);
+    return sale || null;
+  } catch (error) {
+    console.error('Error fetching sale by ID from localStorage:', error);
     return null;
+  }
+};
+
+export const createSale = async (saleData: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>): Promise<Sale> => {
+  try {
+    const sales = getSalesFromStorage();
+    const newSale: Sale = {
+      ...saleData,
+      id: `sale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    sales.push(newSale);
+    saveSalesToStorage(sales);
+    
+    return newSale;
+  } catch (error) {
+    console.error('Error creating sale in localStorage:', error);
+    throw error;
+  }
+};
+
+export const updateSale = async (saleId: string, saleData: Partial<Sale>): Promise<Sale | null> => {
+  try {
+    const sales = getSalesFromStorage();
+    const saleIndex = sales.findIndex(s => s.id === saleId);
+    
+    if (saleIndex === -1) {
+      return null;
+    }
+    
+    sales[saleIndex] = {
+      ...sales[saleIndex],
+      ...saleData,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    saveSalesToStorage(sales);
+    return sales[saleIndex];
+  } catch (error) {
+    console.error('Error updating sale in localStorage:', error);
+    throw error;
+  }
+};
+
+export const deleteSale = async (saleId: string): Promise<boolean> => {
+  try {
+    const sales = getSalesFromStorage();
+    const filteredSales = sales.filter(s => s.id !== saleId);
+    
+    if (filteredSales.length === sales.length) {
+      return false; // Sale not found
+    }
+    
+    saveSalesToStorage(filteredSales);
+    return true;
+  } catch (error) {
+    console.error('Error deleting sale from localStorage:', error);
+    return false;
   }
 };
 
@@ -171,9 +463,10 @@ export const exportSalesToCSV = async (sales: Sale[]): Promise<void> => {
 
 export const refundSale = async (saleId: string): Promise<void> => {
   try {
-    await apiCall(`/sales/${saleId}/refund`, {
-      method: 'POST',
-    });
+    const sale = await updateSale(saleId, { status: 'refunded' });
+    if (!sale) {
+      throw new Error('Sale not found');
+    }
   } catch (error) {
     console.error('Error processing refund:', error);
     throw error;

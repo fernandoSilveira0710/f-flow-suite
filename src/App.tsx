@@ -78,6 +78,7 @@ import PosSettings from "./pages/settings/pos";
 import ScheduleSettings from "./pages/settings/schedule";
 import GroomingSettings from "./pages/settings/grooming";
 import InventorySettings from "./pages/settings/inventory";
+import UnitsSettings from "./pages/settings/units";
 import PaymentsIndex from "./pages/settings/payments/index";
 import NotificationsSettings from "./pages/settings/notifications";
 import ImportExportSettings from "./pages/settings/import-export";
@@ -192,6 +193,7 @@ function App() {
             <Route path="schedule" element={<ScheduleSettings />} />
             <Route path="grooming" element={<GroomingSettings />} />
             <Route path="inventory" element={<InventorySettings />} />
+            <Route path="units" element={<UnitsSettings />} />
             <Route path="payments" element={<PaymentsIndex />} />
             <Route path="payments/new" element={<NovoPagamento />} />
             <Route path="payments/:id/edit" element={<NovoPagamento />} />

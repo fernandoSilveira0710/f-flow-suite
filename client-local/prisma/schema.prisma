@@ -8,17 +8,17 @@ datasource db {
 }
 
 model Sale {
-  id         String     @id @default(uuid())
-  code       String     @unique
-  operator   String
-  payment    String
-  status     String     @default("paid")
-  total      Decimal    @default(0)
-  customerId String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  customer   Customer?  @relation(fields: [customerId], references: [id])
-  items      SaleItem[]
+  id            String     @id @default(uuid())
+  code          String     @unique
+  operator      String
+  paymentMethod String
+  status        String     @default("paid")
+  total         Decimal    @default(0)
+  customerId    String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  items         SaleItem[]
 
   @@index([customerId])
 }
