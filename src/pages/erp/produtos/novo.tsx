@@ -22,6 +22,7 @@ import { ImageUpload } from '@/components/products/image-upload';
 export default function ProdutosNovo() {
   const navigate = useNavigate();
   const categories = mockAPI.getCategories();
+  const unitsOfMeasure = mockAPI.getUnitsOfMeasure();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -29,9 +30,11 @@ export default function ProdutosNovo() {
     sku: '',
     barcode: '',
     categoryId: '',
+    unitOfMeasureId: '',
     price: '',
     cost: '',
     stock: '',
+    minStock: '',
     active: true,
     imageUrl: undefined as string | undefined,
   });
@@ -45,9 +48,11 @@ export default function ProdutosNovo() {
       sku: formData.sku,
       barcode: formData.barcode,
       categoryId: formData.categoryId,
+      unitOfMeasureId: formData.unitOfMeasureId,
       price: parseFloat(formData.price),
       cost: parseFloat(formData.cost),
       stock: parseInt(formData.stock),
+      minStock: formData.minStock ? parseInt(formData.minStock) : undefined,
       active: formData.active,
       imageUrl: formData.imageUrl,
     });
@@ -96,7 +101,7 @@ export default function ProdutosNovo() {
               <CardTitle>Informações Básicas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="name">Nome do Produto *</Label>
                   <Input
@@ -108,7 +113,7 @@ export default function ProdutosNovo() {
                 </div>
 
                 <div>
-                  <Label htmlFor="categoryId">Categoria *</Label>
+                  <Label htmlFor="category">Categoria *</Label>
                   <Select
                     value={formData.categoryId}
                     onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
@@ -121,6 +126,25 @@ export default function ProdutosNovo() {
                       {categories.map((cat) => (
                         <SelectItem key={cat.id} value={cat.id}>
                           {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="unitOfMeasure">Unidade de Medida</Label>
+                  <Select
+                    value={formData.unitOfMeasureId}
+                    onValueChange={(value) => setFormData({ ...formData, unitOfMeasureId: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unitsOfMeasure.map((unit) => (
+                        <SelectItem key={unit.id} value={unit.id}>
+                          {unit.name} ({unit.abbreviation})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -198,6 +222,20 @@ export default function ProdutosNovo() {
                     value={formData.stock}
                     onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                     required
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="minStock">Estoque Mínimo</Label>
+                  <Input
+                    id="minStock"
+                    type="number"
+                    value={formData.minStock}
+                    onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
+                    placeholder="0"
+                    min="0"
                   />
                 </div>
               </div>

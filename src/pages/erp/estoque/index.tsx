@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/erp/page-header';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -62,6 +63,9 @@ export default function StockPositionPage() {
   const [document, setDocument] = useState('');
   const [notes, setNotes] = useState('');
   const [motivo, setMotivo] = useState('');
+  const [minStock, setMinStock] = useState('');
+  const [alterarSaldo, setAlterarSaldo] = useState(false);
+  const [alterarMinimo, setAlterarMinimo] = useState(false);
 
   const { toast } = useToast();
   const { entitlements } = useEntitlements();
@@ -114,15 +118,42 @@ export default function StockPositionPage() {
     setDocument('');
     setNotes('');
     setMotivo('');
+    setMinStock(product.estoqueMinimo?.toString() || '');
+    setAlterarSaldo(false);
+    setAlterarMinimo(false);
   };
 
   const handleMovement = () => {
     if (!selectedProduct || !movementDialog) return;
 
-    const qtd = parseFloat(quantity);
-    if (isNaN(qtd) || qtd <= 0) {
-      toast({ title: 'Erro', description: 'Quantidade inválida', variant: 'destructive' });
-      return;
+    // Para ajuste, verificar se pelo menos uma opção está habilitada
+    if (movementDialog === 'AJUSTE') {
+      if (!alterarSaldo && !alterarMinimo) {
+        toast({ title: 'Erro', description: 'Selecione pelo menos uma opção para alterar', variant: 'destructive' });
+        return;
+      }
+      
+      if (alterarSaldo) {
+        const qtd = parseFloat(quantity);
+        if (isNaN(qtd) || qtd < 0) {
+          toast({ title: 'Erro', description: 'Novo saldo inválido', variant: 'destructive' });
+          return;
+        }
+      }
+      
+      if (alterarMinimo) {
+        const minStockValue = parseFloat(minStock);
+        if (isNaN(minStockValue) || minStockValue < 0) {
+          toast({ title: 'Erro', description: 'Estoque mínimo inválido', variant: 'destructive' });
+          return;
+        }
+      }
+    } else {
+      const qtd = parseFloat(quantity);
+      if (isNaN(qtd) || qtd <= 0) {
+        toast({ title: 'Erro', description: 'Quantidade inválida', variant: 'destructive' });
+        return;
+      }
     }
 
     try {
@@ -130,16 +161,21 @@ export default function StockPositionPage() {
         tipo: movementDialog,
         produtoId: selectedProduct.id,
         sku: selectedProduct.sku,
-        quantidade: qtd,
+        quantidade: movementDialog === 'AJUSTE' && alterarSaldo ? parseFloat(quantity) : movementDialog !== 'AJUSTE' ? parseFloat(quantity) : undefined,
         custoUnit: cost ? parseFloat(cost) : undefined,
         origem: movementDialog === 'ENTRADA' ? 'COMPRA' : movementDialog === 'SAIDA' ? 'VENDA' : 'INVENTARIO',
         motivo: motivo || undefined,
         documento: document || undefined,
         observacao: notes || undefined,
+        estoqueMinimo: movementDialog === 'AJUSTE' && alterarMinimo ? parseFloat(minStock) : undefined,
       });
 
       setProducts(getProducts());
       setMovementDialog(null);
+      setAlterarSaldo(false);
+      setAlterarMinimo(false);
+      setQuantity('');
+      setMinStock('');
       toast({
         title: 'Sucesso',
         description: `${movementDialog === 'ENTRADA' ? 'Entrada' : movementDialog === 'SAIDA' ? 'Saída' : 'Ajuste'} registrado com sucesso`,
@@ -320,18 +356,104 @@ export default function StockPositionPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="quantity">
-                {movementDialog === 'AJUSTE' ? 'Novo saldo' : 'Quantidade'}
-              </Label>
-              <Input
-                id="quantity"
-                type="number"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                placeholder="0"
-              />
-            </div>
+            {/* Exibir estoque atual */}
+            {selectedProduct && (
+              <div className="bg-muted/50 p-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Estoque Atual:</span>
+                  <span className="text-lg font-bold text-primary">
+                    {selectedProduct.estoqueAtual} {selectedProduct.unidade}
+                  </span>
+                </div>
+                {movementDialog === 'AJUSTE' && (
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                    <span className="text-sm font-medium">Estoque Mínimo Atual:</span>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {selectedProduct.estoqueMinimo || prefs.estoqueMinimoPadrao || 0} {selectedProduct.unidade}
+                    </span>
+                  </div>
+                )}
+                {movementDialog === 'ENTRADA' && quantity && (
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                    <span className="text-sm text-muted-foreground">Novo estoque:</span>
+                    <span className="text-sm font-medium text-green-600">
+                      {selectedProduct.estoqueAtual + (parseFloat(quantity) || 0)} {selectedProduct.unidade}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {movementDialog === 'AJUSTE' ? (
+              <>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="alterarSaldo"
+                      checked={alterarSaldo}
+                      onCheckedChange={(checked) => setAlterarSaldo(checked as boolean)}
+                    />
+                    <Label htmlFor="alterarSaldo" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Alterar saldo do estoque
+                    </Label>
+                  </div>
+                  {alterarSaldo && (
+                    <div>
+                      <Label htmlFor="quantity">Novo saldo</Label>
+                      <Input
+                        id="quantity"
+                        type="number"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        placeholder="0"
+                        min="0"
+                        step="1"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="alterarMinimo"
+                      checked={alterarMinimo}
+                      onCheckedChange={(checked) => setAlterarMinimo(checked as boolean)}
+                    />
+                    <Label htmlFor="alterarMinimo" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Alterar estoque mínimo
+                    </Label>
+                  </div>
+                  {alterarMinimo && (
+                    <div>
+                      <Label htmlFor="minStock">Novo estoque mínimo</Label>
+                      <Input
+                        id="minStock"
+                        type="number"
+                        value={minStock}
+                        onChange={(e) => setMinStock(e.target.value)}
+                        placeholder="0"
+                        min="0"
+                        step="1"
+                      />
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div>
+                <Label htmlFor="quantity">Quantidade</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  placeholder="0"
+                  min="0"
+                  step="1"
+                />
+              </div>
+            )}
 
             {movementDialog === 'ENTRADA' && (
               <div>

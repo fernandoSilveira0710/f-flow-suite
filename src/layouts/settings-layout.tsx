@@ -97,6 +97,12 @@ export default function SettingsLayout() {
       requiresPlan: null,
     },
     {
+      label: 'Unidades de Medida',
+      icon: Package,
+      path: '/erp/settings/units',
+      requiresPlan: null,
+    },
+    {
       type: 'separator' as const,
       label: 'Geral',
     },
