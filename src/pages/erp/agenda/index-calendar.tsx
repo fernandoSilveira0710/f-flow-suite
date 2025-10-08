@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isToday, isSameDay, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -43,10 +43,29 @@ export default function AgendaIndex() {
   const [selectedService, setSelectedService] = useState<string>(searchParams.get('serviceId') || 'all');
   const [selectedStatus, setSelectedStatus] = useState<string>(searchParams.get('status') || 'all');
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const appointments = getAppointments();
   const services = getServices();
   const staff = getStaff();
+
+  // Load appointments asynchronously
+  useEffect(() => {
+    const loadAppointments = async () => {
+      try {
+        setLoading(true);
+        const appointmentsData = await getAppointments();
+        setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        setAppointments([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAppointments();
+  }, []);
 
   // Filtrar appointments
   const filteredAppointments = useMemo(() => {
@@ -289,17 +308,23 @@ export default function AgendaIndex() {
         onAction={() => navigate('/erp/agenda/novo')}
       />
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar cliente ou serviço..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-muted-foreground">Carregando agendamentos...</div>
         </div>
+      ) : (
+        <>
+          {/* Filtros */}
+          <div className="flex flex-wrap gap-4 items-center">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar cliente ou serviço..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
 
         <Select value={selectedStaff} onValueChange={setSelectedStaff}>
           <SelectTrigger className="w-[200px]">
@@ -361,13 +386,15 @@ export default function AgendaIndex() {
         </Tabs>
       </div>
 
-      {/* Conteúdo */}
-      <div className="rounded-2xl border bg-card p-6">
-        {viewMode === 'day' && renderDayView()}
-        {viewMode === 'week' && renderWeekView()}
-        {viewMode === 'month' && renderMonthView()}
-        {viewMode === 'list' && renderListView()}
-      </div>
+        {/* Conteúdo */}
+        <div className="rounded-2xl border bg-card p-6">
+          {viewMode === 'day' && renderDayView()}
+          {viewMode === 'week' && renderWeekView()}
+          {viewMode === 'month' && renderMonthView()}
+          {viewMode === 'list' && renderListView()}
+        </div>
+        </>
+      )}
     </div>
   );
 }
