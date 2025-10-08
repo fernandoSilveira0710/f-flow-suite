@@ -111,17 +111,31 @@ model Pet {
   @@index([tutorId])
 }
 
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  services    Service[]
+}
+
 model Service {
   id            String         @id @default(uuid())
   name          String
   description   String?
   price         Decimal
   duration      Int
+  categoryId    String?
   active        Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  category      Category?      @relation(fields: [categoryId], references: [id])
   appointments  Appointment[]
   groomingItems GroomingItem[]
+
+  @@index([categoryId])
 }
 
 model Professional {
@@ -255,6 +269,17 @@ model StockMovement {
   product   Product  @relation(fields: [productId], references: [id])
 
   @@index([productId])
+}
+
+model ResourceType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active])
 }
 
 model OutboxEvent {
