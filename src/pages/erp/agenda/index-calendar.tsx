@@ -100,8 +100,8 @@ export default function AgendaIndex() {
   // Renderizar visualizações
   const renderDayView = () => {
     const dayAppointments = filteredAppointments.filter((apt) =>
-      isSameDay(parseISO(apt.startISO), currentDate)
-    ).sort((a, b) => a.startISO.localeCompare(b.startISO));
+      isSameDay(parseISO(apt.startTime), currentDate)
+    ).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     return (
       <div className="space-y-2">
@@ -120,9 +120,9 @@ export default function AgendaIndex() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={cn('w-2 h-2 rounded-full', statusColors[apt.status])} />
-                    <span className="font-medium">{format(parseISO(apt.startISO), 'HH:mm', { locale: ptBR })}</span>
+                    <span className="font-medium">{format(parseISO(apt.startTime), 'HH:mm', { locale: ptBR })}</span>
                     <span className="text-muted-foreground">-</span>
-                    <span className="font-medium">{format(parseISO(apt.endISO), 'HH:mm', { locale: ptBR })}</span>
+                    <span className="font-medium">{format(parseISO(apt.endTime), 'HH:mm', { locale: ptBR })}</span>
                   </div>
                   <div className="font-semibold">{apt.customerNome}</div>
                   <div className="text-sm text-muted-foreground">{apt.serviceNome}</div>
@@ -147,8 +147,8 @@ export default function AgendaIndex() {
       <div className="grid grid-cols-7 gap-2">
         {weekDays.map((day) => {
           const dayAppointments = filteredAppointments.filter((apt) =>
-            isSameDay(parseISO(apt.startISO), day)
-          ).sort((a, b) => a.startISO.localeCompare(b.startISO));
+            isSameDay(parseISO(apt.startTime), day)
+          ).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
           return (
             <div key={day.toISOString()} className="border rounded-lg p-2 min-h-[200px]">
@@ -168,7 +168,7 @@ export default function AgendaIndex() {
                   >
                     <div className="flex items-center gap-1 mb-1">
                       <span className={cn('w-1.5 h-1.5 rounded-full', statusColors[apt.status])} />
-                      <span className="font-medium">{format(parseISO(apt.startISO), 'HH:mm')}</span>
+                      <span className="font-medium">{format(parseISO(apt.startTime), 'HH:mm')}</span>
                     </div>
                     <div className="font-medium truncate">{apt.customerNome}</div>
                     <div className="text-muted-foreground truncate">{apt.serviceNome}</div>
@@ -204,7 +204,7 @@ export default function AgendaIndex() {
         ))}
         {days.map((day) => {
           const dayAppointments = filteredAppointments.filter((apt) =>
-            isSameDay(parseISO(apt.startISO), day)
+            isSameDay(parseISO(apt.startTime), day)
           );
           const isCurrentMonth = day.getMonth() === currentDate.getMonth();
 
@@ -267,7 +267,7 @@ export default function AgendaIndex() {
                   <div className="flex items-center gap-2 mb-1">
                     <span className={cn('w-2 h-2 rounded-full', statusColors[apt.status])} />
                     <span className="font-medium">
-                      {format(parseISO(apt.startISO), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      {format(parseISO(apt.startTime), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                     </span>
                   </div>
                   <div className="font-semibold">{apt.customerNome}</div>

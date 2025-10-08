@@ -9,13 +9,15 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getGroomResourceById, updateGroomResource, type ResourceType } from '@/lib/grooming-api';
+import { getResourceTypes } from '@/pages/erp/grooming/resource-types/index';
 import { toast } from 'sonner';
 
 const tipos: ResourceType[] = ['BOX', 'GAIOLA', 'MESA', 'SECADOR'];
 
 export default function EditarRecurso() {
-  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [resourceTypes] = useState(() => getResourceTypes().filter(rt => rt.active));
   const [loading, setLoading] = useState(true);
   const [tipo, setTipo] = useState<ResourceType>('BOX');
   const [nome, setNome] = useState('');
@@ -91,8 +93,8 @@ export default function EditarRecurso() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-background z-50">
-                  {tipos.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  {resourceTypes.map((rt) => (
+                    <SelectItem key={rt.name} value={rt.name}>{rt.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

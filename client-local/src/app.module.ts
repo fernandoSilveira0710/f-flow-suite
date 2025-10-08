@@ -10,6 +10,7 @@ import { ProductsModule } from './products/products.module';
 import { CustomersModule } from './customers/customers.module';
 import { PetsModule } from './pets/pets.module';
 import { ServicesModule } from './services/services.module';
+import { CategoriesModule } from './categories/categories.module';
 import { ProfessionalsModule } from './professionals/professionals.module';
 import { CheckInsModule } from './checkins/checkins.module';
 import { ResourcesModule } from './resources/resources.module';
@@ -17,6 +18,7 @@ import { HealthModule } from './health/health.module';
 import { ConfigurationsModule } from './configurations/configurations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
+import { ResourceTypeModule } from './resource-type/resource-type.module';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
     CustomersModule,
     PetsModule,
     ServicesModule,
+    CategoriesModule,
     ProfessionalsModule,
     CheckInsModule,
     InventoryModule,
@@ -38,6 +41,7 @@ import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
     ConfigurationsModule,
     DashboardModule,
     FeatureFlagsModule,
+    ResourceTypeModule,
   ],
 })
 export class AppModule {}

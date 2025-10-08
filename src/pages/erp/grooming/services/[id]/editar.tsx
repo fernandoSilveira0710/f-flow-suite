@@ -21,7 +21,7 @@ const categories: { value: ServiceCategory; label: string }[] = [
 ];
 
 const recursos = [
-  { value: '', label: 'Nenhum' },
+  { value: 'NENHUM', label: 'Nenhum' },
   { value: 'BOX', label: 'Box' },
   { value: 'MESA', label: 'Mesa' },
   { value: 'SECADOR', label: 'Secador' },
@@ -39,7 +39,7 @@ export default function EditarGroomingService() {
   const [precoG, setPrecoG] = useState('');
   const [precoGG, setPrecoGG] = useState('');
   const [duracaoBaseMin, setDuracaoBaseMin] = useState('');
-  const [requerRecurso, setRequerRecurso] = useState('');
+  const [requerRecurso, setRequerRecurso] = useState('NENHUM');
   const [cor, setCor] = useState('#3B82F6');
   const [ativo, setAtivo] = useState(true);
 
@@ -61,7 +61,7 @@ export default function EditarGroomingService() {
     setPrecoG(String(service.precoPorPorte.G));
     setPrecoGG(String(service.precoPorPorte.GG));
     setDuracaoBaseMin(String(service.duracaoBaseMin));
-    setRequerRecurso(service.requerRecurso || '');
+    setRequerRecurso(service.requerRecurso || 'NENHUM');
     setCor(service.cor || '#3B82F6');
     setAtivo(service.ativo);
     setLoading(false);
@@ -86,7 +86,7 @@ export default function EditarGroomingService() {
         GG: parseFloat(precoGG) || 0,
       },
       duracaoBaseMin: parseInt(duracaoBaseMin) || 60,
-      requerRecurso: requerRecurso ? (requerRecurso as any) : null,
+      requerRecurso: requerRecurso !== 'NENHUM' ? (requerRecurso as any) : null,
       cor,
       ativo,
     });

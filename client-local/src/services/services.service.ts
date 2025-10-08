@@ -21,6 +21,7 @@ export class ServicesService {
         description: createServiceDto.description,
         price: createServiceDto.price,
         duration: createServiceDto.duration || 0,
+        categoryId: createServiceDto.categoryId,
         active: createServiceDto.active ?? true,
       },
     });
@@ -68,7 +69,7 @@ export class ServicesService {
         ...(updateServiceDto.description !== undefined && { description: updateServiceDto.description }),
         ...(updateServiceDto.price !== undefined && { price: updateServiceDto.price }),
         ...(updateServiceDto.duration !== undefined && { duration: updateServiceDto.duration }),
-        ...(updateServiceDto.category !== undefined && { category: updateServiceDto.category }),
+        ...(updateServiceDto.categoryId !== undefined && { categoryId: updateServiceDto.categoryId }),
         ...(updateServiceDto.active !== undefined && { active: updateServiceDto.active }),
       },
     });
