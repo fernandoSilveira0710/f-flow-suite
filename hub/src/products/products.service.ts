@@ -7,9 +7,6 @@ export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAllByTenant(tenantId: string): Promise<ProductResponseDto[]> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const products = await this.prisma.product.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' },
@@ -19,9 +16,6 @@ export class ProductsService {
   }
 
   async findOneByTenant(tenantId: string, productId: string): Promise<ProductResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     const product = await this.prisma.product.findFirst({
       where: { 
         id: productId,
@@ -37,9 +31,6 @@ export class ProductsService {
   }
 
   async upsertFromEvent(tenantId: string, eventPayload: any): Promise<ProductResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     const product = await this.prisma.product.upsert({
       where: { 
         id: eventPayload.id,
@@ -85,9 +76,6 @@ export class ProductsService {
   }
 
   async deleteFromEvent(tenantId: string, productId: string): Promise<void> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     await this.prisma.product.delete({
       where: { 
         id: productId,

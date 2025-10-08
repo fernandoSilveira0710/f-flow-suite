@@ -7,9 +7,6 @@ export class ProfessionalsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAllByTenant(tenantId: string): Promise<ProfessionalResponseDto[]> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const professionals = await this.prisma.professional.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' },
@@ -19,9 +16,6 @@ export class ProfessionalsService {
   }
 
   async findOneByTenant(tenantId: string, professionalId: string): Promise<ProfessionalResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const professional = await this.prisma.professional.findFirst({
       where: { 
         id: professionalId,
@@ -37,9 +31,6 @@ export class ProfessionalsService {
   }
 
   async upsertFromEvent(tenantId: string, eventPayload: any): Promise<ProfessionalResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const professional = await this.prisma.professional.upsert({
       where: { 
         id: eventPayload.id,
@@ -73,9 +64,6 @@ export class ProfessionalsService {
   }
 
   async deleteFromEvent(tenantId: string, professionalId: string): Promise<void> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     await this.prisma.professional.delete({
       where: { 
         id: professionalId,

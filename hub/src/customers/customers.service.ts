@@ -7,9 +7,6 @@ export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAllByTenant(tenantId: string): Promise<CustomerResponseDto[]> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const customers = await this.prisma.customer.findMany({
       where: { 
         tenantId,
@@ -36,9 +33,6 @@ export class CustomersService {
   }
 
   async findOneByTenant(tenantId: string, customerId: string): Promise<CustomerResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     const customer = await this.prisma.customer.findFirst({
       where: { 
         id: customerId,
@@ -69,9 +63,6 @@ export class CustomersService {
   }
 
   async upsertFromEvent(tenantId: string, eventPayload: any): Promise<CustomerResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     const customer = await this.prisma.customer.upsert({
       where: { 
         id: eventPayload.id,
@@ -123,9 +114,6 @@ export class CustomersService {
   }
 
   async deleteFromEvent(tenantId: string, customerId: string): Promise<void> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     await this.prisma.customer.update({
       where: { 
         id: customerId,

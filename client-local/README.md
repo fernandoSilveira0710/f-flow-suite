@@ -246,6 +246,92 @@ Resposta:
 }
 ```
 
+### Health Dependencies
+
+```bash
+GET http://127.0.0.1:3010/health/deps
+```
+
+Resposta:
+```json
+{
+  "sqlite": {
+    "status": "connected",
+    "responseTime": 2
+  },
+  "hub": {
+    "status": "connected",
+    "responseTime": 150
+  }
+}
+```
+
+### Dashboard
+
+```bash
+GET http://127.0.0.1:3010/dashboard/summary
+```
+
+Resposta:
+```json
+{
+  "vendas": {
+    "hoje": 0,
+    "semana": 0,
+    "mes": 0
+  },
+  "estoque": {
+    "produtosAtivos": 0,
+    "estoqueTotal": 0,
+    "alertasBaixoEstoque": 0
+  },
+  "agendamentos": {
+    "hoje": 0,
+    "semana": 0,
+    "pendentes": 0
+  },
+  "grooming": {
+    "agendamentosHoje": 0,
+    "servicosAtivos": 0,
+    "faturamentoMes": 0
+  }
+}
+```
+
+### Feature Flags
+
+```bash
+# Obter todas as feature flags
+GET http://127.0.0.1:3010/feature-flags
+
+# Verificar feature específica
+GET http://127.0.0.1:3010/feature-flags/pos
+GET http://127.0.0.1:3010/feature-flags/grooming
+GET http://127.0.0.1:3010/feature-flags/appointments
+GET http://127.0.0.1:3010/feature-flags/inventory
+GET http://127.0.0.1:3010/feature-flags/customers
+GET http://127.0.0.1:3010/feature-flags/reports
+```
+
+Resposta (todas as flags):
+```json
+{
+  "mvpPosEnabled": true,
+  "mvpGroomingEnabled": true,
+  "mvpAppointmentsEnabled": true,
+  "mvpInventoryEnabled": true,
+  "mvpCustomersEnabled": true,
+  "mvpReportsEnabled": true
+}
+```
+
+Resposta (feature específica):
+```json
+{
+  "enabled": true
+}
+```
+
 ## 🚨 Troubleshooting
 
 ### Problemas Comuns

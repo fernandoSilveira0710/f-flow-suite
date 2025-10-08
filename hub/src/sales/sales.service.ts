@@ -43,9 +43,6 @@ export class SalesService {
     
     this.logger.log(`Found tenant: ${tenant.id} (slug: ${tenant.slug})`);
 
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenant.id}'`;
-
     // Validate required fields
     if (!eventPayload.createdAt || !eventPayload.code || !eventPayload.operator || 
         eventPayload.total === undefined || !eventPayload.paymentMethod) {

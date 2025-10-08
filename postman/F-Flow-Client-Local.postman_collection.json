@@ -979,6 +979,166 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/dashboard/summary",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "dashboard",
+                "summary"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna métricas do dashboard', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('vendas');",
+                  "  pm.expect(body).to.have.property('estoque');",
+                  "  pm.expect(body).to.have.property('agendamentos');",
+                  "  pm.expect(body).to.have.property('grooming');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Feature Flags",
+      "item": [
+        {
+          "name": "Get All Feature Flags",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/feature-flags",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "feature-flags"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna feature flags', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('mvpPosEnabled');",
+                  "  pm.expect(body).to.have.property('mvpGroomingEnabled');",
+                  "  pm.expect(body).to.have.property('mvpAppointmentsEnabled');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check POS Feature",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/feature-flags/pos",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "feature-flags",
+                "pos"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna status da feature', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('enabled');",
+                  "  pm.expect(body.enabled).to.be.a('boolean');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check Grooming Feature",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_local_url}}/feature-flags/grooming",
+              "host": [
+                "{{client_local_url}}"
+              ],
+              "path": [
+                "feature-flags",
+                "grooming"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Retorna status da feature', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('enabled');",
+                  "  pm.expect(body.enabled).to.be.a('boolean');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

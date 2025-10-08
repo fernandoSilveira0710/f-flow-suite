@@ -11,9 +11,6 @@ export class InventoryService {
   async processInventoryAdjustmentEvent(tenantId: string, payload: any): Promise<void> {
     this.logger.debug(`Processing inventory adjustment event for tenant ${tenantId}`);
 
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     // Create inventory adjustment record
     await this.prisma.inventoryAdjustment.create({
       data: {
@@ -34,9 +31,6 @@ export class InventoryService {
   }
 
   async findAllByTenant(tenantId: string): Promise<InventoryAdjustmentResponseDto[]> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const adjustments = await this.prisma.inventoryAdjustment.findMany({
       where: { tenantId },
       orderBy: { adjustedAt: 'desc' },
@@ -46,9 +40,6 @@ export class InventoryService {
   }
 
   async findByProduct(tenantId: string, productId: string): Promise<InventoryAdjustmentResponseDto[]> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const adjustments = await this.prisma.inventoryAdjustment.findMany({
       where: { 
         tenantId,
@@ -61,9 +52,6 @@ export class InventoryService {
   }
 
   async getInventoryLevels(tenantId: string): Promise<InventoryLevelResponseDto[]> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     // Get latest stock levels from products table
     const products = await this.prisma.product.findMany({
       where: { 

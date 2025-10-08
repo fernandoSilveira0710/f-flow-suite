@@ -13,7 +13,10 @@ import { ServicesModule } from './services/services.module';
 import { ProfessionalsModule } from './professionals/professionals.module';
 import { CheckInsModule } from './checkins/checkins.module';
 import { ResourcesModule } from './resources/resources.module';
-import { HealthController } from './health/health.controller';
+import { HealthModule } from './health/health.module';
+import { ConfigurationsModule } from './configurations/configurations.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 
 @Module({
   imports: [
@@ -31,7 +34,10 @@ import { HealthController } from './health/health.controller';
     AppointmentsModule,
     ResourcesModule,
     SyncAgentModule,
+    HealthModule,
+    ConfigurationsModule,
+    DashboardModule,
+    FeatureFlagsModule,
   ],
-  controllers: [HealthController],
 })
 export class AppModule {}
