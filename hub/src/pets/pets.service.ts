@@ -7,9 +7,6 @@ export class PetsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAllByTenant(tenantId: string): Promise<PetResponseDto[]> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const pets = await this.prisma.pet.findMany({
       where: { 
         tenantId,
@@ -32,9 +29,6 @@ export class PetsService {
   }
 
   async findByTutor(tenantId: string, tutorId: string): Promise<PetResponseDto[]> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     const pets = await this.prisma.pet.findMany({
       where: { 
         tenantId,
@@ -58,9 +52,6 @@ export class PetsService {
   }
 
   async findOneByTenant(tenantId: string, petId: string): Promise<PetResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     const pet = await this.prisma.pet.findFirst({
       where: { 
         id: petId,
@@ -87,9 +78,6 @@ export class PetsService {
   }
 
   async upsertFromEvent(tenantId: string, eventPayload: any): Promise<PetResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     const pet = await this.prisma.pet.upsert({
       where: { 
         id: eventPayload.id,
@@ -135,9 +123,6 @@ export class PetsService {
   }
 
   async deleteFromEvent(tenantId: string, petId: string): Promise<void> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     await this.prisma.pet.update({
       where: { 
         id: petId,

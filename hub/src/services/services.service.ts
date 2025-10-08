@@ -7,9 +7,6 @@ export class ServicesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAllByTenant(tenantId: string): Promise<ServiceResponseDto[]> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const services = await this.prisma.service.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' },
@@ -19,9 +16,6 @@ export class ServicesService {
   }
 
   async findOneByTenant(tenantId: string, serviceId: string): Promise<ServiceResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const service = await this.prisma.service.findFirst({
       where: { 
         id: serviceId,
@@ -37,9 +31,6 @@ export class ServicesService {
   }
 
   async upsertFromEvent(tenantId: string, eventPayload: any): Promise<ServiceResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const service = await this.prisma.service.upsert({
       where: { 
         id: eventPayload.id,
@@ -71,9 +62,6 @@ export class ServicesService {
   }
 
   async deleteFromEvent(tenantId: string, serviceId: string): Promise<void> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     await this.prisma.service.delete({
       where: { 
         id: serviceId,
