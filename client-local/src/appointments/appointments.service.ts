@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EventValidatorService } from '../common/validation/event-validator.service';
+import { ResourcesService } from '../resources/resources.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 
@@ -9,15 +10,31 @@ export class AppointmentsService {
   constructor(
     private prisma: PrismaService,
     private eventValidator: EventValidatorService,
+    private resourcesService: ResourcesService,
   ) {}
 
   async create(createAppointmentDto: CreateAppointmentDto) {
+    // Check resource availability if resourceId is provided
+    if (createAppointmentDto.resourceId) {
+      const isAvailable = await this.resourcesService.checkResourceAvailability(
+        createAppointmentDto.resourceId,
+        new Date(createAppointmentDto.date),
+        createAppointmentDto.startTime,
+        createAppointmentDto.endTime
+      );
+      
+      if (!isAvailable) {
+        throw new Error('Resource is not available at the specified time');
+      }
+    }
+
     const appointment = await this.prisma.appointment.create({
       data: {
         customerId: createAppointmentDto.customerId,
         petId: createAppointmentDto.petId,
         serviceId: createAppointmentDto.serviceId,
         professionalId: createAppointmentDto.professionalId,
+        resourceId: createAppointmentDto.resourceId,
         serviceType: 'grooming', // default value since it's required but not in DTO
         date: new Date(createAppointmentDto.date),
         startTime: createAppointmentDto.startTime,
@@ -32,6 +49,7 @@ export class AppointmentsService {
         pet: true,
         service: true,
         professional: true,
+        resource: true,
       },
     });
 
@@ -51,6 +69,7 @@ export class AppointmentsService {
         pet: true,
         service: true,
         professional: true,
+        resource: true,
       },
       orderBy: {
         date: 'asc',
@@ -66,11 +85,43 @@ export class AppointmentsService {
         pet: true,
         service: true,
         professional: true,
+        resource: true,
       },
     });
   }
 
   async update(id: string, updateAppointmentDto: UpdateAppointmentDto) {
+    // Check resource availability if resourceId is being updated
+    if (updateAppointmentDto.resourceId || updateAppointmentDto.date || updateAppointmentDto.startTime || updateAppointmentDto.endTime) {
+      // Get current appointment to check existing values
+      const currentAppointment = await this.prisma.appointment.findUnique({
+        where: { id }
+      });
+      
+      if (!currentAppointment) {
+        throw new Error('Appointment not found');
+      }
+
+      const resourceId = updateAppointmentDto.resourceId || currentAppointment.resourceId;
+      const date = updateAppointmentDto.date ? new Date(updateAppointmentDto.date) : currentAppointment.date;
+      const startTime = updateAppointmentDto.startTime || currentAppointment.startTime;
+      const endTime = updateAppointmentDto.endTime || currentAppointment.endTime;
+
+      if (resourceId && startTime && endTime) {
+        const isAvailable = await this.resourcesService.checkResourceAvailability(
+          resourceId,
+          date,
+          startTime,
+          endTime,
+          id // exclude current appointment from conflict check
+        );
+        
+        if (!isAvailable) {
+          throw new Error('Resource is not available at the specified time');
+        }
+      }
+    }
+
     const appointment = await this.prisma.appointment.update({
       where: { id },
       data: {
@@ -82,6 +133,7 @@ export class AppointmentsService {
         pet: true,
         service: true,
         professional: true,
+        resource: true,
       },
     });
 
@@ -99,6 +151,7 @@ export class AppointmentsService {
         pet: true,
         service: true,
         professional: true,
+        resource: true,
       },
     });
 
@@ -115,6 +168,7 @@ export class AppointmentsService {
       petId: appointment.petId,
       serviceId: appointment.serviceId,
       professionalId: appointment.professionalId,
+      resourceId: appointment.resourceId,
       serviceType: appointment.serviceType,
       date: appointment.date,
       startTime: appointment.startTime,

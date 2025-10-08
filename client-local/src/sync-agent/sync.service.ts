@@ -18,6 +18,12 @@ export class SyncService {
   }
 
   async pushOutbox(events?: Record<string, unknown>[]) {
+    // Check if sync is enabled
+    if (process.env.SYNC_ENABLED === 'false') {
+      this.logger.debug('Sync is disabled (SYNC_ENABLED=false), skipping push');
+      return { accepted: 0, message: 'Sync disabled' };
+    }
+
     // If no events provided, fetch from database
     if (!events) {
       const outboxEvents = await this.prisma.outboxEvent.findMany({
@@ -70,6 +76,12 @@ export class SyncService {
   }
 
   async pullCommands(limit = 100) {
+    // Check if sync is enabled
+    if (process.env.SYNC_ENABLED === 'false') {
+      this.logger.debug('Sync is disabled (SYNC_ENABLED=false), skipping pull');
+      return { commands: [], message: 'Sync disabled' };
+    }
+
     const tenantId = process.env.TENANT_ID ?? 'unknown';
     this.logger.debug(`Pulling commands from hub for tenant ${tenantId}`);
     return this.http.get(`/tenants/${tenantId}/sync/commands`, { limit });

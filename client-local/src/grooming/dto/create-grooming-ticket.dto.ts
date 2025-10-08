@@ -29,14 +29,19 @@ export class CreateGroomingTicketDto {
   @IsString()
   tutorId: string;
 
+  @IsOptional()
+  @IsString()
+  professionalId?: string;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => GroomingItemDto)
-  items: GroomingItemDto[];
+  items?: GroomingItemDto[];
 
   @IsOptional()
   @IsString()
-  status?: string = 'pending';
+  status?: string = 'aberto';
 
   @IsOptional()
   @IsString()
