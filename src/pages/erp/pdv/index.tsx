@@ -233,7 +233,7 @@ export default function PdvPage() {
       if (selectedItemIndex >= 0 && cart[selectedItemIndex]) {
         const item = cart[selectedItemIndex];
         if (item.qtd > 1) {
-          handleUpdateQtd(item.productId, item.qtd - 1);
+          handleUpdateQtd(item.id, item.qtd - 1);
         }
       }
     }, disabled: anyModalOpen || activeTab !== 'vender' },
@@ -265,7 +265,7 @@ export default function PdvPage() {
     }, disabled: anyModalOpen || activeTab !== 'historico' },
     { key: 'Delete', handler: () => {
       if (selectedItemIndex >= 0 && cart[selectedItemIndex]) {
-        handleRemoveItem(cart[selectedItemIndex].productId);
+        handleRemoveItem(cart[selectedItemIndex].id);
       }
     }, disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'Escape', handler: () => setShowCancelSale(true), disabled: anyModalOpen || activeTab !== 'vender' || cart.length === 0 },
@@ -294,18 +294,18 @@ export default function PdvPage() {
     }
   };
 
-  const handleUpdateQtd = async (productId: string, qtd: number) => {
+  const handleUpdateQtd = async (itemId: string, qtd: number) => {
     try {
-      const updatedCart = await updateCartItem(productId, qtd);
+      const updatedCart = await updateCartItem(itemId, qtd);
       setCart(updatedCart);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Erro ao atualizar');
     }
   };
 
-  const handleRemoveItem = async (productId: string) => {
+  const handleRemoveItem = async (itemId: string) => {
     try {
-      const updatedCart = await removeFromCart(productId);
+      const updatedCart = await removeFromCart(itemId);
       setCart(updatedCart);
       setSelectedItemIndex(-1);
       toast.success('Item removido');
@@ -330,10 +330,10 @@ export default function PdvPage() {
 
     try {
       const discountAmount = discountType === 'percent' 
-        ? (item.qtd * item.precoUnit * value) / 100
+        ? (item.qtd * item.produto.preco * value) / 100
         : value;
 
-      const updatedCart = await applyItemDiscount(item.productId, discountAmount);
+      const updatedCart = await applyItemDiscount(item.produto.id, discountAmount);
       setCart(updatedCart);
       toast.success('Desconto aplicado');
       setShowDiscountItem(false);
@@ -595,7 +595,7 @@ export default function PdvPage() {
                         <TableBody>
                           {cart.map((item, index) => (
                             <TableRow 
-                              key={item.productId}
+                              key={item.produto.id}
                               className={cn(
                                 "cursor-pointer",
                                 selectedItemIndex === index && "bg-muted"
@@ -605,15 +605,15 @@ export default function PdvPage() {
                               <TableCell className="font-medium">
                                 <div className="flex items-center gap-2">
                                   <ProductImage
-                                    imageUrl={item.imageUrl}
-                                    productName={item.nome}
+                                    imageUrl={item.produto.imageUrl}
+                                    productName={item.produto.nome}
                                     size={32}
                                     className="rounded"
                                   />
-                                  {item.nome}
+                                  {item.produto.nome}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-muted-foreground text-sm">{item.sku}</TableCell>
+                              <TableCell className="text-muted-foreground text-sm">{item.produto.sku}</TableCell>
                               <TableCell className="text-center">
                                 <div className="flex items-center justify-center gap-1">
                                   <Button
@@ -622,7 +622,7 @@ export default function PdvPage() {
                                     className="h-6 w-6"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (item.qtd > 1) handleUpdateQtd(item.productId, item.qtd - 1);
+                                      if (item.qtd > 1) handleUpdateQtd(item.id, item.qtd - 1);
                                     }}
                                   >
                                     <Minus className="h-3 w-3" />
@@ -634,14 +634,14 @@ export default function PdvPage() {
                                     className="h-6 w-6"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleUpdateQtd(item.productId, item.qtd + 1);
+                                      handleUpdateQtd(item.id, item.qtd + 1);
                                     }}
                                   >
                                     <Plus className="h-3 w-3" />
                                   </Button>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right">R$ {item.precoUnit.toFixed(2)}</TableCell>
+                              <TableCell className="text-right">R$ {item.produto.preco.toFixed(2)}</TableCell>
                               <TableCell className="text-right font-semibold">
                                 R$ {item.subtotal.toFixed(2)}
                               </TableCell>
@@ -652,7 +652,7 @@ export default function PdvPage() {
                                   className="h-8 w-8"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleRemoveItem(item.productId);
+                                    handleRemoveItem(item.id);
                                   }}
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -832,15 +832,15 @@ export default function PdvPage() {
                       sales.map((sale) => (
                         <TableRow key={sale.id}>
                           <TableCell className="font-medium">{sale.id}</TableCell>
-                          <TableCell>{new Date(sale.data).toLocaleString('pt-BR')}</TableCell>
-                          <TableCell>{sale.operador}</TableCell>
-                          <TableCell className="text-center">{sale.itens.length}</TableCell>
+                          <TableCell>{new Date(sale.createdAt).toLocaleString('pt-BR')}</TableCell>
+                          <TableCell>{sale.operator}</TableCell>
+                          <TableCell className="text-center">{sale.items?.length || 0}</TableCell>
                           <TableCell className="text-right font-semibold">
                             R$ {sale.total.toFixed(2)}
                           </TableCell>
-                          <TableCell>{sale.pagamento}</TableCell>
+                          <TableCell>{sale.paymentMethod}</TableCell>
                           <TableCell>
-                            <Badge variant={sale.status === 'Pago' ? 'default' : 'destructive'}>
+                            <Badge variant={sale.status === 'completed' ? 'default' : 'destructive'} className={sale.status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''}>
                               {sale.status}
                             </Badge>
                           </TableCell>
