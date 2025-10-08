@@ -11,9 +11,10 @@ import { ProfessionalsModule } from '../professionals/professionals.module';
 import { AppointmentsModule } from '../appointments/appointments.module';
 import { CheckInsModule } from '../checkins/checkins.module';
 import { ResourcesModule } from '../resources/resources.module';
+import { GroomingModule } from '../grooming/grooming.module';
 
 @Module({
-  imports: [ProductsModule, SalesModule, CustomersModule, PetsModule, InventoryModule, ServicesModule, ProfessionalsModule, AppointmentsModule, CheckInsModule, ResourcesModule],
+  imports: [ProductsModule, SalesModule, CustomersModule, PetsModule, InventoryModule, ServicesModule, ProfessionalsModule, AppointmentsModule, CheckInsModule, ResourcesModule, GroomingModule],
   providers: [SyncService],
   controllers: [SyncController],
 })

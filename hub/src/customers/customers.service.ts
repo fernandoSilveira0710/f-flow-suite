@@ -1,15 +1,16 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { CustomerResponseDto } from './dto';
+import { EventsService } from '../common/events.service';
+import { CreateCustomerDto, UpdateCustomerDto, CustomerResponseDto } from './dto';
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventsService: EventsService,
+  ) {}
 
   async findAllByTenant(tenantId: string): Promise<CustomerResponseDto[]> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = '${tenantId}'`;
-
     const customers = await this.prisma.customer.findMany({
       where: { 
         tenantId,
@@ -36,9 +37,6 @@ export class CustomersService {
   }
 
   async findOneByTenant(tenantId: string, customerId: string): Promise<CustomerResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     const customer = await this.prisma.customer.findFirst({
       where: { 
         id: customerId,
@@ -69,9 +67,6 @@ export class CustomersService {
   }
 
   async upsertFromEvent(tenantId: string, eventPayload: any): Promise<CustomerResponseDto> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
-
     const customer = await this.prisma.customer.upsert({
       where: { 
         id: eventPayload.id,
@@ -123,8 +118,109 @@ export class CustomersService {
   }
 
   async deleteFromEvent(tenantId: string, customerId: string): Promise<void> {
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    await this.prisma.customer.update({
+      where: { 
+        id: customerId,
+        tenantId 
+      },
+      data: {
+        active: false,
+      },
+    });
+  }
+
+  async create(tenantId: string, createCustomerDto: CreateCustomerDto): Promise<CustomerResponseDto> {
+    // Check for duplicate email if provided
+    if (createCustomerDto.email) {
+      const existingCustomer = await this.prisma.customer.findFirst({
+        where: {
+          tenantId,
+          email: createCustomerDto.email,
+          active: true,
+        },
+      });
+
+      if (existingCustomer) {
+        throw new ConflictException(`Customer with email ${createCustomerDto.email} already exists`);
+      }
+    }
+
+    const customer = await this.prisma.customer.create({
+      data: {
+        tenantId,
+        ...createCustomerDto,
+        dataNascISO: createCustomerDto.dataNascISO ? new Date(createCustomerDto.dataNascISO) : null,
+      },
+      include: {
+        pets: {
+          where: { active: true },
+          select: {
+            id: true,
+            name: true,
+            species: true,
+            breed: true,
+            active: true,
+          },
+        },
+      },
+    });
+
+    // Generate event for synchronization
+    await this.generateCustomerEvent(tenantId, 'customer.created.v1', customer);
+
+    return this.mapToResponseDto(customer);
+  }
+
+  async update(tenantId: string, customerId: string, updateCustomerDto: UpdateCustomerDto): Promise<CustomerResponseDto> {
+    const existingCustomer = await this.findOneByTenant(tenantId, customerId);
+
+    // Check for duplicate email if provided and different from current
+    if (updateCustomerDto.email && updateCustomerDto.email !== existingCustomer.email) {
+      const duplicateCustomer = await this.prisma.customer.findFirst({
+        where: {
+          tenantId,
+          email: updateCustomerDto.email,
+          active: true,
+          id: { not: customerId },
+        },
+      });
+
+      if (duplicateCustomer) {
+        throw new ConflictException(`Customer with email ${updateCustomerDto.email} already exists`);
+      }
+    }
+
+    const customer = await this.prisma.customer.update({
+      where: { 
+        id: customerId,
+        tenantId 
+      },
+      data: {
+        ...updateCustomerDto,
+        dataNascISO: updateCustomerDto.dataNascISO ? new Date(updateCustomerDto.dataNascISO) : undefined,
+      },
+      include: {
+        pets: {
+          where: { active: true },
+          select: {
+            id: true,
+            name: true,
+            species: true,
+            breed: true,
+            active: true,
+          },
+        },
+      },
+    });
+
+    // Generate event for synchronization
+    await this.generateCustomerEvent(tenantId, 'customer.updated.v1', customer);
+
+    return this.mapToResponseDto(customer);
+  }
+
+  async remove(tenantId: string, customerId: string): Promise<void> {
+    const existingCustomer = await this.findOneByTenant(tenantId, customerId);
 
     await this.prisma.customer.update({
       where: { 
@@ -134,6 +230,18 @@ export class CustomersService {
       data: {
         active: false,
       },
+    });
+
+    // Generate event for synchronization
+    await this.generateCustomerEvent(tenantId, 'customer.deleted.v1', { id: customerId });
+  }
+
+  private async generateCustomerEvent(tenantId: string, eventType: string, customer: any): Promise<void> {
+    await this.eventsService.createEvent(tenantId, {
+      eventType,
+      entityType: 'customer',
+      entityId: customer.id,
+      data: customer,
     });
   }
 

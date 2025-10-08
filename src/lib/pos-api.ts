@@ -292,26 +292,41 @@ export const createSale = async (saleData: {
   items: { productId: string; qty: number; unitPrice: number }[];
 }): Promise<Sale> => {
   try {
-    const sale = await apiCall<any>('/pos/sales', {
-      method: 'POST',
-      body: JSON.stringify(saleData),
-    });
+    // Get existing sales from localStorage
+    const existingSales = getFromStorage<Sale[]>('2f.pos.sales', []);
+    
+    // Calculate total
+    const total = saleData.items.reduce((sum, item) => sum + (item.qty * item.unitPrice), 0);
+    
+    // Create new sale
+    const newSale: Sale = {
+      id: `sale_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      code: `VND${String(existingSales.length + 1).padStart(6, '0')}`,
+      operator: saleData.operator,
+      paymentMethod: saleData.paymentMethod,
+      status: 'completed',
+      total,
+      customerId: saleData.customerId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      items: saleData.items.map((item, index) => ({
+        id: `item_${Date.now()}_${index}`,
+        productId: item.productId,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+        subtotal: item.qty * item.unitPrice,
+        createdAt: new Date().toISOString(),
+      })),
+    };
+
+    // Save to localStorage
+    const updatedSales = [...existingSales, newSale];
+    setInStorage('2f.pos.sales', updatedSales);
 
     // Clear cart after successful sale
     await clearCart();
 
-    return {
-      id: sale.id,
-      code: sale.code,
-      operator: sale.operator,
-      paymentMethod: sale.paymentMethod,
-      status: sale.status,
-      total: sale.total,
-      customerId: sale.customerId,
-      createdAt: sale.createdAt,
-      updatedAt: sale.updatedAt,
-      items: sale.items,
-    };
+    return newSale;
   } catch (error) {
     console.error('Error creating sale:', error);
     throw error;
@@ -320,19 +335,8 @@ export const createSale = async (saleData: {
 
 export const getSales = async (): Promise<Sale[]> => {
   try {
-    const sales = await apiCall<any[]>('/pos/sales');
-    return sales.map(sale => ({
-      id: sale.id,
-      code: sale.code,
-      operator: sale.operator,
-      paymentMethod: sale.paymentMethod,
-      status: sale.status,
-      total: sale.total,
-      customerId: sale.customerId,
-      createdAt: sale.createdAt,
-      updatedAt: sale.updatedAt,
-      items: sale.items,
-    }));
+    const sales = getFromStorage<Sale[]>('2f.pos.sales', []);
+    return Array.isArray(sales) ? sales : [];
   } catch (error) {
     console.error('Error getting sales:', error);
     return [];
@@ -341,19 +345,9 @@ export const getSales = async (): Promise<Sale[]> => {
 
 export const getSaleById = async (id: string): Promise<Sale | null> => {
   try {
-    const sale = await apiCall<any>(`/pos/sales/${id}`);
-    return {
-      id: sale.id,
-      code: sale.code,
-      operator: sale.operator,
-      paymentMethod: sale.paymentMethod,
-      status: sale.status,
-      total: sale.total,
-      customerId: sale.customerId,
-      createdAt: sale.createdAt,
-      updatedAt: sale.updatedAt,
-      items: sale.items,
-    };
+    const sales = getFromStorage<Sale[]>('2f.pos.sales', []);
+    const sale = sales.find(s => s.id === id);
+    return sale || null;
   } catch (error) {
     console.error('Error getting sale by id:', error);
     return null;

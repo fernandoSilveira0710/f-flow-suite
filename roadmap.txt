@@ -309,25 +309,27 @@ Gerar event.grooming.ticket.created.v1 e event.grooming.ticket.updated.v1.
 
 Hub espelha para relatórios.
 
-Configurações e Dashboard (6.8)
+Configurações e Dashboard (6.8) ✅ CONCLUÍDO
 
-CRUD simples para configurações da loja: métodos de pagamento, impostos, temas, etc.
+✅ CRUD simples para configurações da loja: métodos de pagamento, impostos, temas, etc.
 
-Endpoint /dashboard/summary que retorna métricas (total de vendas, estoque baixo, agendas do dia).
+✅ Endpoint /dashboard/summary que retorna métricas (total de vendas, estoque baixo, agendas do dia).
 
 Criar queries no Hub para relatórios agregados.
 
-Integração e Saúde (6.9)
+Integração e Saúde (6.9) ✅ CONCLUÍDO
 
-Atualizar o SyncAgent para lidar com todos os novos eventos, com schemas JSON validados por Ajv.
+✅ Atualizar o SyncAgent para lidar com todos os novos eventos, com schemas JSON validados por Ajv.
 
-Ajustar sync.service.ts no Hub para aplicar eventos a cada tabela.
+✅ Ajustar sync.service.ts no Hub para aplicar eventos a cada tabela.
 
-Melhorar /health/deps no client-local para checar SQLite e pingar Hub.
+✅ Melhorar /health/deps no client-local para checar SQLite e pingar Hub.
 
-Documentação e Flags (6.10)
+Documentação e Flags (6.10) ✅ CONCLUÍDO
 
-Atualizar .env.example adicionando MVP_POS_ENABLED, MVP_GROOMING_ENABLED, etc., caso deseje ativar módulos individualmente.
+✅ Atualizar .env.example adicionando MVP_POS_ENABLED, MVP_GROOMING_ENABLED, etc., caso deseje ativar módulos individualmente.
+
+✅ Implementar sistema de feature flags com endpoints REST (/feature-flags).
 
 Atualizar README e Roadmap.
 

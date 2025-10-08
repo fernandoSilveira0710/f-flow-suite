@@ -174,6 +174,62 @@ export class GroomingService {
     return tickets.map(this.mapToResponseDto);
   }
 
+  async upsertTicketFromEvent(tenantId: string, eventPayload: any): Promise<GroomingTicketResponse> {
+    // First, upsert the ticket
+    const ticket = await this.prisma.groomingTicket.upsert({
+      where: { 
+        id: eventPayload.id,
+      },
+      create: {
+        id: eventPayload.id,
+        tenantId,
+        petId: eventPayload.petId,
+        tutorId: eventPayload.tutorId,
+        professionalId: eventPayload.professionalId,
+        code: eventPayload.code,
+        status: eventPayload.status,
+        total: eventPayload.total,
+        notes: eventPayload.notes,
+        createdAt: new Date(eventPayload.createdAt),
+        updatedAt: new Date(eventPayload.updatedAt),
+      },
+      update: {
+        petId: eventPayload.petId,
+        tutorId: eventPayload.tutorId,
+        professionalId: eventPayload.professionalId,
+        code: eventPayload.code,
+        status: eventPayload.status,
+        total: eventPayload.total,
+        notes: eventPayload.notes,
+        updatedAt: new Date(eventPayload.updatedAt),
+      },
+    });
+
+    // Delete existing items and recreate them
+    await this.prisma.groomingItem.deleteMany({
+      where: { ticketId: eventPayload.id },
+    });
+
+    // Create new items
+    if (eventPayload.items && eventPayload.items.length > 0) {
+      await this.prisma.groomingItem.createMany({
+        data: eventPayload.items.map((item: any) => ({
+          id: item.id,
+          ticketId: eventPayload.id,
+          serviceId: item.serviceId,
+          productId: item.productId,
+          name: item.name,
+          price: item.price,
+          qty: item.qty,
+          createdAt: new Date(item.createdAt),
+        })),
+      });
+    }
+
+    // Return the complete ticket with items
+    return this.findOne(tenantId, eventPayload.id);
+  }
+
   private mapToResponseDto(ticket: any): GroomingTicketResponse {
     return {
       id: ticket.id,

@@ -240,7 +240,9 @@ initMockData();
 // ============= SERVICES API =============
 
 export function getServices(): Service[] {
-  return getStorage<Service[]>(KEYS.SERVICES, []);
+  const services = getStorage<Service[]>(KEYS.SERVICES, []);
+  // Ensure we always return an array
+  return Array.isArray(services) ? services : [];
 }
 
 export function getServiceById(id: string): Service | null {
@@ -292,7 +294,8 @@ export function duplicateService(id: string): Service | null {
 // ============= STAFF API =============
 
 export function getStaff(): Staff[] {
-  return getStorage<Staff[]>(KEYS.STAFF, []);
+  const staff = getStorage<Staff[]>(KEYS.STAFF, []);
+  return Array.isArray(staff) ? staff : [];
 }
 
 export function getStaffById(id: string): Staff | null {
@@ -332,7 +335,8 @@ export function deleteStaff(id: string): boolean {
 // ============= CUSTOMERS API =============
 
 export function getCustomers(): Customer[] {
-  return getStorage<Customer[]>(KEYS.CUSTOMERS, []);
+  const customers = getStorage<Customer[]>(KEYS.CUSTOMERS, []);
+  return Array.isArray(customers) ? customers : [];
 }
 
 export function getCustomerById(id: string): Customer | null {
@@ -373,30 +377,55 @@ export function deleteCustomer(id: string): boolean {
 // ============= APPOINTMENTS API =============
 
 export async function getAppointments(): Promise<Appointment[]> {
-  return apiCall<Appointment[]>('/appointments');
+  const appointments = getStorage<Appointment[]>(KEYS.APPOINTMENTS, []);
+  return Array.isArray(appointments) ? appointments : [];
 }
 
 export async function getAppointmentById(id: string): Promise<Appointment | null> {
   try {
-    return await apiCall<Appointment>(`/appointments/${id}`);
+    const appointments = getStorage<Appointment[]>(KEYS.APPOINTMENTS, []);
+    const appointment = appointments.find(a => a.id === id);
+    return appointment || null;
   } catch (error) {
     return null;
   }
 }
 
 export async function createAppointment(data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>): Promise<Appointment> {
-  return apiCall<Appointment>('/appointments', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
+  const appointments = getStorage<Appointment[]>(KEYS.APPOINTMENTS, []);
+  
+  const newAppointment: Appointment = {
+    ...data,
+    id: uuid(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  
+  const updatedAppointments = [...appointments, newAppointment];
+  setStorage(KEYS.APPOINTMENTS, updatedAppointments);
+  
+  return newAppointment;
 }
 
 export async function updateAppointment(id: string, updates: Partial<Appointment>): Promise<Appointment | null> {
   try {
-    return await apiCall<Appointment>(`/appointments/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(updates),
-    });
+    const appointments = getStorage<Appointment[]>(KEYS.APPOINTMENTS, []);
+    const appointmentIndex = appointments.findIndex(a => a.id === id);
+    
+    if (appointmentIndex === -1) {
+      return null;
+    }
+    
+    const updatedAppointment: Appointment = {
+      ...appointments[appointmentIndex],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    appointments[appointmentIndex] = updatedAppointment;
+    setStorage(KEYS.APPOINTMENTS, appointments);
+    
+    return updatedAppointment;
   } catch (error) {
     return null;
   }
@@ -404,9 +433,14 @@ export async function updateAppointment(id: string, updates: Partial<Appointment
 
 export async function deleteAppointment(id: string): Promise<boolean> {
   try {
-    await apiCall(`/appointments/${id}`, {
-      method: 'DELETE',
-    });
+    const appointments = getStorage<Appointment[]>(KEYS.APPOINTMENTS, []);
+    const filteredAppointments = appointments.filter(a => a.id !== id);
+    
+    if (filteredAppointments.length === appointments.length) {
+      return false; // Appointment not found
+    }
+    
+    setStorage(KEYS.APPOINTMENTS, filteredAppointments);
     return true;
   } catch (error) {
     return false;

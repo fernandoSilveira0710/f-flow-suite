@@ -8,16 +8,16 @@ datasource db {
 }
 
 model Sale {
-  id         String    @id @default(uuid())
-  code       String    @unique
+  id         String     @id @default(uuid())
+  code       String     @unique
   operator   String
   payment    String
-  status     String    @default("paid")
-  total      Decimal   @default(0)
+  status     String     @default("paid")
+  total      Decimal    @default(0)
   customerId String?
-  customer   Customer? @relation(fields: [customerId], references: [id])
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  customer   Customer?  @relation(fields: [customerId], references: [id])
   items      SaleItem[]
 
   @@index([customerId])
@@ -26,138 +26,138 @@ model Sale {
 model SaleItem {
   id        String   @id @default(uuid())
   saleId    String
-  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
   productId String
-  product   Product  @relation(fields: [productId], references: [id])
   qty       Int
   unitPrice Decimal
   subtotal  Decimal
   createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   @@index([saleId])
   @@index([productId])
 }
 
 model Product {
-  id          String   @id @default(uuid())
-  sku         String?  @unique
-  name        String
-  description String?
-  salePrice   Decimal  // renamed from price
-  costPrice   Decimal?
-  stockQty    Int      @default(0) // renamed from stock
-  category    String?
-  barcode     String?  @unique
-  unit        String?  // Added field for product unit
-  minStock    Int?     // Added field for minimum stock level
-  maxStock    Int?     // Added field for maximum stock level
-  trackStock  Boolean  @default(true) // Added field to enable/disable stock tracking
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  stockMovements StockMovement[]
-  saleItems   SaleItem[]
+  id                   String                @id @default(uuid())
+  sku                  String?               @unique
+  name                 String
+  description          String?
+  salePrice            Decimal
+  costPrice            Decimal?
+  stockQty             Int                   @default(0)
+  category             String?
+  barcode              String?               @unique
+  unit                 String?
+  minStock             Int?
+  maxStock             Int?
+  trackStock           Boolean               @default(true)
+  active               Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  groomingItems        GroomingItem[]
   inventoryAdjustments InventoryAdjustment[]
-  groomingItems GroomingItem[]
+  saleItems            SaleItem[]
+  stockMovements       StockMovement[]
 }
 
 model InventoryAdjustment {
   id        String   @id @default(uuid())
   productId String
-  product   Product  @relation(fields: [productId], references: [id])
-  delta     Int      // positive for increase, negative for decrease
+  delta     Int
   reason    String
   createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
 
   @@index([productId])
 }
 
 model Customer {
-  id           String    @id @default(uuid())
-  name         String
-  documento    String?   // CPF/CNPJ
-  email        String?   @unique
-  phone        String?
-  dataNascISO  DateTime? // Data de nascimento
-  tags         String?   // JSON string for tags
-  notes        String?   // Notas/observações
-  address      String?
-  active       Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  appointments Appointment[]
-  sales        Sale[]
-  pets         Pet[]
+  id              String           @id @default(uuid())
+  name            String
+  documento       String?
+  email           String?          @unique
+  phone           String?
+  dataNascISO     DateTime?
+  tags            String?
+  notes           String?
+  address         String?
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  appointments    Appointment[]
   groomingTickets GroomingTicket[]
+  pets            Pet[]
+  sales           Sale[]
 }
 
 model Pet {
-  id           String    @id @default(uuid())
-  tutorId      String
-  tutor        Customer  @relation(fields: [tutorId], references: [id])
-  name         String
-  species      String    // espécie (dog, cat, etc.)
-  breed        String?   // raça
-  weight       Decimal?  // peso
-  birthDate    DateTime? // dataNascimento
-  observations String?   // observações
-  active       Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  appointments Appointment[]
+  id              String           @id @default(uuid())
+  tutorId         String
+  name            String
+  species         String
+  breed           String?
+  weight          Decimal?
+  birthDate       DateTime?
+  observations    String?
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  appointments    Appointment[]
+  checkIns        CheckIn[]
   groomingTickets GroomingTicket[]
-  checkIns     CheckIn[]
+  tutor           Customer         @relation(fields: [tutorId], references: [id])
 
   @@index([tutorId])
 }
 
 model Service {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  price       Decimal
-  duration    Int      // in minutes
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  appointments Appointment[]
+  id            String         @id @default(uuid())
+  name          String
+  description   String?
+  price         Decimal
+  duration      Int
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  appointments  Appointment[]
   groomingItems GroomingItem[]
 }
 
 model Professional {
-  id        String   @id @default(uuid())
-  name      String
-  role      String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  appointments Appointment[]
+  id              String           @id @default(uuid())
+  name            String
+  role            String
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  appointments    Appointment[]
+  checkIns        CheckIn[]
   groomingTickets GroomingTicket[]
-  checkIns  CheckIn[]
 }
 
 model Appointment {
-  id             String       @id @default(uuid())
+  id             String        @id @default(uuid())
   customerId     String?
-  customer       Customer?    @relation(fields: [customerId], references: [id])
   petId          String?
-  pet            Pet?         @relation(fields: [petId], references: [id])
   serviceId      String?
-  service        Service?     @relation(fields: [serviceId], references: [id])
   professionalId String?
-  professional   Professional? @relation(fields: [professionalId], references: [id])
   resourceId     String?
-  resource       Resource?    @relation(fields: [resourceId], references: [id])
-  serviceType    String       // kept for backward compatibility
+  serviceType    String
   date           DateTime
   startTime      String?
   endTime        String?
-  duration       Int          // in minutes
-  status         String       @default("scheduled") // scheduled, confirmed, in_progress, completed, cancelled
+  duration       Int
+  status         String        @default("scheduled")
   notes          String?
   price          Decimal?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  resource       Resource?     @relation(fields: [resourceId], references: [id])
+  professional   Professional? @relation(fields: [professionalId], references: [id])
+  service        Service?      @relation(fields: [serviceId], references: [id])
+  pet            Pet?          @relation(fields: [petId], references: [id])
+  customer       Customer?     @relation(fields: [customerId], references: [id])
 
   @@index([customerId])
   @@index([petId])
@@ -167,20 +167,20 @@ model Appointment {
 }
 
 model GroomingTicket {
-  id             String   @id @default(uuid())
+  id             String         @id @default(uuid())
   petId          String
-  pet            Pet      @relation(fields: [petId], references: [id])
   tutorId        String
-  tutor          Customer @relation(fields: [tutorId], references: [id])
   professionalId String?
-  professional   Professional? @relation(fields: [professionalId], references: [id])
-  code           String   @unique // ticket number for identification
-  status         String   @default("aberto") // aberto, em_atendimento, concluido, cancelado
-  total          Decimal  @default(0)
+  code           String         @unique
+  status         String         @default("aberto")
+  total          Decimal        @default(0)
   notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   items          GroomingItem[]
+  professional   Professional?  @relation(fields: [professionalId], references: [id])
+  tutor          Customer       @relation(fields: [tutorId], references: [id])
+  pet            Pet            @relation(fields: [petId], references: [id])
 
   @@index([petId])
   @@index([tutorId])
@@ -190,15 +190,15 @@ model GroomingTicket {
 model GroomingItem {
   id        String         @id @default(uuid())
   ticketId  String
-  ticket    GroomingTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   serviceId String?
-  service   Service?       @relation(fields: [serviceId], references: [id])
   productId String?
-  product   Product?       @relation(fields: [productId], references: [id])
   name      String
   price     Decimal
   qty       Int            @default(1)
   createdAt DateTime       @default(now())
+  product   Product?       @relation(fields: [productId], references: [id])
+  service   Service?       @relation(fields: [serviceId], references: [id])
+  ticket    GroomingTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   @@index([ticketId])
   @@index([serviceId])
@@ -208,7 +208,7 @@ model GroomingItem {
 model Resource {
   id           String        @id @default(uuid())
   name         String
-  type         String        // equipment, room, tool, etc.
+  type         String
   description  String?
   active       Boolean       @default(true)
   createdAt    DateTime      @default(now())
@@ -219,45 +219,55 @@ model Resource {
 model CheckIn {
   id             String       @id @default(uuid())
   petId          String
-  pet            Pet          @relation(fields: [petId], references: [id])
   professionalId String
-  professional   Professional @relation(fields: [professionalId], references: [id])
   checkInAt      DateTime     @default(now())
   checkOutAt     DateTime?
   notes          String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  pet            Pet          @relation(fields: [petId], references: [id])
 
   @@index([petId])
   @@index([professionalId])
 }
 
 model Configuration {
-  id    String @id @default(uuid())
-  key   String @unique
-  value String
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  category    String   @default("general")
+  type        String   @default("string")
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
 }
 
 model StockMovement {
   id        String   @id @default(uuid())
   productId String
-  product   Product  @relation(fields: [productId], references: [id])
-  type      String   // in, out, adjustment
+  type      String
   quantity  Int
   reason    String?
   createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
 
   @@index([productId])
 }
 
 model OutboxEvent {
-  id        String   @id @default(uuid())
-  eventType String
-  payload   String   // JSON string
-  processed Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String    @id @default(uuid())
+  eventType   String
+  payload     String
+  processed   Boolean   @default(false)
+  status      String?
+  createdAt   DateTime  @default(now())
   processedAt DateTime?
+  updatedAt   DateTime  @updatedAt
 
   @@index([processed])
   @@index([eventType])
+  @@index([status])
 }
