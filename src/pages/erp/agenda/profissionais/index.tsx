@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreVertical, Pencil, Trash2, User, Box } from 'lucide-react';
 import { PageHeader } from '@/components/erp/page-header';
 import { EmptyState } from '@/components/erp/empty-state';
+import { AgendaTabs } from '@/components/erp/agenda-tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -87,6 +88,7 @@ export default function ProfissionaisIndex() {
   if (professionals.length === 0) {
     return (
       <>
+        <AgendaTabs />
         <PageHeader
           title="Profissionais & Recursos"
           description="Gerencie profissionais e recursos da agenda"
@@ -104,6 +106,7 @@ export default function ProfissionaisIndex() {
 
   return (
     <div className="space-y-6">
+      <AgendaTabs />
       <PageHeader
         title="Profissionais & Recursos"
         description={`${profissionais.length} profissionais e ${recursos.length} recursos`}
