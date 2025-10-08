@@ -17,6 +17,7 @@ import { ProfessionalsModule } from './professionals/professionals.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { CheckInsModule } from './checkins/checkins.module';
 import { ResourcesModule } from './resources/resources.module';
+import { GroomingModule } from './grooming/grooming.module';
 import { HealthController } from './health/health.controller';
 import { JwksController } from './auth/jwks.controller';
 import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
@@ -40,6 +41,7 @@ import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
     AppointmentsModule,
     CheckInsModule,
     ResourcesModule,
+    GroomingModule,
   ],
   controllers: [HealthController, JwksController],
   providers: [PrismaService],

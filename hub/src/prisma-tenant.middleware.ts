@@ -22,6 +22,8 @@ export class PrismaTenantMiddleware implements NestMiddleware {
       (req as Request & { user?: { tenantId?: string } })?.user?.tenantId ??
       null;
 
+    console.log(`[PrismaTenantMiddleware] Path: ${req.path}, Method: ${req.method}, TenantId: ${tenantId}`);
+
     const rlsEnforced = process.env.RLS_ENFORCED === 'true';
 
     // Se RLS está habilitado, exigir tenant válido
@@ -34,10 +36,17 @@ export class PrismaTenantMiddleware implements NestMiddleware {
     if (tenantId) {
       try {
         const sanitizedTenantId = tenantId.replace(/'/g, "''");
+        console.log(`[PrismaTenantMiddleware] Setting tenant context: ${sanitizedTenantId}`);
         await this.prisma.$executeRawUnsafe(
           `SET app.tenant_id = '${sanitizedTenantId}'`
         );
+        console.log(`[PrismaTenantMiddleware] Tenant context set successfully`);
+        
+        // Definir o tenantId no request para o decorator TenantId
+        req.tenantId = tenantId;
+        console.log(`[PrismaTenantMiddleware] Set request.tenantId: ${tenantId}`);
       } catch (error) {
+        console.error(`[PrismaTenantMiddleware] Error setting tenant context:`, error);
         // Se o SET falhar, as policies RLS impedirão o acesso.
       }
     }

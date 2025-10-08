@@ -9,6 +9,8 @@ import { ServicesService } from '../services/services.service';
 import { ProfessionalsService } from '../professionals/professionals.service';
 import { AppointmentsService } from '../appointments/appointments.service';
 import { CheckInsService } from '../checkins/checkins.service';
+import { ResourcesService } from '../resources/resources.service';
+import { ResourceUpsertedEventDto, ResourceDeletedEventDto } from '../resources/dto';
 
 interface OutboxEvent {
   id: string;
@@ -33,6 +35,7 @@ export class SyncService {
     private readonly professionalsService: ProfessionalsService,
     private readonly appointmentsService: AppointmentsService,
     private readonly checkInsService: CheckInsService,
+    private readonly resourcesService: ResourcesService,
   ) {}
 
   async ingestEvents(tenantId: string, events: OutboxEvent[]): Promise<void> {
@@ -94,6 +97,14 @@ export class SyncService {
         break;
       case 'professional.deleted.v1':
         await this.professionalsService.deleteFromEvent(tenantId, payload.id);
+        break;
+      case 'resource.upserted.v1':
+        const resourceUpsertedPayload = payload as ResourceUpsertedEventDto;
+        await this.resourcesService.upsertFromEvent(tenantId, resourceUpsertedPayload);
+        break;
+      case 'resource.deleted.v1':
+        const resourceDeletedPayload = payload as ResourceDeletedEventDto;
+        await this.resourcesService.deleteFromEvent(tenantId, resourceDeletedPayload.id);
         break;
       case 'appointment.created.v1':
         await this.processAppointmentEvent(tenantId, 'created', payload);
