@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { PetResponseDto } from './dto';
+import { EventsService } from '../common/events.service';
+import { CreatePetDto, UpdatePetDto, PetResponseDto } from './dto';
 
 @Injectable()
 export class PetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventsService: EventsService,
+  ) {}
 
   async findAllByTenant(tenantId: string): Promise<PetResponseDto[]> {
     const pets = await this.prisma.pet.findMany({
@@ -131,6 +135,115 @@ export class PetsService {
       data: {
         active: false,
       },
+    });
+  }
+
+  async create(tenantId: string, createPetDto: CreatePetDto): Promise<PetResponseDto> {
+    // Verify that the tutor exists and belongs to the tenant
+    const tutor = await this.prisma.customer.findFirst({
+      where: {
+        id: createPetDto.tutorId,
+        tenantId,
+        active: true,
+      },
+    });
+
+    if (!tutor) {
+      throw new NotFoundException(`Tutor with ID ${createPetDto.tutorId} not found`);
+    }
+
+    const pet = await this.prisma.pet.create({
+      data: {
+        tenantId,
+        ...createPetDto,
+        birthDate: createPetDto.birthDate ? new Date(createPetDto.birthDate) : null,
+      },
+      include: {
+        tutor: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    });
+
+    // Generate event for synchronization
+    await this.generatePetEvent(tenantId, 'pet.created.v1', pet);
+
+    return this.mapToResponseDto(pet);
+  }
+
+  async update(tenantId: string, petId: string, updatePetDto: UpdatePetDto): Promise<PetResponseDto> {
+    const existingPet = await this.findOneByTenant(tenantId, petId);
+
+    // Verify that the tutor exists and belongs to the tenant if tutorId is being updated
+    if (updatePetDto.tutorId && updatePetDto.tutorId !== existingPet.tutorId) {
+      const tutor = await this.prisma.customer.findFirst({
+        where: {
+          id: updatePetDto.tutorId,
+          tenantId,
+          active: true,
+        },
+      });
+
+      if (!tutor) {
+        throw new NotFoundException(`Tutor with ID ${updatePetDto.tutorId} not found`);
+      }
+    }
+
+    const pet = await this.prisma.pet.update({
+      where: { 
+        id: petId,
+        tenantId 
+      },
+      data: {
+        ...updatePetDto,
+        birthDate: updatePetDto.birthDate ? new Date(updatePetDto.birthDate) : undefined,
+      },
+      include: {
+        tutor: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    });
+
+    // Generate event for synchronization
+    await this.generatePetEvent(tenantId, 'pet.updated.v1', pet);
+
+    return this.mapToResponseDto(pet);
+  }
+
+  async remove(tenantId: string, petId: string): Promise<void> {
+    const existingPet = await this.findOneByTenant(tenantId, petId);
+
+    await this.prisma.pet.update({
+      where: { 
+        id: petId,
+        tenantId 
+      },
+      data: {
+        active: false,
+      },
+    });
+
+    // Generate event for synchronization
+    await this.generatePetEvent(tenantId, 'pet.deleted.v1', { id: petId });
+  }
+
+  private async generatePetEvent(tenantId: string, eventType: string, pet: any): Promise<void> {
+    await this.eventsService.createEvent(tenantId, {
+      eventType,
+      entityType: 'pet',
+      entityId: pet.id,
+      data: pet,
     });
   }
 

@@ -40,6 +40,7 @@ model Tenant {
   resources            Resource[]
   checkIns             CheckIn[]
   configurations       Configuration[]
+  roles                Role[]
 }
 
 model User {
@@ -49,9 +50,12 @@ model User {
   email       String
   displayName String
   role        String   @default("operator")
+  active      Boolean  @default(true)
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([tenantId, email])
+  @@index([tenantId, active])
 }
 
 model License {
@@ -87,18 +91,44 @@ model Entitlement {
 }
 
 model PaymentMethod {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  code      String
-  label     String
-  active    Boolean  @default(true)
-  position  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String   @id @default(uuid())
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nome                  String
+  tipo                  String   // CASH, DEBIT, CREDIT, PIX, VOUCHER, OTHER
+  ativo                 Boolean  @default(true)
+  ordem                 Int      @default(0)
+  permiteTroco          Boolean  @default(false)
+  permiteParcelas       Boolean  @default(false)
+  maxParcelas           Int?
+  jurosPorParcelaPct    Decimal?
+  descontoFixoPct       Decimal?
+  taxaFixa              Decimal?
+  
+  // Integration settings (JSON)
+  integracaoProvider    String?  // nenhum, maquininha, gateway
+  referenciaExterna     String?
+  imprimeComprovante    Boolean  @default(false)
+  
+  // Cash rules
+  contabilizaNoCaixa    Boolean  @default(true)
+  permiteSangria        Boolean  @default(false)
+  
+  // Restrictions
+  valorMin              Decimal?
+  valorMax              Decimal?
+  somenteSeCaixaAberto  Boolean  @default(true)
+  
+  // Visibility
+  mostrarNoPDV          Boolean  @default(true)
+  visivelSomenteParaRoles String? // JSON array of role names
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  @@unique([code, tenantId], name: "code_tenantId")
-  @@index([tenantId, position])
+  @@unique([tenantId, nome])
+  @@index([tenantId, ativo])
+  @@index([tenantId, ordem])
 }
 
 model OutboxEvent {
@@ -426,6 +456,21 @@ model CheckIn {
 }
 
 // ===== CONFIGURATION ENTITIES =====
+
+model Role {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  permissions String[] // Array of permission strings
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId, active])
+}
 
 model Configuration {
   id       String @id @default(uuid())
