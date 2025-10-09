@@ -61,7 +61,7 @@
     "@types/nock": "^10.0.3",
     "@types/node": "^22.16.5",
     "@types/node-cron": "^3.0.11",
-    "@types/semver": "^7.5.8",
+    "@types/semver": "^7.7.1",
     "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.8.1",
     "@typescript-eslint/parser": "^8.8.1",

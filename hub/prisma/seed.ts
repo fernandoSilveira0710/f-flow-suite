@@ -18,6 +18,80 @@ async function main() {
     create: { name: '2F Demo' },
   });
 
+  // Criar planos primeiro
+  const starterPlan = await prisma.plan.upsert({
+    where: { id: 'starter' },
+    update: {},
+    create: {
+      id: 'starter',
+      name: 'Básico',
+      description: 'Ideal para pet shops pequenos',
+      price: 19.99,
+      currency: 'BRL',
+      maxSeats: 2,
+      maxDevices: 1,
+      featuresEnabled: JSON.stringify([
+        'Até 2 usuários',
+        'Agendamento básico',
+        'PDV simples',
+        'Controle de estoque',
+        'Relatórios básicos',
+        'Suporte por email'
+      ]),
+      active: true,
+    },
+  });
+
+  const proPlan = await prisma.plan.upsert({
+    where: { id: 'pro' },
+    update: {},
+    create: {
+      id: 'pro',
+      name: 'Profissional',
+      description: 'Para pet shops em crescimento',
+      price: 59.99,
+      currency: 'BRL',
+      maxSeats: 5,
+      maxDevices: 2,
+      featuresEnabled: JSON.stringify([
+        'Até 5 usuários',
+        'Agendamento avançado',
+        'PDV completo',
+        'Gestão de estoque avançada',
+        'CRM completo',
+        'Relatórios avançados',
+        'Notificações automáticas',
+        'Suporte prioritário'
+      ]),
+      active: true,
+    },
+  });
+
+  const maxPlan = await prisma.plan.upsert({
+    where: { id: 'max' },
+    update: {},
+    create: {
+      id: 'max',
+      name: 'Enterprise',
+      description: 'Para grandes operações',
+      price: 99.99,
+      currency: 'BRL',
+      maxSeats: 15,
+      maxDevices: 5,
+      featuresEnabled: JSON.stringify([
+        'Usuários ilimitados',
+        'Todos os recursos',
+        'Multi-loja',
+        'API personalizada',
+        'Relatórios personalizados',
+        'Treinamento incluído',
+        'Suporte 24/7',
+        'Gerente de conta dedicado'
+      ]),
+      active: true,
+    },
+  });
+
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'demo' },
     update: {},

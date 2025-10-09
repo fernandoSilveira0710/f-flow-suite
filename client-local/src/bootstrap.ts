@@ -146,8 +146,39 @@ export async function bootstrap(): Promise<void> {
     });
     
     // Configure structured logger for NestJS
-  app.useLogger(new StructuredLogger(logDir));
+    app.useLogger(new StructuredLogger(logDir));
     logger.log('Structured logger configured successfully');
+    
+    // Verificação de licença na inicialização
+    try {
+      logger.log('Checking license status on startup...');
+      const { StartupLicenseGuard } = await import('./licensing/startup-license.guard');
+      const startupGuard = app.get(StartupLicenseGuard);
+      
+      // Atualiza cache de licença se possível
+      await startupGuard.updateCacheOnStartup();
+      
+      // Verifica status da licença
+      const licenseCheck = await startupGuard.checkStartupLicense();
+      
+      if (!licenseCheck.canStart) {
+        logger.error(`License check failed: ${licenseCheck.message}`);
+        logger.error('Application cannot start due to license restrictions');
+        process.exit(1);
+      }
+      
+      if (licenseCheck.showWarning) {
+        logger.warn(`License Warning: ${licenseCheck.message}`);
+      } else if (licenseCheck.requiresSetup) {
+        logger.warn(`License Setup Required: ${licenseCheck.message}`);
+      } else {
+        logger.log(`License Status: ${licenseCheck.message}`);
+      }
+      
+    } catch (error) {
+      logger.warn('License check failed during startup:', error instanceof Error ? error.message : String(error));
+      logger.warn('Continuing startup with limited functionality');
+    }
     
     // Start server
     const port = process.env.PORT ? Number(process.env.PORT) : 3010;

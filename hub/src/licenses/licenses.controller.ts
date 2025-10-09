@@ -122,19 +122,29 @@ export class LicensesController {
       if (!result.valid) {
         return {
           valid: false,
+          registered: result.license !== null,
+          licensed: false,
+          status: result.reason === 'LICENSE_NOT_FOUND' ? 'not_registered' : 
+                  result.reason === 'LICENSE_EXPIRED' ? 'expired' : 'inactive',
           reason: result.reason,
-          message: this.getValidationMessage(result.reason)
+          message: this.getValidationMessage(result.reason),
+          expiresAt: result.license?.expiry || null,
+          planKey: result.license?.planKey || null
         };
       }
 
       return {
         valid: true,
+        registered: true,
+        licensed: true,
+        status: 'active',
         license: {
           tenantId: result.license.tenantId,
           planKey: result.license.planKey,
           maxSeats: result.license.maxSeats,
           status: result.license.status,
           expiresAt: result.license.expiry,
+          graceDays: result.license.graceDays || 7,
           tenant: {
             name: result.license.tenant?.name,
             email: result.license.tenant?.email

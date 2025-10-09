@@ -1,13 +1,28 @@
+import { useState, useEffect } from 'react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import { Check, Star } from 'lucide-react'
 
+interface HubPlan {
+  id: string;
+  name: string;
+  price: number;
+  billingCycle: string;
+  features: string[];
+  active: boolean;
+}
+
 const PricingPage = () => {
-  const plans = [
+  const [hubPlans, setHubPlans] = useState<HubPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fallback plans (hardcoded)
+  const fallbackPlans = [
     {
+      id: 'starter',
       name: 'Básico',
-      price: 'R$ 19,99',
-      period: '/mês',
+      price: 19.99,
+      billingCycle: 'monthly',
       description: 'Ideal para pet shops pequenos',
       features: [
         'Até 2 usuários',
@@ -18,12 +33,14 @@ const PricingPage = () => {
         'Suporte por email'
       ],
       popular: false,
-      cta: 'Começar Teste'
+      cta: 'Começar Teste',
+      active: true
     },
     {
+      id: 'pro',
       name: 'Profissional',
-      price: 'R$ 59,99',
-      period: '/mês',
+      price: 59.99,
+      billingCycle: 'monthly',
       description: 'Para pet shops em crescimento',
       features: [
         'Até 5 usuários',
@@ -36,12 +53,14 @@ const PricingPage = () => {
         'Suporte prioritário'
       ],
       popular: true,
-      cta: 'Começar Teste'
+      cta: 'Começar Teste',
+      active: true
     },
     {
+      id: 'max',
       name: 'Enterprise',
-      price: 'R$ 99,99',
-      period: '/mês',
+      price: 99.99,
+      billingCycle: 'monthly',
       description: 'Para grandes operações',
       features: [
         'Usuários ilimitados',
@@ -54,9 +73,82 @@ const PricingPage = () => {
         'Gerente de conta dedicado'
       ],
       popular: false,
-      cta: 'Falar com Vendas'
+      cta: 'Falar com Vendas',
+      active: true
     }
-  ]
+  ];
+
+  useEffect(() => {
+    loadPlansFromHub();
+  }, []);
+
+  const loadPlansFromHub = async () => {
+    setLoading(true);
+    try {
+      // Buscar planos da API pública do Hub
+      const response = await fetch('http://localhost:8081/public/plans?active=true');
+      if (response.ok) {
+        const plans = await response.json();
+        setHubPlans(plans);
+      } else {
+        console.warn('Falha ao buscar planos do Hub, usando planos locais');
+        setHubPlans(fallbackPlans);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar planos do Hub:', error);
+      // Fallback para planos locais
+      setHubPlans(fallbackPlans);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mapear planos do Hub para formato da página
+  const mapHubPlanToDisplay = (plan: HubPlan) => {
+    let description = 'Plano personalizado';
+    let popular = false;
+    let cta = 'Começar Teste';
+
+    // Mapear baseado no preço ou nome
+    if (plan.price <= 20) {
+      description = 'Ideal para pet shops pequenos';
+      popular = false;
+    } else if (plan.price <= 60) {
+      description = 'Para pet shops em crescimento';
+      popular = true;
+    } else {
+      description = 'Para grandes operações';
+      cta = 'Falar com Vendas';
+    }
+
+    return {
+      id: plan.id,
+      name: plan.name,
+      price: `R$ ${plan.price.toFixed(2).replace('.', ',')}`,
+      period: plan.billingCycle === 'monthly' ? '/mês' : '/ano',
+      description,
+      features: plan.features,
+      popular,
+      cta
+    };
+  };
+
+  const displayPlans = hubPlans.map(mapHubPlanToDisplay);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Carregando planos...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -81,9 +173,9 @@ const PricingPage = () => {
       <section className="py-20 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {plans.map((plan, index) => (
+            {displayPlans.map((plan, index) => (
               <div
-                key={index}
+                key={plan.id}
                 className={`relative bg-white rounded-2xl shadow-lg border-2 ${
                   plan.popular 
                     ? 'border-primary-500 scale-105' 

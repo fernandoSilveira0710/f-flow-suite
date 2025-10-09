@@ -113,7 +113,7 @@ export class AutoUpdateService {
       };
     } catch (error) {
       this.logger.error('Failed to check for updates:', error);
-      throw new Error(`Update check failed: ${error.message}`);
+      throw new Error(`Update check failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -172,7 +172,7 @@ export class AutoUpdateService {
         stage: 'error',
         progress: 0,
         message: 'Update failed',
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       };
       throw error;
     } finally {
@@ -202,7 +202,7 @@ export class AutoUpdateService {
     const arch = process.arch;
     
     // Platform-specific asset patterns
-    const patterns = {
+    const patterns: Record<string, RegExp> = {
       win32: /f-flow-client.*win.*\.(exe|zip)$/i,
       darwin: /f-flow-client.*mac.*\.(dmg|pkg|zip)$/i,
       linux: /f-flow-client.*linux.*\.(deb|rpm|tar\.gz|zip)$/i,
