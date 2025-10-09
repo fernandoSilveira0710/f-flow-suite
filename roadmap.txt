@@ -72,6 +72,10 @@
 * ✅ `LicensingGuard` implementado para proteger rotas de negócio.
 * ✅ Testes unitários e e2e implementados.
 * ✅ Documentação completa no README.md.
+* ✅ **Sistema de Planos Integrado**: Frontend ERP com painel de billing completo.
+* ✅ **Sincronização de Planos**: Client-local sincroniza mudanças de plano com Hub.
+* ✅ **Validação SQLite**: Sistema totalmente funcional com banco SQLite local.
+* ✅ **Entitlements Dinâmicos**: Recursos habilitados/desabilitados baseados no plano ativo.
   **Flags**
 * ✅ `LICENSING_ENFORCED=true` (em dev pode ser false).
   **Aceite**
@@ -81,6 +85,9 @@
 * ✅ Verificação JWT RS256 com chave pública.
 * ✅ Armazenamento seguro de tokens.
 * ✅ Renovação automática de licenças.
+* ✅ **Painel de Billing**: Interface completa em `/erp/settings/billing` com planos, histórico e upgrade.
+* ✅ **Sincronização de Planos**: Mudanças de plano refletem imediatamente no sistema.
+* ✅ **Teste de Integração**: Sistema validado com SQLite, Hub e Client-local funcionando em conjunto.
   **Rollback**
 * ✅ Setar `LICENSING_ENFORCED=false` (DEV) enquanto corrige.
 
