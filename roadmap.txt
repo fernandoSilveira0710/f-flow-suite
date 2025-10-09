@@ -410,29 +410,29 @@ Incremental PRs: cada sub-etapa pode ser submetida em um PR, garantindo que test
 
 ---
 
-## Etapa 10 — Site Institucional + Postman E2E + Releases/Auto-update
+## Etapa 10 — Site Institucional + Postman E2E + Releases/Auto-update ✅
 
 **Objetivo:** pacote completo para distribuir o SaaS.
 **Escopo**
 
-* **Site institucional** (landing + docs de instalação) no monorepo (`/site`), build estático (Vite/Next estático).
-* **Coleção Postman** E2E: seed → health → ativar licença → CRUD → sync roundtrip.
-* **Auto-update** do client-local:
+* ✅ **Site institucional** (landing + docs de instalação) no monorepo (`/site`), build estático (Vite/Next estático).
+* ✅ **Coleção Postman** E2E: seed → health → ativar licença → CRUD → sync roundtrip.
+* ✅ **Auto-update** do client-local:
 
-  * Serviço verifica versão publicada (GitHub Releases/S3).
-  * Download silencioso + aplicação + rollback se health falhar.
-* **CI/CD (GitHub Actions)**:
+  * ✅ Serviço verifica versão publicada (GitHub Releases/S3).
+  * ✅ Download silencioso + aplicação + rollback se health falhar.
+* ✅ **CI/CD (GitHub Actions)**:
 
-  * Lint, typecheck, unit, integração (Hub com Postgres de serviço).
-  * Build **binários** + **instaladores** (NSIS/pkgbuild/deb).
-  * Publica em **Releases** com changelog.
+  * ✅ Lint, typecheck, unit, integração (Hub com Postgres de serviço).
+  * ✅ Build **binários** + **instaladores** (NSIS/pkgbuild/deb).
+  * ✅ Publica em **Releases** com changelog.
     **Flags**
-* `AUTO_UPDATE_ENABLED=true` (produção).
+* ✅ `AUTO_UPDATE_ENABLED=true` (produção).
   **Aceite**
-* Instalação fresca: setup de licença → uso normal → sync OK.
-* Update publicado ➜ cliente atualiza sozinho e mantém dados/serviço.
+* ✅ Instalação fresca: setup de licença → uso normal → sync OK.
+* ✅ Update publicado ➜ cliente atualiza sozinho e mantém dados/serviço.
   **Rollback**
-* Pipeline mantém **artefato anterior**; auto-update reverte quando health falha.
+* ✅ Pipeline mantém **artefato anterior**; auto-update reverte quando health falha.
 
 ---
 
