@@ -1,14 +1,19 @@
-﻿import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
 type LicenseJwtPayload = {
-  tenant_id: string;
-  plan_id: string;
-  entitlements: Record<string, unknown>;
-  max_seats: number;
-  device_id?: string;
+  tid: string; // tenant_id
+  did?: string; // device_id
+  plan: string; // plan name
+  planId?: string; // plan UUID
+  ent: Record<string, unknown>; // entitlements/features
+  maxSeats: number;
+  maxDevices: number;
   exp?: number;
+  grace?: number;
+  iat?: number;
+  iss?: string;
 };
 
 @Injectable()

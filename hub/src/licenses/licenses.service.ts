@@ -15,6 +15,20 @@ export class LicensesService {
       throw new Error('LICENSE_NOT_FOUND');
     }
 
+    // Get active subscription with plan details
+    const subscription = await this.prisma.subscription.findFirst({
+      where: { 
+        tenantId,
+        status: 'ACTIVE',
+        startAt: { lte: new Date() },
+        expiresAt: { gte: new Date() }
+      },
+      include: {
+        plan: true
+      }
+    });
+
+    // Fallback to legacy entitlements if no active subscription
     const entitlements = await this.prisma.entitlement.findMany({
       where: { planKey: license.planKey },
     });
@@ -22,12 +36,15 @@ export class LicensesService {
     const payload = {
       tid: tenantId,
       did: deviceId,
-      plan: license.planKey,
-      ent: entitlements.reduce<Record<string, unknown>>((acc, ent) => {
+      plan: subscription?.plan?.name || license.planKey,
+      planId: subscription?.planId || null,
+      ent: subscription?.plan?.featuresEnabled || entitlements.reduce<Record<string, unknown>>((acc, ent) => {
         acc[ent.key] = ent.value;
         return acc;
       }, {}),
-      exp: Math.floor(new Date(license.expiry).getTime() / 1000),
+      maxSeats: subscription?.plan?.maxSeats || license.maxSeats,
+      maxDevices: subscription?.plan?.maxDevices || 1,
+      exp: Math.floor(new Date(subscription?.expiresAt || license.expiry).getTime() / 1000),
       grace: license.graceDays,
       iat: Math.floor(Date.now() / 1000),
       iss: '2f-hub',
