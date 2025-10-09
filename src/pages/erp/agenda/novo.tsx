@@ -68,12 +68,18 @@ export default function NovoAgendamento() {
 
   // Calcular horário de término
   const endTime = useMemo(() => {
-    if (!selectedService || !startTime) return '';
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const start = setMinutes(setHours(new Date(), hours), minutes);
-    const totalMin = selectedService.duracaoMin + (selectedService.bufferAntesMin || 0) + (selectedService.bufferDepoisMin || 0);
-    const end = addMinutes(start, totalMin);
-    return format(end, 'HH:mm');
+    if (!selectedService || !startTime || typeof startTime !== 'string' || !startTime.includes(':')) return '';
+    try {
+      const [hours, minutes] = startTime.split(':').map(Number);
+      if (isNaN(hours) || isNaN(minutes)) return '';
+      const start = setMinutes(setHours(new Date(), hours), minutes);
+      const totalMin = selectedService.duracaoMin + (selectedService.bufferAntesMin || 0) + (selectedService.bufferDepoisMin || 0);
+      const end = addMinutes(start, totalMin);
+      return format(end, 'HH:mm');
+    } catch (error) {
+      console.error('Erro ao calcular horário de término:', error);
+      return '';
+    }
   }, [selectedService, startTime]);
 
   const handleStaffToggle = (staffId: string) => {
@@ -92,35 +98,51 @@ export default function NovoAgendamento() {
       return;
     }
 
-    const customer = customers.find(c => c.id === customerId)!;
-    const service = services.find(s => s.id === serviceId)!;
+    // Verificar se startTime é uma string válida antes de usar split
+    if (typeof startTime !== 'string' || !startTime.includes(':')) {
+      toast.error('Horário de início inválido');
+      return;
+    }
 
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const startDate = setMinutes(setHours(date, hours), minutes);
-    const endDate = addMinutes(startDate, service.duracaoMin);
+    try {
+      const customer = customers.find(c => c.id === customerId)!;
+      const service = services.find(s => s.id === serviceId)!;
 
-    const newAppointment = {
-      customerId,
-      customerNome: customer.nome,
-      customerContato: customer.telefone || customer.email,
-      petId: petId || undefined,
-      serviceId,
-      serviceNome: service.nome,
-      staffIds,
-      startISO: startDate.toISOString(),
-      endISO: endDate.toISOString(),
-      status: (prefs.confirmarAuto ? 'CONFIRMADO' : 'AGENDADO') as 'CONFIRMADO' | 'AGENDADO',
-      origem: 'INTERNO' as const,
-      notas: notas.trim() || undefined,
-      pagamento: (sinal || metodoPagamento) ? {
-        metodo: metodoPagamento as any,
-        sinal: sinal ? parseFloat(sinal) : undefined,
-      } : undefined,
-    };
+      const [hours, minutes] = startTime.split(':').map(Number);
+      if (isNaN(hours) || isNaN(minutes)) {
+        toast.error('Horário de início inválido');
+        return;
+      }
 
-    createAppointment(newAppointment);
-    toast.success('Agendamento criado com sucesso');
-    navigate('/erp/agenda');
+      const startDate = setMinutes(setHours(date, hours), minutes);
+      const endDate = addMinutes(startDate, service.duracaoMin);
+
+      const newAppointment = {
+        customerId,
+        customerNome: customer.nome,
+        customerContato: customer.telefone || customer.email,
+        petId: petId || undefined,
+        serviceId,
+        serviceNome: service.nome,
+        staffIds,
+        startISO: startDate.toISOString(),
+        endISO: endDate.toISOString(),
+        status: (prefs.confirmarAuto ? 'CONFIRMADO' : 'AGENDADO') as 'CONFIRMADO' | 'AGENDADO',
+        origem: 'INTERNO' as const,
+        notas: notas.trim() || undefined,
+        pagamento: (sinal || metodoPagamento) ? {
+          metodo: metodoPagamento as any,
+          sinal: sinal ? parseFloat(sinal) : undefined,
+        } : undefined,
+      };
+
+      createAppointment(newAppointment);
+      toast.success('Agendamento criado com sucesso');
+      navigate('/erp/agenda');
+    } catch (error) {
+      console.error('Erro ao criar agendamento:', error);
+      toast.error('Erro ao criar agendamento');
+    }
   };
 
   const filteredCustomers = useMemo(() => {
