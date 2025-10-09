@@ -12,13 +12,21 @@ export function useEntitlements() {
       setCurrentPlan(getCurrentPlan());
     };
 
+    // Observar mudanças no planChanged event
+    const handlePlanChange = () => {
+      setEntitlements(getEntitlements());
+      setCurrentPlan(getCurrentPlan());
+    };
+
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('planChanged', handlePlanChange);
     
     // Observar mudanças no mesmo tab
     const interval = setInterval(handleStorageChange, 1000);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('planChanged', handlePlanChange);
       clearInterval(interval);
     };
   }, []);

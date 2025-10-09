@@ -4,7 +4,6 @@
  */
 
 import { getCurrentPlan, setPlan as setEntitlementsPlan, getEntitlements } from './entitlements';
-import { apiClient, getTenantId } from './api-client';
 
 // Types
 export interface Organization {
@@ -49,6 +48,17 @@ export interface Role {
   id: string;
   nome: string;
   permissions: string[];
+}
+
+export interface Seat {
+  id: string;
+  nome: string;
+  email: string;
+  roleId: string;
+  ativo: boolean;
+  tipo: 'USUARIO' | 'ASSENTO'; // Diferencia usuários reais de assentos
+  criadoEm: string;
+  ultimoAcesso?: string;
 }
 
 export interface PlanInfo {
@@ -116,6 +126,7 @@ const STORAGE_KEYS = {
   branding: '2f.settings.branding',
   users: '2f.settings.users',
   roles: '2f.settings.roles',
+  seats: '2f.settings.seats',
   apiKeys: '2f.settings.apiKeys',
   webhooks: '2f.settings.webhooks',
   posPrefs: '2f.settings.posPrefs',
@@ -203,6 +214,27 @@ const DEFAULT_ROLES: Role[] = [
   },
 ];
 
+const DEFAULT_SEATS: Seat[] = [
+  { 
+    id: '1', 
+    nome: 'Assento Demo 1', 
+    email: 'assento1@demo.com', 
+    roleId: 'admin', 
+    ativo: true, 
+    tipo: 'ASSENTO',
+    criadoEm: new Date().toISOString()
+  },
+  { 
+    id: '2', 
+    nome: 'Assento Demo 2', 
+    email: 'assento2@demo.com', 
+    roleId: 'admin', 
+    ativo: false, 
+    tipo: 'ASSENTO',
+    criadoEm: new Date().toISOString()
+  },
+];
+
 export const ALL_PERMISSIONS = [
   { id: 'products:read', nome: 'Ver Produtos', grupo: 'Produtos' },
   { id: 'products:write', nome: 'Editar Produtos', grupo: 'Produtos' },
@@ -252,189 +284,129 @@ export const updateBranding = async (data: Branding): Promise<Branding> => {
   return data;
 };
 
-// Users
+// Users - Using only localStorage (prepared for future backend integration)
 export const getUsers = async (): Promise<User[]> => {
-  try {
-    const tenantId = getTenantId();
-    const response = await apiClient<{ data: any[] }>(`/tenants/${tenantId}/users`);
-    
-    // Transform Hub User model to frontend User interface
-    return response.data.map((user: any) => ({
-      id: user.id,
-      nome: user.displayName,
-      email: user.email,
-      roleId: user.role || 'admin', // Default role if not set
-      ativo: user.active,
-    }));
-  } catch (error) {
-    console.warn('Failed to fetch users from Hub, falling back to localStorage:', error);
-    // Fallback to localStorage if Hub is not available
-    return getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
-  }
+  await delay(300);
+  return getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
 };
 
 export const createUser = async (user: Omit<User, 'id'>): Promise<User> => {
-  try {
-    const tenantId = getTenantId();
-    const hubUser = await apiClient(`/tenants/${tenantId}/users`, {
-      method: 'POST',
-      body: {
-        displayName: user.nome,
-        email: user.email,
-        role: user.roleId,
-        active: user.ativo,
-      },
-    });
-    
-    return {
-      id: hubUser.id,
-      nome: hubUser.displayName,
-      email: hubUser.email,
-      roleId: hubUser.role || 'admin',
-      ativo: hubUser.active,
-    };
-  } catch (error) {
-    console.warn('Failed to create user in Hub, falling back to localStorage:', error);
-    // Fallback to localStorage
-    const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
-    const newUser = { ...user, id: Date.now().toString() };
-    const updated = [...users, newUser];
-    setInStorage(STORAGE_KEYS.users, updated);
-    return newUser;
-  }
+  await delay(500);
+  const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
+  const newUser = { ...user, id: Date.now().toString() };
+  const updated = [...users, newUser];
+  setInStorage(STORAGE_KEYS.users, updated);
+  return newUser;
 };
 
 export const updateUser = async (id: string, data: Partial<User>): Promise<User> => {
-  try {
-    const tenantId = getTenantId();
-    const hubUser = await apiClient(`/tenants/${tenantId}/users/${id}`, {
-      method: 'PATCH',
-      body: {
-        ...(data.nome && { displayName: data.nome }),
-        ...(data.email && { email: data.email }),
-        ...(data.roleId && { role: data.roleId }),
-        ...(data.ativo !== undefined && { active: data.ativo }),
-      },
-    });
-    
-    return {
-      id: hubUser.id,
-      nome: hubUser.displayName,
-      email: hubUser.email,
-      roleId: hubUser.role || 'admin',
-      ativo: hubUser.active,
-    };
-  } catch (error) {
-    console.warn('Failed to update user in Hub, falling back to localStorage:', error);
-    // Fallback to localStorage
-    const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
-    const updated = users.map(u => u.id === id ? { ...u, ...data } : u);
-    setInStorage(STORAGE_KEYS.users, updated);
-    return updated.find(u => u.id === id)!;
+  await delay(500);
+  const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
+  const updated = users.map(u => u.id === id ? { ...u, ...data } : u);
+  setInStorage(STORAGE_KEYS.users, updated);
+  const updatedUser = updated.find(u => u.id === id);
+  if (!updatedUser) {
+    throw new Error('Usuário não encontrado');
   }
+  return updatedUser;
 };
 
 export const deleteUser = async (id: string): Promise<void> => {
-  try {
-    const tenantId = getTenantId();
-    await apiClient(`/tenants/${tenantId}/users/${id}`, {
-      method: 'DELETE',
-    });
-  } catch (error) {
-    console.warn('Failed to delete user in Hub, falling back to localStorage:', error);
-    // Fallback to localStorage
-    const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
-    const updated = users.filter(u => u.id !== id);
-    setInStorage(STORAGE_KEYS.users, updated);
-  }
+  await delay(500);
+  const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
+  const updated = users.filter(u => u.id !== id);
+  setInStorage(STORAGE_KEYS.users, updated);
 };
 
-// Roles
+// Roles - Using only localStorage (prepared for future backend integration)
 export const getRoles = async (): Promise<Role[]> => {
-  try {
-    const tenantId = getTenantId();
-    const response = await apiClient<{ data: any[] }>(`/tenants/${tenantId}/roles`);
-    
-    // Transform Hub Role model to frontend Role interface
-    return response.data.map((role: any) => ({
-      id: role.id,
-      nome: role.name,
-      permissions: role.permissions,
-    }));
-  } catch (error) {
-    console.warn('Failed to fetch roles from Hub, falling back to localStorage:', error);
-    // Fallback to localStorage if Hub is not available
-    return getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
-  }
+  await delay(300);
+  return getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
 };
 
 export const createRole = async (role: Omit<Role, 'id'>): Promise<Role> => {
-  try {
-    const tenantId = getTenantId();
-    const hubRole = await apiClient(`/tenants/${tenantId}/roles`, {
-      method: 'POST',
-      body: {
-        name: role.nome,
-        permissions: role.permissions,
-        active: true,
-      },
-    });
-    
-    return {
-      id: hubRole.id,
-      nome: hubRole.name,
-      permissions: hubRole.permissions,
-    };
-  } catch (error) {
-    console.warn('Failed to create role in Hub, falling back to localStorage:', error);
-    // Fallback to localStorage
-    const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
-    const newRole = { ...role, id: Date.now().toString() };
-    const updated = [...roles, newRole];
-    setInStorage(STORAGE_KEYS.roles, updated);
-    return newRole;
-  }
+  await delay(500);
+  const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
+  const newRole = { ...role, id: Date.now().toString() };
+  const updated = [...roles, newRole];
+  setInStorage(STORAGE_KEYS.roles, updated);
+  return newRole;
 };
 
 export const updateRole = async (id: string, data: Partial<Role>): Promise<Role> => {
-  try {
-    const tenantId = getTenantId();
-    const hubRole = await apiClient(`/tenants/${tenantId}/roles/${id}`, {
-      method: 'PATCH',
-      body: {
-        ...(data.nome && { name: data.nome }),
-        ...(data.permissions && { permissions: data.permissions }),
-      },
-    });
-    
-    return {
-      id: hubRole.id,
-      nome: hubRole.name,
-      permissions: hubRole.permissions,
-    };
-  } catch (error) {
-    console.warn('Failed to update role in Hub, falling back to localStorage:', error);
-    // Fallback to localStorage
-    const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
-    const updated = roles.map(r => r.id === id ? { ...r, ...data } : r);
-    setInStorage(STORAGE_KEYS.roles, updated);
-    return updated.find(r => r.id === id)!;
+  await delay(500);
+  const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
+  const updated = roles.map(r => r.id === id ? { ...r, ...data } : r);
+  setInStorage(STORAGE_KEYS.roles, updated);
+  const updatedRole = updated.find(r => r.id === id);
+  if (!updatedRole) {
+    throw new Error('Role não encontrada');
   }
+  return updatedRole;
 };
 
 export const deleteRole = async (id: string): Promise<void> => {
-  try {
-    const tenantId = getTenantId();
-    await apiClient(`/tenants/${tenantId}/roles/${id}`, {
-      method: 'DELETE',
-    });
-  } catch (error) {
-    console.warn('Failed to delete role in Hub, falling back to localStorage:', error);
-    // Fallback to localStorage
-    const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
-    const updated = roles.filter(r => r.id !== id);
-    setInStorage(STORAGE_KEYS.roles, updated);
+  await delay(500);
+  const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
+  const updated = roles.filter(r => r.id !== id);
+  setInStorage(STORAGE_KEYS.roles, updated);
+};
+
+// Seats - Using only localStorage (prepared for future backend integration)
+export const getSeats = async (): Promise<Seat[]> => {
+  await delay(300);
+  return getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
+};
+
+export const createSeat = async (seat: Omit<Seat, 'id' | 'criadoEm'>): Promise<Seat> => {
+  await delay(500);
+  const seats = getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
+  const newSeat: Seat = { 
+    ...seat, 
+    id: Date.now().toString(),
+    criadoEm: new Date().toISOString(),
+    tipo: 'ASSENTO'
+  };
+  const updated = [...seats, newSeat];
+  setInStorage(STORAGE_KEYS.seats, updated);
+  return newSeat;
+};
+
+export const updateSeat = async (id: string, data: Partial<Seat>): Promise<Seat> => {
+  await delay(500);
+  const seats = getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
+  const updated = seats.map(s => s.id === id ? { ...s, ...data } : s);
+  setInStorage(STORAGE_KEYS.seats, updated);
+  const updatedSeat = updated.find(s => s.id === id);
+  if (!updatedSeat) {
+    throw new Error('Assento não encontrado');
   }
+  return updatedSeat;
+};
+
+export const deleteSeat = async (id: string): Promise<void> => {
+  await delay(500);
+  const seats = getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
+  const updated = seats.filter(s => s.id !== id);
+  setInStorage(STORAGE_KEYS.seats, updated);
+};
+
+export const getSeatById = async (id: string): Promise<Seat | null> => {
+  await delay(200);
+  const seats = getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
+  return seats.find(s => s.id === id) || null;
+};
+
+export const getActiveSeats = async (): Promise<Seat[]> => {
+  await delay(300);
+  const seats = await getSeats();
+  return seats.filter(s => s.ativo);
+};
+
+export const getSeatsByRole = async (roleId: string): Promise<Seat[]> => {
+  await delay(300);
+  const seats = await getSeats();
+  return seats.filter(s => s.roleId === roleId);
 };
 
 // Plan
@@ -460,13 +432,49 @@ export const getPlanInfo = async (): Promise<PlanInfo> => {
   };
 };
 
-export const updatePlan = async (plan: 'starter' | 'pro' | 'max', cycle?: 'MENSAL' | 'ANUAL'): Promise<PlanInfo> => {
-  await delay(500);
-  setEntitlementsPlan(plan);
-  if (cycle) {
-    setInStorage(STORAGE_KEYS.planCycle, cycle);
+export const updatePlan = async (planKey: 'starter' | 'pro' | 'max') => {
+  try {
+    // Tentar sincronizar com o client-local primeiro
+    const clientLocalResponse = await fetch('http://localhost:3001/licensing/plan/sync', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        tenantId: 'demo',
+        planKey 
+      }),
+    });
+
+    if (clientLocalResponse.ok) {
+      console.log('Plan synchronized successfully with client-local and Hub');
+    } else {
+      console.warn('Failed to sync with client-local, trying Hub directly');
+      
+      // Fallback para Hub direto
+      const hubResponse = await fetch('http://localhost:3000/licenses/demo/plan', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ planKey }),
+      });
+
+      if (hubResponse.ok) {
+        console.log('Plan updated successfully in Hub');
+      } else {
+        console.warn('Failed to update plan in Hub, falling back to localStorage');
+      }
+    }
+  } catch (error) {
+    console.warn('Services not available, using localStorage fallback:', error);
   }
-  return getPlanInfo();
+
+  // Atualizar localStorage como fallback ou confirmação
+  localStorage.setItem('selectedPlan', planKey);
+  
+  // Disparar evento customizado para notificar outras partes da aplicação
+  window.dispatchEvent(new CustomEvent('planChanged', { detail: { planKey } }));
 };
 
 // License (mock UI only)

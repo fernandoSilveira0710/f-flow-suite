@@ -1,4 +1,4 @@
-﻿import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -43,18 +43,43 @@ async function main() {
       tenantId: tenant.id,
       status: 'trial',
       planKey: 'pro',
-      maxSeats: 2,
+      maxSeats: 5,
       expiry,
       graceDays: 7,
     },
   });
 
+  // Entitlements para todos os planos
   const entitlements: SeedEntitlement[] = [
+    // Starter Plan (R$ 19,99)
+    { planKey: 'starter', key: 'products', value: true },
+    { planKey: 'starter', key: 'pdv', value: true },
+    { planKey: 'starter', key: 'stock', value: true },
+    { planKey: 'starter', key: 'dashboards', value: true },
+    { planKey: 'starter', key: 'agenda', value: false },
+    { planKey: 'starter', key: 'banho_tosa', value: false },
+    { planKey: 'starter', key: 'reports', value: false },
+    { planKey: 'starter', key: 'max_users', value: 1 },
+    
+    // Pro Plan (R$ 49,99)
+    { planKey: 'pro', key: 'products', value: true },
     { planKey: 'pro', key: 'pdv', value: true },
-    { planKey: 'pro', key: 'grooming', value: true },
+    { planKey: 'pro', key: 'stock', value: true },
+    { planKey: 'pro', key: 'dashboards', value: true },
     { planKey: 'pro', key: 'agenda', value: true },
-    { planKey: 'pro', key: 'estoque_negativo', value: false },
+    { planKey: 'pro', key: 'banho_tosa', value: true },
+    { planKey: 'pro', key: 'reports', value: false },
     { planKey: 'pro', key: 'max_users', value: 5 },
+    
+    // Max Plan (R$ 99,99)
+    { planKey: 'max', key: 'products', value: true },
+    { planKey: 'max', key: 'pdv', value: true },
+    { planKey: 'max', key: 'stock', value: true },
+    { planKey: 'max', key: 'dashboards', value: true },
+    { planKey: 'max', key: 'agenda', value: true },
+    { planKey: 'max', key: 'banho_tosa', value: true },
+    { planKey: 'max', key: 'reports', value: true },
+    { planKey: 'max', key: 'max_users', value: 15 },
   ];
 
   for (const entitlement of entitlements) {
@@ -100,10 +125,11 @@ async function main() {
 }
 
 main()
-  .catch((error) => {
-    console.error('Seed failed', error);
-    process.exit(1);
-  })
-  .finally(async () => {
+  .then(async () => {
     await prisma.$disconnect();
+  })
+  .catch(async (e) => {
+    console.error(e);
+    await prisma.$disconnect();
+    process.exit(1);
   });

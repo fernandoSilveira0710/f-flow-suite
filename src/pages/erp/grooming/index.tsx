@@ -87,7 +87,8 @@ export default function GroomingIndex() {
 
     // Date filter
     result = result.filter((t) => {
-      const ticketDate = parseISO(t.dataAberturaISO);
+      if (!t.createdAt) return false;
+      const ticketDate = parseISO(t.createdAt);
       return ticketDate >= dateRange.start && ticketDate <= dateRange.end;
     });
 
@@ -110,14 +111,14 @@ export default function GroomingIndex() {
     // Service filter
     if (filters.servico.length > 0) {
       result = result.filter((t) =>
-        t.itens.some((item) => filters.servico.includes(item.serviceId))
+        t.items?.some((item) => filters.servico.includes(item.serviceId || ''))
       );
     }
 
     // Porte filter
     if (filters.porte.length > 0) {
       result = result.filter((t) =>
-        t.itens.some((item) => filters.porte.includes(item.porte))
+        t.items?.some((item) => filters.porte.includes(item.porte || ''))
       );
     }
 
@@ -126,13 +127,13 @@ export default function GroomingIndex() {
 
   // Calculate KPIs
   const kpis = useMemo(() => {
-    const todayTickets = tickets.filter((t) => isToday(parseISO(t.dataAberturaISO)));
+    const todayTickets = tickets.filter((t) => t.createdAt && isToday(parseISO(t.createdAt)));
     const inProgress = todayTickets.filter(
       (t) => !['ENTREGUE', 'CANCELADO'].includes(t.status)
     );
     const ready = todayTickets.filter((t) => t.status === 'PRONTO');
     const receita = todayTickets.reduce(
-      (sum, t) => sum + t.itens.reduce((s, i) => s + i.preco * i.qtd, 0),
+      (sum, t) => sum + (t.items || []).reduce((s, i) => s + (i.price || 0) * (i.qty || 0), 0),
       0
     );
     return {
@@ -500,13 +501,11 @@ export default function GroomingIndex() {
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex-1 min-w-0">
                                   <div className={cn('font-semibold truncate', density.text)}>
-                                    {ticket.petNome}
+                                    {pet?.nome || 'Pet não encontrado'}
                                   </div>
-                                  {filters.density !== 'compact' && (
-                                    <div className="text-xs text-muted-foreground truncate">
-                                      {ticket.tutorNome}
-                                    </div>
-                                  )}
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    Tutor: {tutor?.nome || 'Tutor não encontrado'}
+                                  </div>
                                 </div>
                                 {pet && (
                                   <Badge variant="outline" className="text-xs flex-shrink-0">
@@ -516,17 +515,22 @@ export default function GroomingIndex() {
                               </div>
 
                               {/* Services */}
-                              <div className="flex flex-wrap gap-1">
-                                {ticket.itens.slice(0, filters.density === 'compact' ? 2 : 3).map((item, idx) => (
-                                  <Badge key={idx} variant="secondary" className="text-xs">
-                                    {item.nome}
-                                  </Badge>
-                                ))}
-                                {ticket.itens.length > (filters.density === 'compact' ? 2 : 3) && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    +{ticket.itens.length - (filters.density === 'compact' ? 2 : 3)}
-                                  </Badge>
-                                )}
+                              <div className="space-y-1">
+                                <div className="text-xs text-muted-foreground">
+                                  Serviços ({(ticket.items || []).length}):
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {(ticket.items || []).slice(0, filters.density === 'compact' ? 2 : 3).map((item, idx) => (
+                                    <Badge key={idx} variant="secondary" className="text-xs">
+                                      {item.name}
+                                    </Badge>
+                                  ))}
+                                  {(ticket.items || []).length > (filters.density === 'compact' ? 2 : 3) && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      +{(ticket.items || []).length - (filters.density === 'compact' ? 2 : 3)}
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
 
                               {/* Footer */}
@@ -535,11 +539,17 @@ export default function GroomingIndex() {
                                   <Clock className="h-3 w-3 flex-shrink-0" />
                                   <span className="truncate">{ticket.codigo}</span>
                                 </div>
-                                {ticket.sinalRecebido && (
-                                  <Badge variant="outline" className="text-xs flex-shrink-0">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1 text-green-600 font-medium">
                                     <DollarSign className="h-3 w-3" />
-                                  </Badge>
-                                )}
+                                    <span>R$ {(ticket.totalPrice || 0).toFixed(2)}</span>
+                                  </div>
+                                  {ticket.sinalRecebido && (
+                                    <Badge variant="outline" className="text-xs flex-shrink-0">
+                                      Pago
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
 
                               {/* Quick Actions */}

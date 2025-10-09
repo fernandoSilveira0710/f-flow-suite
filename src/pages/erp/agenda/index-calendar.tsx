@@ -2,8 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isToday, isSameDay, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Plus, ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Search } from 'lucide-react';
-import { PageHeader } from '@/components/erp/page-header';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -12,24 +11,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getAppointments, getServices, getStaff, type Appointment } from '@/lib/schedule-api';
 import { cn } from '@/lib/utils';
 
-type ViewMode = 'day' | 'week' | 'month' | 'list';
+type ViewMode = 'day' | 'week' | 'month';
 
 const statusColors = {
   AGENDADO: 'bg-blue-500',
   CONFIRMADO: 'bg-green-500',
-  CHECKIN: 'bg-purple-500',
+  CHECKIN: 'bg-yellow-500',
+  ANDAMENTO: 'bg-orange-500',
   CONCLUIDO: 'bg-gray-500',
   CANCELADO: 'bg-red-500',
-  NO_SHOW: 'bg-orange-500',
+  FALTA: 'bg-purple-500',
 };
 
 const statusLabels = {
   AGENDADO: 'Agendado',
   CONFIRMADO: 'Confirmado',
   CHECKIN: 'Check-in',
+  ANDAMENTO: 'Em Andamento',
   CONCLUIDO: 'Concluído',
   CANCELADO: 'Cancelado',
-  NO_SHOW: 'Não Compareceu',
+  FALTA: 'Falta',
 };
 
 export default function AgendaIndex() {
@@ -67,7 +68,7 @@ export default function AgendaIndex() {
     loadAppointments();
   }, []);
 
-  // Filtrar appointments
+  // Filtrar agendamentos
   const filteredAppointments = useMemo(() => {
     return appointments.filter((apt) => {
       const matchSearch = !search || 
@@ -100,8 +101,8 @@ export default function AgendaIndex() {
   // Renderizar visualizações
   const renderDayView = () => {
     const dayAppointments = filteredAppointments.filter((apt) =>
-      isSameDay(parseISO(apt.startISO), currentDate)
-    ).sort((a, b) => a.startISO.localeCompare(b.startISO));
+      apt.startTime && isSameDay(parseISO(apt.startTime), currentDate)
+    ).sort((a, b) => a.startTime && b.startTime ? a.startTime.localeCompare(b.startTime) : 0);
 
     return (
       <div className="space-y-2">
@@ -120,9 +121,9 @@ export default function AgendaIndex() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={cn('w-2 h-2 rounded-full', statusColors[apt.status])} />
-                    <span className="font-medium">{format(parseISO(apt.startISO), 'HH:mm', { locale: ptBR })}</span>
+                    <span className="font-medium">{apt.startTime ? format(parseISO(apt.startTime), 'HH:mm', { locale: ptBR }) : 'N/A'}</span>
                     <span className="text-muted-foreground">-</span>
-                    <span className="font-medium">{format(parseISO(apt.endISO), 'HH:mm', { locale: ptBR })}</span>
+                    <span className="font-medium">{apt.endTime ? format(parseISO(apt.endTime), 'HH:mm', { locale: ptBR }) : 'N/A'}</span>
                   </div>
                   <div className="font-semibold">{apt.customerNome}</div>
                   <div className="text-sm text-muted-foreground">{apt.serviceNome}</div>
@@ -147,8 +148,8 @@ export default function AgendaIndex() {
       <div className="grid grid-cols-7 gap-2">
         {weekDays.map((day) => {
           const dayAppointments = filteredAppointments.filter((apt) =>
-            isSameDay(parseISO(apt.startISO), day)
-          ).sort((a, b) => a.startISO.localeCompare(b.startISO));
+            apt.startTime && isSameDay(parseISO(apt.startTime), day)
+          ).sort((a, b) => a.startTime && b.startTime ? a.startTime.localeCompare(b.startTime) : 0);
 
           return (
             <div key={day.toISOString()} className="border rounded-lg p-2 min-h-[200px]">
@@ -168,7 +169,7 @@ export default function AgendaIndex() {
                   >
                     <div className="flex items-center gap-1 mb-1">
                       <span className={cn('w-1.5 h-1.5 rounded-full', statusColors[apt.status])} />
-                      <span className="font-medium">{format(parseISO(apt.startISO), 'HH:mm')}</span>
+                      <span className="font-medium">{apt.startTime ? format(parseISO(apt.startTime), 'HH:mm') : 'N/A'}</span>
                     </div>
                     <div className="font-medium truncate">{apt.customerNome}</div>
                     <div className="text-muted-foreground truncate">{apt.serviceNome}</div>
@@ -204,7 +205,7 @@ export default function AgendaIndex() {
         ))}
         {days.map((day) => {
           const dayAppointments = filteredAppointments.filter((apt) =>
-            isSameDay(parseISO(apt.startISO), day)
+            apt.startTime && isSameDay(parseISO(apt.startTime), day)
           );
           const isCurrentMonth = day.getMonth() === currentDate.getMonth();
 
@@ -244,47 +245,6 @@ export default function AgendaIndex() {
     );
   };
 
-  const renderListView = () => {
-    const sortedAppointments = [...filteredAppointments].sort((a, b) => 
-      a.startISO.localeCompare(b.startISO)
-    );
-
-    return (
-      <div className="space-y-2">
-        {sortedAppointments.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            Nenhum agendamento encontrado
-          </div>
-        ) : (
-          sortedAppointments.map((apt) => (
-            <div
-              key={apt.id}
-              className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-              onClick={() => navigate(`/erp/agenda/${apt.id}`)}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={cn('w-2 h-2 rounded-full', statusColors[apt.status])} />
-                    <span className="font-medium">
-                      {format(parseISO(apt.startISO), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                    </span>
-                  </div>
-                  <div className="font-semibold">{apt.customerNome}</div>
-                  <div className="text-sm text-muted-foreground">{apt.serviceNome}</div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Profissional(is): {apt.staffIds.map(id => staff.find(s => s.id === id)?.nome).filter(Boolean).join(', ')}
-                  </div>
-                </div>
-                <Badge variant="secondary">{statusLabels[apt.status]}</Badge>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    );
-  };
-
   const dateRangeLabel = useMemo(() => {
     if (viewMode === 'day') {
       return format(currentDate, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
@@ -295,19 +255,11 @@ export default function AgendaIndex() {
     } else if (viewMode === 'month') {
       return format(currentDate, "MMMM 'de' yyyy", { locale: ptBR });
     }
-    return 'Todos';
+    return '';
   }, [currentDate, viewMode]);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Agenda"
-        description="Gerencie os agendamentos de serviços"
-        actionLabel="Novo Agendamento"
-        actionIcon={Plus}
-        onAction={() => navigate('/erp/agenda/novo')}
-      />
-
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="text-muted-foreground">Carregando agendamentos...</div>
@@ -326,73 +278,71 @@ export default function AgendaIndex() {
               />
             </div>
 
-        <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Profissional" />
-          </SelectTrigger>
-          <SelectContent className="bg-background z-50">
-            <SelectItem value="all">Todos</SelectItem>
-            {staff.filter(s => s.ativo).map((s) => (
-              <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Profissional" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                <SelectItem value="all">Todos</SelectItem>
+                {staff.filter(s => s.ativo).map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Select value={selectedService} onValueChange={setSelectedService}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Serviço" />
-          </SelectTrigger>
-          <SelectContent className="bg-background z-50">
-            <SelectItem value="all">Todos</SelectItem>
-            {services.filter(s => s.ativo).map((s) => (
-              <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <Select value={selectedService} onValueChange={setSelectedService}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Serviço" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                <SelectItem value="all">Todos</SelectItem>
+                {services.filter(s => s.ativo).map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent className="bg-background z-50">
-            <SelectItem value="all">Todos</SelectItem>
-            {Object.entries(statusLabels).map(([value, label]) => (
-              <SelectItem key={value} value={value}>{label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                <SelectItem value="all">Todos</SelectItem>
+                {Object.entries(statusLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-      {/* Navegação e Tabs */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePrevious}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" onClick={handleToday}>Hoje</Button>
-          <Button variant="outline" size="icon" onClick={handleNext}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <span className="ml-4 font-medium">{dateRangeLabel}</span>
-        </div>
+          {/* Navegação e Tabs */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={handlePrevious}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" onClick={handleToday}>Hoje</Button>
+              <Button variant="outline" size="icon" onClick={handleNext}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <span className="ml-4 font-medium">{dateRangeLabel}</span>
+            </div>
 
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-          <TabsList>
-            <TabsTrigger value="day">Dia</TabsTrigger>
-            <TabsTrigger value="week">Semana</TabsTrigger>
-            <TabsTrigger value="month">Mês</TabsTrigger>
-            <TabsTrigger value="list">Lista</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+              <TabsList>
+                <TabsTrigger value="day">Dia</TabsTrigger>
+                <TabsTrigger value="week">Semana</TabsTrigger>
+                <TabsTrigger value="month">Mês</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
 
-        {/* Conteúdo */}
-        <div className="rounded-2xl border bg-card p-6">
-          {viewMode === 'day' && renderDayView()}
-          {viewMode === 'week' && renderWeekView()}
-          {viewMode === 'month' && renderMonthView()}
-          {viewMode === 'list' && renderListView()}
-        </div>
+          {/* Conteúdo */}
+          <div className="rounded-2xl border bg-card p-6">
+            {viewMode === 'day' && renderDayView()}
+            {viewMode === 'week' && renderWeekView()}
+            {viewMode === 'month' && renderMonthView()}
+          </div>
         </>
       )}
     </div>

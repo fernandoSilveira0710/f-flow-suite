@@ -47,4 +47,48 @@ export class LicensesService {
 
     return token;
   }
+
+  async updatePlan(tenantId: string, planKey: 'starter' | 'pro' | 'max') {
+    // Verificar se o tenant existe
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new Error('TENANT_NOT_FOUND');
+    }
+
+    // Definir maxSeats baseado no plano
+    const maxSeatsMap = {
+      starter: 1,
+      pro: 5,
+      max: 15,
+    };
+
+    // Atualizar o plano no tenant
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { planId: planKey },
+    });
+
+    // Atualizar ou criar a licença
+    const license = await this.prisma.license.upsert({
+      where: { tenantId },
+      update: {
+        planKey,
+        maxSeats: maxSeatsMap[planKey],
+        updatedAt: new Date(),
+      },
+      create: {
+        tenantId,
+        planKey,
+        status: 'active',
+        maxSeats: maxSeatsMap[planKey],
+        expiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 ano
+        graceDays: 7,
+      },
+    });
+
+    return license;
+  }
 }

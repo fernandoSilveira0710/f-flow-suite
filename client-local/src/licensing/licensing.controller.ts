@@ -1,14 +1,8 @@
-import { Body, Controller, Get, Post, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Put, Body, HttpException, HttpStatus } from '@nestjs/common';
 import { LicensingService } from './licensing.service';
 
-export interface ActivateDto {
-  tenantId: string;
-  deviceId: string;
-  licenseKey?: string;
-}
-
 export interface ActivateResponse {
-  status: 'activated' | 'error';
+  status: string;
   message?: string;
   expiresIn?: number;
   graceDays?: number;
@@ -17,7 +11,7 @@ export interface ActivateResponse {
 
 export interface InstallStatusResponse {
   needsSetup: boolean;
-  status: 'activated' | 'not_activated' | 'offline_grace' | 'expired' | 'development';
+  status: string;
   plan?: string;
   exp?: number;
   grace?: number;
@@ -28,77 +22,60 @@ export class LicensingController {
   constructor(private readonly licensingService: LicensingService) {}
 
   @Post('activate')
-  async activate(@Body() dto: ActivateDto): Promise<ActivateResponse> {
-    if (!dto?.tenantId || !dto?.deviceId) {
-      throw new HttpException(
-        'tenantId e deviceId são obrigatórios',
-        HttpStatus.BAD_REQUEST
-      );
-    }
-
+  async activate(@Body() dto: { tenantId: string; deviceId: string; licenseKey?: string }): Promise<ActivateResponse> {
     try {
-      const result = await this.licensingService.activateLicense(
-        dto.tenantId,
-        dto.deviceId,
-        dto.licenseKey
-      );
-
-      return result;
+      return await this.licensingService.activateLicense(dto.tenantId, dto.deviceId, dto.licenseKey);
     } catch (error: any) {
-      this.licensingService.logger.error('License activation failed', error);
-      
-      if (error.message?.includes('LICENSING_NOT_ENFORCED')) {
-        return {
-          status: 'activated',
-          message: 'Licensing not enforced in development mode'
-        };
-      }
-
-      return {
-        status: 'error',
-        message: (error as Error).message || 'Falha na ativação da licença'
-      };
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
 
   @Get('install/status')
   async getInstallStatus(): Promise<InstallStatusResponse> {
-    try {
-      return await this.licensingService.getInstallStatus();
-    } catch (error) {
-      this.licensingService.logger.error('Failed to get install status', error);
-      
-      // In case of error, assume setup is needed
-      return { needsSetup: true, status: 'not_activated' };
-    }
+    return await this.licensingService.getInstallStatus();
   }
 
   @Get('license')
-  async getLicense() {
-    try {
-      const license = await this.licensingService.getCurrentLicense();
-      
-      if (!license) {
-        throw new HttpException(
-          'Licença não encontrada',
-          HttpStatus.NOT_FOUND
-        );
-      }
+  async getCurrentLicense() {
+    const license = await this.licensingService.getCurrentLicense();
+    
+    if (!license) {
+      throw new HttpException('No license found', HttpStatus.NOT_FOUND);
+    }
 
-      // Map internal token format to API response format
-      return {
-        tenantId: license.tid,
-        deviceId: license.did,
-        plan: license.plan,
-        entitlements: Array.isArray(license.ent) ? license.ent : Object.keys(license.ent || {}),
-        status: license.status,
-        expiresAt: license.exp ? new Date(license.exp * 1000).toISOString() : undefined
-      };
-    } catch (error) {
-      throw new HttpException(
-        'Licença não encontrada',
-        HttpStatus.NOT_FOUND
-      );
+    return {
+      tenantId: license.tid,
+      deviceId: license.did,
+      plan: license.plan,
+      status: license.status,
+      entitlements: license.ent,
+      expiresAt: new Date(license.exp * 1000).toISOString()
+    };
+  }
+
+  @Put('plan/sync')
+  async syncPlan(@Body() dto: { tenantId: string; planKey: 'starter' | 'pro' | 'max' }) {
+    if (!dto.tenantId || !dto.planKey) {
+      throw new HttpException('tenantId and planKey are required', HttpStatus.BAD_REQUEST);
+    }
+
+    if (!['starter', 'pro', 'max'].includes(dto.planKey)) {
+      throw new HttpException('planKey must be starter, pro, or max', HttpStatus.BAD_REQUEST);
+    }
+
+    try {
+      const success = await this.licensingService.syncPlanWithHub(dto.tenantId, dto.planKey);
+      
+      if (success) {
+        return {
+          success: true,
+          message: `Plan synchronized successfully: ${dto.planKey}`
+        };
+      } else {
+        throw new HttpException('Failed to sync plan with Hub', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+    } catch (error: any) {
+      throw new HttpException(error.message || 'Internal server error', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }

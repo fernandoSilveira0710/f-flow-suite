@@ -218,6 +218,45 @@ export class LicensingService implements OnModuleInit {
     }
   }
 
+  async syncPlanWithHub(tenantId: string, planKey: 'starter' | 'pro' | 'max'): Promise<boolean> {
+    if (!this.licensingEnforced) {
+      this.logger.warn('Plan sync skipped - licensing not enforced');
+      return true;
+    }
+
+    try {
+      const response = await axios.put(`${this.hubBaseUrl}/licenses/${tenantId}/plan`, {
+        planKey
+      });
+
+      if (response.status === 200) {
+        this.logger.log(`Plan updated successfully in Hub: ${planKey}`);
+        
+        // Tentar renovar a licença para obter os novos entitlements
+        try {
+          await this.activateLicense(tenantId, this.deviceId);
+          this.logger.log('License renewed with new plan entitlements');
+        } catch (renewError) {
+          this.logger.warn('Failed to renew license after plan update', renewError);
+        }
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error: any) {
+      this.logger.error('Failed to sync plan with Hub', error);
+      
+      if (error.response?.status === 404) {
+        this.logger.error('Tenant not found in Hub');
+      } else if (error.response?.status === 400) {
+        this.logger.error('Invalid plan key provided');
+      }
+      
+      return false;
+    }
+  }
+
   private async validateAndDecodeToken(token: string): Promise<LicenseToken> {
     try {
       if (this.publicKey) {

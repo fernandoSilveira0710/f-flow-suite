@@ -1,4 +1,4 @@
-import { Body, Controller, Post, HttpException, HttpStatus } from '@nestjs/common';
+import { Body, Controller, Post, Put, Param, HttpException, HttpStatus } from '@nestjs/common';
 import { LicensesService } from './licenses.service';
 
 @Controller('licenses')
@@ -33,6 +33,47 @@ export class LicensesController {
         throw new HttpException(
           'Configuração de chave privada ausente',
           HttpStatus.INTERNAL_SERVER_ERROR
+        );
+      }
+
+      throw new HttpException(
+        'Erro interno do servidor',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Put(':tenantId/plan')
+  async updatePlan(
+    @Param('tenantId') tenantId: string,
+    @Body() dto: { planKey: 'starter' | 'pro' | 'max' }
+  ) {
+    if (!dto?.planKey) {
+      throw new HttpException(
+        'planKey é obrigatório',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    if (!['starter', 'pro', 'max'].includes(dto.planKey)) {
+      throw new HttpException(
+        'planKey deve ser starter, pro ou max',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    try {
+      const updatedLicense = await this.licensesService.updatePlan(tenantId, dto.planKey);
+      return { 
+        success: true, 
+        license: updatedLicense,
+        message: `Plano atualizado para ${dto.planKey}` 
+      };
+    } catch (error: any) {
+      if (error?.message === 'TENANT_NOT_FOUND') {
+        throw new HttpException(
+          'Tenant não encontrado',
+          HttpStatus.NOT_FOUND
         );
       }
 

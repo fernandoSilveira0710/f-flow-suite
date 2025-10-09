@@ -8,17 +8,17 @@ datasource db {
 }
 
 model Sale {
-  id         String     @id @default(uuid())
-  code       String     @unique
-  operator   String
-  payment    String
-  status     String     @default("paid")
-  total      Decimal    @default(0)
-  customerId String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  customer   Customer?  @relation(fields: [customerId], references: [id])
-  items      SaleItem[]
+  id            String     @id @default(uuid())
+  code          String     @unique
+  operator      String
+  paymentMethod String
+  status        String     @default("paid")
+  total         Decimal    @default(0)
+  customerId    String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  items         SaleItem[]
 
   @@index([customerId])
 }
@@ -111,17 +111,31 @@ model Pet {
   @@index([tutorId])
 }
 
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  services    Service[]
+}
+
 model Service {
   id            String         @id @default(uuid())
   name          String
   description   String?
   price         Decimal
   duration      Int
+  categoryId    String?
   active        Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  category      Category?      @relation(fields: [categoryId], references: [id])
   appointments  Appointment[]
   groomingItems GroomingItem[]
+
+  @@index([categoryId])
 }
 
 model Professional {
@@ -232,6 +246,31 @@ model CheckIn {
   @@index([professionalId])
 }
 
+model User {
+  id          String   @id @default(uuid())
+  displayName String
+  email       String   @unique
+  role        String   @default("user")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([email])
+  @@index([active])
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions String   // JSON string of permissions array
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active])
+}
+
 model Configuration {
   id          String   @id @default(uuid())
   key         String   @unique
@@ -255,6 +294,17 @@ model StockMovement {
   product   Product  @relation(fields: [productId], references: [id])
 
   @@index([productId])
+}
+
+model ResourceType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active])
 }
 
 model OutboxEvent {

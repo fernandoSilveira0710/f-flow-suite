@@ -11,6 +11,9 @@ import { Switch } from '@/components/ui/switch';
 import { Form, FormField } from '@/components/ui/form';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
+import GroomingCategoriesIndex from '@/pages/erp/grooming/categories/index';
+import GroomingResourceTypesIndex from '@/pages/erp/grooming/resource-types/index';
+import GroomingSpecialtiesIndex from '@/pages/erp/grooming/specialties/index';
 
 const schema = z.object({
   activeColumns: z.array(z.string()).min(1, 'Selecione ao menos uma coluna'),
@@ -232,6 +235,36 @@ export default function GroomingSettings() {
                   </FieldGroup>
                 )}
               />
+            </div>
+          </SettingsSection>
+
+          {/* Categorias de Serviços */}
+          <SettingsSection
+            title="Categorias de Serviços"
+            description="Gerencie as categorias disponíveis para os serviços de grooming"
+          >
+            <div className="mt-4">
+              <GroomingCategoriesIndex />
+            </div>
+          </SettingsSection>
+
+          {/* Tipos de Recursos */}
+          <SettingsSection
+            title="Tipos de Recursos"
+            description="Gerencie os tipos de recursos físicos disponíveis para o grooming"
+          >
+            <div className="mt-4">
+              <GroomingResourceTypesIndex />
+            </div>
+          </SettingsSection>
+
+          {/* Especialidades */}
+          <SettingsSection
+            title="Especialidades"
+            description="Gerencie as especialidades disponíveis para os profissionais"
+          >
+            <div className="mt-4">
+              <GroomingSpecialtiesIndex />
             </div>
           </SettingsSection>
 
