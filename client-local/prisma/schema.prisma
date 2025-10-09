@@ -246,6 +246,31 @@ model CheckIn {
   @@index([professionalId])
 }
 
+model User {
+  id          String   @id @default(uuid())
+  displayName String
+  email       String   @unique
+  role        String   @default("user")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([email])
+  @@index([active])
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions String   // JSON string of permissions array
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active])
+}
+
 model Configuration {
   id          String   @id @default(uuid())
   key         String   @unique

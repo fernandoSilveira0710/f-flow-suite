@@ -1,7 +1,6 @@
 import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { SaleResponseDto, CreateSaleDto, UpdateSaleDto } from './dto';
-import { v4 as uuidv4 } from 'uuid';
 
 export interface SaleCreatedEventPayload {
   id: string;
@@ -147,6 +146,7 @@ export class SalesService {
       }
     }
 
+    const { v4: uuidv4 } = await import('uuid');
     const saleId = uuidv4();
     const now = new Date();
 
@@ -169,6 +169,7 @@ export class SalesService {
 
       // Create sale items
       for (const item of createSaleDto.items) {
+        const { v4: uuidv4 } = await import('uuid');
         await tx.saleItem.create({
           data: {
             id: uuidv4(),
@@ -257,6 +258,7 @@ export class SalesService {
 
         // Create new items
         for (const itemDto of updateSaleDto.items) {
+          const { v4: uuidv4 } = await import('uuid');
           await tx.saleItem.create({
             data: {
               id: uuidv4(),

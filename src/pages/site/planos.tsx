@@ -6,18 +6,32 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check } from 'lucide-react';
 import { getAllPlans, setPlan, PlanType } from '@/lib/entitlements';
+import { updatePlan } from '@/lib/settings-api';
 import { toast } from '@/hooks/use-toast';
 
 export default function Planos() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [isLoading, setIsLoading] = useState<string | null>(null);
   const plans = getAllPlans();
 
-  const handleSelectPlan = (planId: PlanType) => {
-    setPlan(planId);
-    toast({
-      title: 'Plano Atualizado!',
-      description: `Você selecionou o plano ${planId.charAt(0).toUpperCase() + planId.slice(1)}.`,
-    });
+  const handleSelectPlan = async (planKey: 'starter' | 'pro' | 'max') => {
+    setIsLoading(planKey);
+    
+    try {
+      await updatePlan(planKey);
+      
+      // Aguardar um pouco para garantir que a atualização foi processada
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Redirecionar para o ERP
+      window.location.href = '/erp';
+    } catch (error) {
+      console.error('Erro ao selecionar plano:', error);
+      // Mesmo com erro, redirecionar (fallback para localStorage)
+      window.location.href = '/erp';
+    } finally {
+      setIsLoading(null);
+    }
   };
 
   return (
@@ -113,8 +127,9 @@ export default function Planos() {
                       className="w-full"
                       variant={isPro ? 'default' : 'outline'}
                       onClick={() => handleSelectPlan(plan.id)}
+                      disabled={isLoading === plan.id}
                     >
-                      Assinar {plan.name}
+                      {isLoading === plan.id ? 'Processando...' : `Assinar ${plan.name}`}
                     </Button>
                   </CardFooter>
                 </Card>

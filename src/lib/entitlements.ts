@@ -12,6 +12,7 @@ export interface Entitlements {
   agenda: boolean;
   banho_tosa: boolean;
   reports: boolean;
+  dashboards: boolean;
   seatLimit: number;
 }
 
@@ -28,13 +29,13 @@ const PLANS: Record<PlanType, Plan> = {
   starter: {
     id: 'starter',
     name: 'Starter',
-    price: 79,
-    priceAnnual: 790,
+    price: 19.99,
+    priceAnnual: 199.9,
     features: [
-      'Gestão de Produtos',
       'PDV Completo',
+      'Gestão de Produtos',
+      'Dashboards',
       'Controle de Estoque',
-      'Agenda de Serviços',
       '1 Usuário',
       'Suporte por E-mail',
     ],
@@ -42,21 +43,22 @@ const PLANS: Record<PlanType, Plan> = {
       products: true,
       pdv: true,
       stock: true,
-      agenda: true,
+      agenda: false,
       banho_tosa: false,
       reports: false,
+      dashboards: true,
       seatLimit: 1,
     },
   },
   pro: {
     id: 'pro',
     name: 'Pro',
-    price: 149,
-    priceAnnual: 1490,
+    price: 49.99,
+    priceAnnual: 499.9,
     features: [
       'Tudo do Starter',
+      'Agenda de Serviços',
       'Banho & Tosa',
-      'Relatórios Avançados',
       'Até 5 Usuários',
       'Suporte Prioritário',
       'API de Integração',
@@ -67,17 +69,19 @@ const PLANS: Record<PlanType, Plan> = {
       stock: true,
       agenda: true,
       banho_tosa: true,
-      reports: true,
+      reports: false,
+      dashboards: true,
       seatLimit: 5,
     },
   },
   max: {
     id: 'max',
     name: 'Max',
-    price: 299,
-    priceAnnual: 2990,
+    price: 99.99,
+    priceAnnual: 999.9,
     features: [
       'Tudo do Pro',
+      'Relatórios Avançados',
       'Até 15 Usuários',
       'White Label',
       'Gestor de Conta Dedicado',
@@ -91,6 +95,7 @@ const PLANS: Record<PlanType, Plan> = {
       agenda: true,
       banho_tosa: true,
       reports: true,
+      dashboards: true,
       seatLimit: 15,
     },
   },
@@ -100,13 +105,22 @@ const STORAGE_KEY = '2f.plan';
 
 export function getCurrentPlan(): PlanType {
   if (typeof window === 'undefined') return 'starter';
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return (stored as PlanType) || 'starter';
+  
+  // Primeiro tentar pegar do novo storage key
+  const newStored = localStorage.getItem('selectedPlan');
+  if (newStored && ['starter', 'pro', 'max'].includes(newStored)) {
+    return newStored as PlanType;
+  }
+  
+  // Fallback para o storage key antigo
+  const oldStored = localStorage.getItem(STORAGE_KEY);
+  return (oldStored as PlanType) || 'starter';
 }
 
 export function setPlan(plan: PlanType): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, plan);
+  localStorage.setItem('selectedPlan', plan);
+  localStorage.setItem(STORAGE_KEY, plan); // Manter compatibilidade
 }
 
 export function getEntitlements(): Entitlements {

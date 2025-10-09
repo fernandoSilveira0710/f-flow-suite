@@ -19,6 +19,7 @@ import { ConfigurationsModule } from './configurations/configurations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { ResourceTypeModule } from './resource-type/resource-type.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ResourceTypeModule } from './resource-type/resource-type.module';
     DashboardModule,
     FeatureFlagsModule,
     ResourceTypeModule,
+    UsersModule,
   ],
 })
 export class AppModule {}
