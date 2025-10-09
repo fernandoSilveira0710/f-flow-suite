@@ -1,12 +1,38 @@
-import { Body, Controller, Post, Put, Param, HttpException, HttpStatus } from '@nestjs/common';
+import { Body, Controller, Post, Put, Param, HttpException, HttpStatus, Get, Query } from '@nestjs/common';
 import { LicensesService } from './licenses.service';
+import { CreateLicenseDto, ActivateLicenseDto, ValidateLicenseDto } from './dto/create-license.dto';
 
 @Controller('licenses')
 export class LicensesController {
   constructor(private readonly licensesService: LicensesService) {}
 
+  @Post('create')
+  async createLicense(@Body() createLicenseDto: CreateLicenseDto) {
+    try {
+      const result = await this.licensesService.createLicenseAfterPayment(createLicenseDto);
+      
+      return {
+        success: true,
+        message: 'Licença criada com sucesso',
+        data: {
+          tenantId: result.tenantId,
+          licenseKey: result.licenseKey,
+          downloadUrl: result.downloadUrl,
+          expiresAt: result.expiresAt,
+          plan: result.license.planKey,
+          maxSeats: result.license.maxSeats,
+        }
+      };
+    } catch (error: any) {
+      throw new HttpException(
+        `Erro ao criar licença: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
   @Post('activate')
-  async activate(@Body() dto: { tenantId: string; deviceId: string }) {
+  async activate(@Body() dto: ActivateLicenseDto) {
     if (!dto?.tenantId || !dto?.deviceId) {
       throw new HttpException(
         'tenantId e deviceId são obrigatórios',
@@ -82,5 +108,58 @@ export class LicensesController {
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
+  }
+
+  @Get('validate')
+  async validateLicense(@Query() query: ValidateLicenseDto) {
+    try {
+      const result = await this.licensesService.validateLicense(
+        query.licenseKey,
+        query.tenantId,
+        query.deviceId
+      );
+
+      if (!result.valid) {
+        return {
+          valid: false,
+          reason: result.reason,
+          message: this.getValidationMessage(result.reason)
+        };
+      }
+
+      return {
+        valid: true,
+        license: {
+          tenantId: result.license.tenantId,
+          planKey: result.license.planKey,
+          maxSeats: result.license.maxSeats,
+          status: result.license.status,
+          expiresAt: result.license.expiry,
+          tenant: {
+            name: result.license.tenant?.name,
+            email: result.license.tenant?.email
+          }
+        }
+      };
+    } catch (error: any) {
+      throw new HttpException(
+        `Erro ao validar licença: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  private getValidationMessage(reason: string): string {
+    const messages = {
+      'LICENSE_NOT_FOUND': 'Licença não encontrada',
+      'LICENSE_INACTIVE': 'Licença inativa',
+      'LICENSE_EXPIRED': 'Licença expirada',
+      'LICENSE_INACTIVE_OR_NOT_FOUND': 'Licença inativa ou não encontrada',
+      'INSUFFICIENT_PARAMETERS': 'Parâmetros insuficientes para validação',
+      'MISSING_LICENSE_PUBLIC_KEY_PEM': 'Chave pública de validação não configurada',
+      'VALIDATION_ERROR': 'Erro na validação da licença'
+    };
+
+    return messages[reason] || 'Erro desconhecido na validação';
   }
 }

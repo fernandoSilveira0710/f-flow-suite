@@ -281,6 +281,82 @@ export class LicensingService implements OnModuleInit {
     }
   }
 
+  async validateLicenseOffline(tenantId?: string, deviceId?: string): Promise<{
+    valid: boolean;
+    reason?: string;
+    license?: LicenseToken;
+    status?: 'activated' | 'offline_grace' | 'expired' | 'development';
+  }> {
+    try {
+      // Se não está enforced, retorna válido em modo desenvolvimento
+      if (!this.licensingEnforced) {
+        return {
+          valid: true,
+          status: 'development',
+          license: {
+            tid: tenantId || 'dev-tenant',
+            did: deviceId || this.deviceId,
+            plan: 'development',
+            ent: ['POS', 'INVENTORY', 'GROOMING', 'ANALYTICS'],
+            exp: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60, // 1 ano
+            grace: 7,
+            iat: Math.floor(Date.now() / 1000),
+            iss: 'dev-mode',
+            status: 'development'
+          }
+        };
+      }
+
+      // Tentar obter token armazenado
+      const token = await this.tokenStore.getToken(tenantId, deviceId || this.deviceId);
+      
+      if (!token) {
+        return {
+          valid: false,
+          reason: 'NO_LICENSE_FOUND'
+        };
+      }
+
+      // Validar e decodificar o token
+      const decodedToken = await this.validateAndDecodeToken(token);
+      const now = Math.floor(Date.now() / 1000);
+      
+      // Verificar se o token ainda está válido
+      if (now <= decodedToken.exp) {
+        return {
+          valid: true,
+          status: 'activated',
+          license: decodedToken
+        };
+      }
+      
+      // Verificar se está no período de tolerância offline
+      const graceEndTime = decodedToken.exp + (decodedToken.grace * 86400); // grace em segundos
+      
+      if (now <= graceEndTime) {
+        return {
+          valid: true,
+          status: 'offline_grace',
+          license: decodedToken
+        };
+      }
+      
+      // Token expirado e fora do período de tolerância
+      return {
+        valid: false,
+        reason: 'LICENSE_EXPIRED',
+        status: 'expired'
+      };
+
+    } catch (error: any) {
+      this.logger.error('Erro na validação offline da licença', error);
+      return {
+        valid: false,
+        reason: error.message || 'VALIDATION_ERROR'
+      };
+    }
+  }
+
   loadLicenseFromFile(path: string) {
     try {
       const contents = readFileSync(path, 'utf-8');

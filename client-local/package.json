@@ -47,7 +47,8 @@
     "pino-pretty": "^13.1.1",
     "reflect-metadata": "^0.2.2",
     "rotating-file-stream": "^3.2.7",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "semver": "^7.6.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.5",
@@ -60,6 +61,7 @@
     "@types/nock": "^10.0.3",
     "@types/node": "^22.16.5",
     "@types/node-cron": "^3.0.11",
+    "@types/semver": "^7.5.8",
     "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.8.1",
     "@typescript-eslint/parser": "^8.8.1",
