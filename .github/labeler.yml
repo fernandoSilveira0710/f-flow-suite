@@ -1,0 +1,140 @@
+# Configuration for the labeler action
+# https://github.com/actions/labeler
+
+# Component labels
+component-hub:
+  - changed-files:
+    - any-glob-to-any-file: 'hub/**/*'
+
+component-client-local:
+  - changed-files:
+    - any-glob-to-any-file: 'client-local/**/*'
+
+component-site:
+  - changed-files:
+    - any-glob-to-any-file: 'site/**/*'
+
+component-database:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - 'hub/prisma/**/*'
+      - 'client-local/prisma/**/*'
+      - '**/*.sql'
+
+component-cicd:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '.github/**/*'
+      - 'docker-compose.yml'
+      - '**/Dockerfile'
+      - '**/.dockerignore'
+
+# Technology labels
+typescript:
+  - changed-files:
+    - any-glob-to-any-file: '**/*.ts'
+
+javascript:
+  - changed-files:
+    - any-glob-to-any-file: '**/*.js'
+
+react:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/*.tsx'
+      - '**/*.jsx'
+
+nestjs:
+  - changed-files:
+    - any-glob-to-any-file: 'hub/**/*.ts'
+
+electron:
+  - changed-files:
+    - any-glob-to-any-file: 'client-local/**/*'
+
+# File type labels
+documentation:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/*.md'
+      - 'docs/**/*'
+
+testing:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/*.test.ts'
+      - '**/*.test.js'
+      - '**/*.spec.ts'
+      - '**/*.spec.js'
+      - 'test/**/*'
+      - '**/__tests__/**/*'
+
+configuration:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/*.json'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.config.*'
+      - '.env*'
+      - '.*rc*'
+
+docker:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/Dockerfile'
+      - '**/.dockerignore'
+      - 'docker-compose*.yml'
+
+# Area labels
+api:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - 'hub/src/**/*.controller.ts'
+      - 'hub/src/**/*.service.ts'
+      - 'hub/src/**/*.module.ts'
+
+ui:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - 'site/src/components/**/*'
+      - 'client-local/src/**/*.tsx'
+      - '**/*.css'
+      - '**/*.scss'
+
+database:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/schema.prisma'
+      - '**/migrations/**/*'
+      - '**/*.sql'
+
+auth:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/auth/**/*'
+      - '**/authentication/**/*'
+      - '**/authorization/**/*'
+
+security:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/*security*'
+      - '**/*auth*'
+      - '.github/workflows/security.yml'
+
+performance:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/*performance*'
+      - '**/*optimization*'
+      - '**/*cache*'
+
+# Dependencies
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file: 
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/yarn.lock'
+      - '**/bun.lockb'

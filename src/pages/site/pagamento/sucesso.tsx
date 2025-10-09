@@ -11,12 +11,12 @@ export default function PagamentoSucesso() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  const { userData, plan, licenseKey, downloadUrl } = location.state || {};
+  const { userData, plan, licenseKey, downloadUrl, tenantId, expiresAt } = location.state || {};
   
   const [emailSent, setEmailSent] = useState(false);
 
   useEffect(() => {
-    if (!userData || !plan || !licenseKey) {
+    if (!userData || !plan || !licenseKey || !tenantId) {
       navigate('/cadastro');
       return;
     }
@@ -28,7 +28,7 @@ export default function PagamentoSucesso() {
     };
 
     sendEmail();
-  }, [userData, plan, licenseKey, navigate]);
+  }, [userData, plan, licenseKey, tenantId, navigate]);
 
   const copyLicenseKey = () => {
     navigator.clipboard.writeText(licenseKey);
@@ -47,7 +47,7 @@ export default function PagamentoSucesso() {
     });
   };
 
-  if (!userData || !plan || !licenseKey) {
+  if (!userData || !plan || !licenseKey || !tenantId) {
     return null;
   }
 
@@ -117,8 +117,18 @@ export default function PagamentoSucesso() {
                   <p className="font-medium">{userData.cpf}</p>
                 </div>
                 <div>
+                  <span className="text-muted-foreground">Tenant ID:</span>
+                  <p className="font-medium text-xs">{tenantId}</p>
+                </div>
+                <div>
                   <span className="text-muted-foreground">Status:</span>
                   <Badge variant="default" className="bg-green-600">Ativa</Badge>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Válida até:</span>
+                  <p className="font-medium text-xs">
+                    {expiresAt ? new Date(expiresAt).toLocaleDateString('pt-BR') : '1 ano'}
+                  </p>
                 </div>
               </div>
             </div>

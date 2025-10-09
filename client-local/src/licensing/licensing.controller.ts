@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, HttpException, HttpStatus, Query } from '@nestjs/common';
 import { LicensingService } from './licensing.service';
 
 export interface ActivateResponse {
@@ -51,6 +51,35 @@ export class LicensingController {
       entitlements: license.ent,
       expiresAt: new Date(license.exp * 1000).toISOString()
     };
+  }
+
+  @Get('validate')
+  async validateOffline(@Query() query: { tenantId?: string; deviceId?: string }) {
+    try {
+      const result = await this.licensingService.validateLicenseOffline(
+        query.tenantId,
+        query.deviceId
+      );
+
+      return {
+        valid: result.valid,
+        status: result.status,
+        reason: result.reason,
+        license: result.license ? {
+          tenantId: result.license.tid,
+          deviceId: result.license.did,
+          plan: result.license.plan,
+          entitlements: result.license.ent,
+          expiresAt: new Date(result.license.exp * 1000).toISOString(),
+          graceDays: result.license.grace
+        } : null
+      };
+    } catch (error: any) {
+      throw new HttpException(
+        `Erro na validação offline: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Put('plan/sync')

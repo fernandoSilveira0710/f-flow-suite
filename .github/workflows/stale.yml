@@ -1,0 +1,113 @@
+name: Mark stale issues and pull requests
+
+on:
+  schedule:
+    # Run daily at 1 AM UTC
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Mark stale issues and PRs
+        uses: actions/stale@v9
+        with:
+          # Token for the action
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          
+          # Issues configuration
+          stale-issue-message: |
+            This issue has been automatically marked as stale because it has not had recent activity. 
+            
+            It will be closed if no further activity occurs within 7 days. If this issue is still relevant, please:
+            - Add a comment to keep it open
+            - Add the `keep-open` label
+            - Provide additional information or updates
+            
+            Thank you for your contributions! 🙏
+          
+          close-issue-message: |
+            This issue has been automatically closed due to inactivity. 
+            
+            If you believe this issue is still relevant, please:
+            - Reopen the issue
+            - Provide updated information
+            - Reference any related work
+            
+            Thank you for your understanding! 🙏
+          
+          # Pull requests configuration  
+          stale-pr-message: |
+            This pull request has been automatically marked as stale because it has not had recent activity.
+            
+            It will be closed if no further activity occurs within 7 days. If this PR is still relevant, please:
+            - Rebase against the latest main branch
+            - Address any review comments
+            - Add the `keep-open` label
+            - Provide an update on the status
+            
+            Thank you for your contributions! 🙏
+          
+          close-pr-message: |
+            This pull request has been automatically closed due to inactivity.
+            
+            If you'd like to continue this work, please:
+            - Reopen the PR
+            - Rebase against the latest main branch  
+            - Address any outstanding review comments
+            
+            Thank you for your contributions! 🙏
+          
+          # Timing configuration
+          days-before-stale: 30        # Mark as stale after 30 days
+          days-before-close: 7         # Close after 7 additional days
+          days-before-pr-close: 7      # Close PRs after 7 additional days
+          
+          # Labels configuration
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+          exempt-issue-labels: 'keep-open,bug,security,enhancement,good first issue,help wanted,priority-high'
+          exempt-pr-labels: 'keep-open,work-in-progress,priority-high'
+          exempt-draft-pr: true        # Don't mark draft PRs as stale
+          
+          # Assignee configuration
+          exempt-all-assignees: true   # Don't mark assigned issues/PRs as stale
+          
+          # Milestone configuration  
+          exempt-all-milestones: true  # Don't mark issues/PRs with milestones as stale
+          
+          # Operation limits
+          operations-per-run: 100      # Limit operations per run
+          
+          # Additional configuration
+          remove-stale-when-updated: true  # Remove stale label when updated
+          debug-only: false               # Set to true for testing
+          ascending: true                 # Process oldest first
+          
+          # Only process issues/PRs, not both in same run
+          only-labels: ''
+          any-of-labels: ''
+          
+          # Enable statistics
+          enable-statistics: true
+
+      - name: Create summary
+        if: always()
+        run: |
+          echo "## Stale Issues and PRs Management" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Stale management workflow completed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Configuration:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Days before stale**: 30 days" >> $GITHUB_STEP_SUMMARY
+          echo "- **Days before close**: 7 days" >> $GITHUB_STEP_SUMMARY
+          echo "- **Exempt labels**: keep-open, bug, security, enhancement, good first issue, help wanted, priority-high" >> $GITHUB_STEP_SUMMARY
+          echo "- **Exempt assignees**: Yes" >> $GITHUB_STEP_SUMMARY
+          echo "- **Exempt milestones**: Yes" >> $GITHUB_STEP_SUMMARY
+          echo "- **Exempt draft PRs**: Yes" >> $GITHUB_STEP_SUMMARY

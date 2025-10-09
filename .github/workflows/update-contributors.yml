@@ -1,0 +1,126 @@
+name: Update Contributors
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/update-contributors.yml'
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  update-contributors:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Get contributor stats
+        id: stats
+        run: |
+          # Get total contributors
+          TOTAL_CONTRIBUTORS=$(git log --format='%aN' | sort -u | wc -l)
+          echo "total_contributors=$TOTAL_CONTRIBUTORS" >> $GITHUB_OUTPUT
+          
+          # Get total commits
+          TOTAL_COMMITS=$(git rev-list --all --count)
+          echo "total_commits=$TOTAL_COMMITS" >> $GITHUB_OUTPUT
+          
+          # Get contributors list
+          git log --format='%aN <%aE>' | sort -u > contributors.tmp
+
+      - name: Get GitHub stats
+        id: github_stats
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get total issues closed
+          CLOSED_ISSUES=$(gh api repos/${{ github.repository }}/issues?state=closed --paginate | jq length)
+          echo "closed_issues=$CLOSED_ISSUES" >> $GITHUB_OUTPUT
+          
+          # Get total PRs merged
+          MERGED_PRS=$(gh api repos/${{ github.repository }}/pulls?state=closed --paginate | jq '[.[] | select(.merged_at != null)] | length')
+          echo "merged_prs=$MERGED_PRS" >> $GITHUB_OUTPUT
+
+      - name: Update CONTRIBUTORS.md
+        run: |
+          # Create updated contributors section
+          cat > contributors_section.md << 'EOF'
+          ### Code Contributors
+          
+          EOF
+          
+          # Add contributors from git log
+          while IFS= read -r contributor; do
+            name=$(echo "$contributor" | sed 's/ <.*//')
+            email=$(echo "$contributor" | sed 's/.*<\(.*\)>.*/\1/')
+            echo "- **$name** - $email" >> contributors_section.md
+          done < contributors.tmp
+          
+          # Update statistics in CONTRIBUTORS.md
+          sed -i "s/Total Contributors: .*/Total Contributors: ${{ steps.stats.outputs.total_contributors }}/" CONTRIBUTORS.md
+          sed -i "s/Total Commits: .*/Total Commits: ${{ steps.stats.outputs.total_commits }}/" CONTRIBUTORS.md
+          sed -i "s/Total Issues Closed: .*/Total Issues Closed: ${{ steps.github_stats.outputs.closed_issues }}/" CONTRIBUTORS.md
+          sed -i "s/Total Pull Requests Merged: .*/Total Pull Requests Merged: ${{ steps.github_stats.outputs.merged_prs }}/" CONTRIBUTORS.md
+          
+          # Update last updated timestamp
+          sed -i "s/Last updated: .*/Last updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')/" CONTRIBUTORS.md
+          
+          # Replace the code contributors section
+          awk '
+            /^### Code Contributors/ { 
+              print; 
+              system("cat contributors_section.md | tail -n +2"); 
+              skip=1; 
+              next 
+            }
+            /^### / && skip { skip=0 }
+            !skip { print }
+          ' CONTRIBUTORS.md > CONTRIBUTORS.md.tmp && mv CONTRIBUTORS.md.tmp CONTRIBUTORS.md
+          
+          # Clean up
+          rm contributors.tmp contributors_section.md
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet CONTRIBUTORS.md; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add CONTRIBUTORS.md
+          git commit -m "chore: update contributors list [skip ci]"
+          git push
+
+      - name: Create summary
+        run: |
+          echo "## Contributors Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Contributors**: ${{ steps.stats.outputs.total_contributors }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Commits**: ${{ steps.stats.outputs.total_commits }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Closed Issues**: ${{ steps.github_stats.outputs.closed_issues }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Merged PRs**: ${{ steps.github_stats.outputs.merged_prs }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changes Made**: ${{ steps.changes.outputs.has_changes }}" >> $GITHUB_STEP_SUMMARY
