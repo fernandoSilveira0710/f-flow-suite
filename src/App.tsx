@@ -15,6 +15,7 @@ import PagamentoSucesso from "./pages/site/pagamento/sucesso";
 
 // ERP Layout & Pages
 import ErpLayout from "./layouts/erp-layout";
+import ErpLogin from "./pages/erp/login";
 import Dashboard from "./pages/erp/dashboard";
 import ProdutosIndex from "./pages/erp/produtos/index";
 import ProdutosNovo from "./pages/erp/produtos/novo";
@@ -104,16 +105,20 @@ function App() {
           <Toaster />
           <Sonner />
           <Routes>
-            {/* Site Routes */}
-            <Route path="/" element={<Home />} />
-            <Route path="/planos" element={<Planos />} />
-            <Route path="/contato" element={<Contato />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/cadastro" element={<Cadastro />} />
-            <Route path="/pagamento" element={<Pagamento />} />
-            <Route path="/pagamento/sucesso" element={<PagamentoSucesso />} />
+            {/* Redirect root to ERP login */}
+            <Route path="/" element={<Navigate to="/erp/login" replace />} />
+            
+            {/* Site Routes (moved to /site prefix) */}
+            <Route path="/site" element={<Home />} />
+            <Route path="/site/planos" element={<Planos />} />
+            <Route path="/site/contato" element={<Contato />} />
+            <Route path="/site/login" element={<Login />} />
+            <Route path="/site/cadastro" element={<Cadastro />} />
+            <Route path="/site/pagamento" element={<Pagamento />} />
+            <Route path="/site/pagamento/sucesso" element={<PagamentoSucesso />} />
 
           {/* ERP Routes */}
+          <Route path="/erp/login" element={<ErpLogin />} />
           <Route path="/erp" element={<ErpLayout />}>
             <Route index element={<Navigate to="/erp/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />

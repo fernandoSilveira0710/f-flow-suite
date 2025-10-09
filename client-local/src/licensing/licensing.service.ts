@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import axios from 'axios';
 import { TokenStore } from './token.store';
 import { ActivateResponse, InstallStatusResponse } from './licensing.controller';
+import { PrismaService } from '../common/prisma/prisma.service';
 
 export interface LicenseToken {
   tid: string; // tenantId
@@ -27,7 +28,8 @@ export class LicensingService implements OnModuleInit {
 
   constructor(
     private readonly tokenStore: TokenStore,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService
   ) {
     this.hubBaseUrl = this.configService.get<string>('HUB_BASE_URL', 'http://localhost:3000');
     this.licensingEnforced = this.configService.get<string>('LICENSING_ENFORCED', 'false') === 'true';
@@ -58,7 +60,7 @@ export class LicensingService implements OnModuleInit {
   ): Promise<ActivateResponse> {
     if (!this.licensingEnforced) {
       return {
-        status: 'activated',
+        success: true,
         message: 'Licensing not enforced in development mode'
       };
     }
@@ -86,10 +88,12 @@ export class LicensingService implements OnModuleInit {
       this.logger.log(`License activated successfully for tenant ${tenantId}`);
 
       return {
-        status: 'activated',
-        expiresIn: decodedToken.exp - Math.floor(Date.now() / 1000),
-        graceDays: decodedToken.grace,
-        plan: decodedToken.plan
+        success: true,
+        message: 'License activated successfully',
+        tenantId,
+        deviceId,
+        planKey: decodedToken.plan,
+        expiresAt: new Date(decodedToken.exp * 1000).toISOString()
       };
     } catch (error: any) {
       this.logger.error('License activation failed', error);
@@ -113,16 +117,16 @@ export class LicensingService implements OnModuleInit {
       
       if (!token) {
         return { 
-          needsSetup: true,
-          status: 'not_activated'
+          isInstalled: false,
+          hasLicense: false
         };
       }
 
       if (!this.licensingEnforced) {
         return { 
-          needsSetup: false,
-          status: 'development',
-          plan: 'development'
+          isInstalled: true,
+          hasLicense: false,
+          planKey: 'development'
         };
       }
 
@@ -133,11 +137,10 @@ export class LicensingService implements OnModuleInit {
       // Check if token is still valid
       if (now <= decodedToken.exp) {
         return {
-          needsSetup: false,
-          status: 'activated',
-          plan: decodedToken.plan,
-          exp: decodedToken.exp,
-          grace: decodedToken.grace
+          isInstalled: true,
+          hasLicense: true,
+          planKey: decodedToken.plan,
+          expiresAt: new Date(decodedToken.exp * 1000).toISOString()
         };
       }
       
@@ -146,26 +149,25 @@ export class LicensingService implements OnModuleInit {
       
       if (now <= graceEndTime) {
         return {
-          needsSetup: false,
-          status: 'offline_grace',
-          plan: decodedToken.plan,
-          exp: decodedToken.exp,
-          grace: decodedToken.grace
+          isInstalled: true,
+          hasLicense: true,
+          planKey: decodedToken.plan,
+          expiresAt: new Date(decodedToken.exp * 1000).toISOString()
         };
       }
       
       // Token expired and outside grace period
       this.logger.warn('License expired and outside grace period');
       return { 
-        needsSetup: true,
-        status: 'expired'
+        isInstalled: false,
+        hasLicense: false
       };
 
     } catch (error) {
       this.logger.error('Failed to check install status', error);
       return { 
-        needsSetup: true,
-        status: 'not_activated'
+        isInstalled: false,
+        hasLicense: false
       };
     }
   }
@@ -365,5 +367,200 @@ export class LicensingService implements OnModuleInit {
       this.logger.error(`Unable to read license file at ${path}`, error as Error);
       return null;
     }
+  }
+
+  /**
+   * Atualiza o cache local de licença com informações do Hub
+   */
+  async updateLicenseCache(tenantId: string): Promise<void> {
+    try {
+      // Chama o endpoint /licenses/validate do Hub
+      const response = await axios.get(`${this.hubBaseUrl}/licenses/validate`, {
+        params: { tenantId, deviceId: this.deviceId }
+      });
+
+      const licenseData = response.data;
+
+      // Atualiza ou cria o registro no cache
+      await this.prisma.licenseCache.upsert({
+        where: { tenantId },
+        update: {
+          registered: licenseData.registered || false,
+          licensed: licenseData.licensed || false,
+          status: licenseData.status || 'not_registered',
+          planKey: licenseData.planKey,
+          maxSeats: licenseData.maxSeats,
+          expiresAt: licenseData.expiresAt ? new Date(licenseData.expiresAt) : null,
+          graceDays: licenseData.graceDays || 7,
+          lastChecked: new Date(),
+          updatedAt: new Date()
+        },
+        create: {
+          tenantId,
+          registered: licenseData.registered || false,
+          licensed: licenseData.licensed || false,
+          status: licenseData.status || 'not_registered',
+          planKey: licenseData.planKey,
+          maxSeats: licenseData.maxSeats,
+          expiresAt: licenseData.expiresAt ? new Date(licenseData.expiresAt) : null,
+          graceDays: licenseData.graceDays || 7,
+          lastChecked: new Date()
+        }
+      });
+
+      this.logger.log(`Cache de licença atualizado para tenant ${tenantId}`);
+    } catch (error) {
+      this.logger.error(`Erro ao atualizar cache de licença para tenant ${tenantId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtém informações de licença do cache local
+   */
+  async getLicenseFromCache(tenantId: string): Promise<any> {
+    try {
+      const cachedLicense = await this.prisma.licenseCache.findUnique({
+        where: { tenantId }
+      });
+
+      if (!cachedLicense) {
+        return null;
+      }
+
+      // Verifica se o cache não está muito desatualizado (mais de 24 horas)
+      const cacheAge = Date.now() - cachedLicense.lastChecked.getTime();
+      const maxCacheAge = 24 * 60 * 60 * 1000; // 24 horas em ms
+
+      return {
+        ...cachedLicense,
+        isStale: cacheAge > maxCacheAge
+      };
+    } catch (error) {
+      this.logger.error(`Erro ao obter licença do cache para tenant ${tenantId}`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Verifica se a licença está válida usando cache local e Hub quando possível
+   */
+  async checkLicenseStatus(tenantId: string): Promise<{
+    valid: boolean;
+    status: string;
+    reason?: string;
+    cached?: boolean;
+    planKey?: string;
+    expiresAt?: Date;
+  }> {
+    try {
+      // Primeiro tenta obter do cache
+      const cachedLicense = await this.getLicenseFromCache(tenantId);
+
+      // Se não há cache ou está desatualizado, tenta atualizar do Hub
+      if (!cachedLicense || cachedLicense.isStale) {
+        try {
+          await this.updateLicenseCache(tenantId);
+          // Obtém novamente do cache após atualização
+          const updatedCache = await this.getLicenseFromCache(tenantId);
+          if (updatedCache) {
+            return this.evaluateLicenseStatus(updatedCache, false);
+          }
+        } catch (error) {
+          this.logger.warn(`Não foi possível atualizar cache do Hub, usando cache local se disponível`);
+          // Se falhou ao atualizar do Hub, usa cache local se disponível
+          if (cachedLicense) {
+            return this.evaluateLicenseStatus(cachedLicense, true);
+          }
+        }
+      } else {
+        // Cache está atualizado, usa ele
+        return this.evaluateLicenseStatus(cachedLicense, true);
+      }
+
+      // Se chegou aqui, não há cache e não conseguiu conectar ao Hub
+      return {
+        valid: false,
+        status: 'not_registered',
+        reason: 'Não foi possível verificar licença - sem conexão com Hub e sem cache local'
+      };
+
+    } catch (error) {
+      this.logger.error(`Erro ao verificar status da licença para tenant ${tenantId}`, error);
+      return {
+        valid: false,
+        status: 'error',
+        reason: 'Erro interno ao verificar licença'
+      };
+    }
+  }
+
+  /**
+   * Avalia o status da licença baseado nos dados do cache
+   */
+  private evaluateLicenseStatus(licenseData: any, cached: boolean): {
+    valid: boolean;
+    status: string;
+    reason?: string;
+    cached: boolean;
+    planKey?: string;
+    expiresAt?: Date;
+  } {
+    const now = new Date();
+
+    // Se não está registrado
+    if (!licenseData.registered) {
+      return {
+        valid: false,
+        status: 'not_registered',
+        reason: 'Tenant não registrado no Hub',
+        cached
+      };
+    }
+
+    // Se não tem licença
+    if (!licenseData.licensed) {
+      return {
+        valid: false,
+        status: 'not_licensed',
+        reason: 'Tenant registrado mas sem licença ativa',
+        cached
+      };
+    }
+
+    // Se tem licença, verifica expiração
+    if (licenseData.expiresAt && now > licenseData.expiresAt) {
+      // Verifica período de graça
+      const gracePeriodEnd = new Date(licenseData.expiresAt.getTime() + (licenseData.graceDays * 24 * 60 * 60 * 1000));
+      
+      if (now <= gracePeriodEnd) {
+        return {
+          valid: true,
+          status: 'offline_grace',
+          reason: 'Licença expirada mas dentro do período de graça',
+          cached,
+          planKey: licenseData.planKey,
+          expiresAt: licenseData.expiresAt
+        };
+      } else {
+        return {
+          valid: false,
+          status: 'expired',
+          reason: 'Licença expirada e fora do período de graça',
+          cached,
+          planKey: licenseData.planKey,
+          expiresAt: licenseData.expiresAt
+        };
+      }
+    }
+
+    // Licença válida
+    return {
+      valid: true,
+      status: 'active',
+      cached,
+      planKey: licenseData.planKey,
+      expiresAt: licenseData.expiresAt
+    };
   }
 }

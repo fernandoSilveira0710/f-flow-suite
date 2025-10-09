@@ -10,6 +10,21 @@ async function bootstrap() {
     bufferLogs: true,
   });
 
+  // Configurar CORS para permitir requisições do frontend
+  app.enableCors({
+    origin: [
+      'http://localhost:8080',
+      'http://127.0.0.1:8080',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:3010',
+      'http://127.0.0.1:3010'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
+    credentials: true
+  });
+
   const port = process.env.PORT ? Number(process.env.PORT) : 8080;
   await app.listen(port);
 

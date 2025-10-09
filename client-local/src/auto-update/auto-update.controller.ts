@@ -26,7 +26,7 @@ export class AutoUpdateController {
       throw new HttpException(
         {
           message: 'Failed to check for updates',
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -59,7 +59,7 @@ export class AutoUpdateController {
       throw new HttpException(
         {
           message: 'Failed to start update installation',
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );

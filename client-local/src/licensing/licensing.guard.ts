@@ -24,26 +24,20 @@ export class LicensingGuard implements CanActivate {
       // Verifica o status da licença
       const status = await this.licensingService.getInstallStatus();
       
-      // Se precisa de setup, bloqueia acesso
-      if (status.needsSetup) {
+      // Se não está instalado ou não tem licença, bloqueia acesso
+      if (!status.isInstalled || !status.hasLicense) {
         this.logger.warn('License setup required, blocking access to business routes');
         throw new UnauthorizedException('License activation required. Please activate your license first.');
       }
 
-      // Se tem licença válida, permite acesso
-      if (status.status === 'activated') {
+      // Se tem licença válida e está instalado, permite acesso
+      if (status.isInstalled && status.hasLicense) {
         this.logger.debug('Valid license found, allowing access');
         return true;
       }
 
-      // Se está no período de graça offline, permite acesso
-      if (status.status === 'offline_grace') {
-        this.logger.debug('Offline grace period active, allowing access');
-        return true;
-      }
-
       // Qualquer outro status bloqueia acesso
-      this.logger.warn(`Invalid license status: ${status.status}, blocking access`);
+      this.logger.warn(`Invalid license status, blocking access`);
       throw new UnauthorizedException('Invalid license status. Please check your license activation.');
 
     } catch (error: any) {
