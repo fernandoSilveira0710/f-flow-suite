@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Package2, Eye, EyeOff, AlertCircle, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/auth-context';
 
 interface Plan {
   id: string;
@@ -28,26 +29,56 @@ export default function ErpLogin() {
   const [loadingPlans, setLoadingPlans] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login, user, licenseStatus, checkLicenseStatus } = useAuth();
+
+  // Redirecionar se já estiver logado e com licença válida
+  useEffect(() => {
+    if (user && licenseStatus?.isValid) {
+      navigate('/erp/dashboard');
+    }
+  }, [user, licenseStatus, navigate]);
 
   // Verificar licença ao carregar a página
   useEffect(() => {
-    checkLicense();
-  }, []);
+    checkLicenseStatus();
+  }, [checkLicenseStatus]);
 
   const checkLicense = async () => {
     try {
-      const response = await fetch('http://localhost:3010/api/license/status');
+      const response = await fetch('http://localhost:3010/licensing/status');
       const data = await response.json();
       
+      // Se não há licença válida ou está expirada
       if (!data.valid || data.expired) {
+        // Verificar se há tenant registrado
+        const installResponse = await fetch('http://localhost:3010/licensing/install-status');
+        const installData = await installResponse.json();
+        
+        // Se não está instalado ou não tem licença, redireciona para cadastro
+        if (!installData.isInstalled || !installData.hasLicense) {
+          toast({
+            title: "Cadastro necessário",
+            description: "Você precisa se cadastrar para usar o sistema.",
+            variant: "destructive",
+          });
+          // Redireciona para a página de cadastro do site
+          navigate('/site/cadastro');
+          return;
+        }
+        
+        // Se tem cadastro mas licença expirada, mostra planos
         setShowPlansModal(true);
         await fetchPlans();
       }
     } catch (error) {
       console.error('Erro ao verificar licença:', error);
-      // Se não conseguir verificar a licença, mostra os planos
-      setShowPlansModal(true);
-      await fetchPlans();
+      // Se não conseguir verificar a licença, redireciona para cadastro
+      toast({
+        title: "Erro de conexão",
+        description: "Não foi possível verificar sua licença. Redirecionando para cadastro.",
+        variant: "destructive",
+      });
+      navigate('/site/cadastro');
     }
   };
 
@@ -133,10 +164,9 @@ export default function ErpLogin() {
     setIsLoading(true);
 
     try {
-      // Simular autenticação
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const success = await login(email, password);
       
-      if (email && password) {
+      if (success) {
         toast({
           title: "Login realizado com sucesso!",
           description: "Redirecionando para o dashboard...",
@@ -145,7 +175,7 @@ export default function ErpLogin() {
       } else {
         toast({
           title: "Erro no login",
-          description: "Por favor, preencha todos os campos.",
+          description: "Por favor, verifique suas credenciais.",
           variant: "destructive",
         });
       }
@@ -237,10 +267,20 @@ export default function ErpLogin() {
             </Button>
           </form>
           
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-2">
             <Button variant="link" className="text-sm text-muted-foreground">
               Esqueceu sua senha?
             </Button>
+            <div className="text-sm text-muted-foreground">
+              Não tem uma licença? {' '}
+              <Button 
+                variant="link" 
+                className="text-sm text-primary p-0 h-auto font-normal"
+                onClick={() => window.open('/site', '_blank')}
+              >
+                Visite nosso site institucional
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

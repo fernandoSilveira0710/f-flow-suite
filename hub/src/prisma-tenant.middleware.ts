@@ -35,19 +35,18 @@ export class PrismaTenantMiddleware implements NestMiddleware {
 
     if (tenantId) {
       try {
-        const sanitizedTenantId = tenantId.replace(/'/g, "''");
-        console.log(`[PrismaTenantMiddleware] Setting tenant context: ${sanitizedTenantId}`);
-        await this.prisma.$executeRawUnsafe(
-          `SET app.tenant_id = '${sanitizedTenantId}'`
-        );
-        console.log(`[PrismaTenantMiddleware] Tenant context set successfully`);
+        console.log(`[PrismaTenantMiddleware] Setting tenant context: ${tenantId}`);
+        
+        // Para SQLite, não podemos usar SET app.tenant_id
+        // O controle de tenant será feito através do request.tenantId
+        // e filtros nas queries do Prisma
         
         // Definir o tenantId no request para o decorator TenantId
         req.tenantId = tenantId;
         console.log(`[PrismaTenantMiddleware] Set request.tenantId: ${tenantId}`);
+        console.log(`[PrismaTenantMiddleware] Tenant context set successfully`);
       } catch (error) {
         console.error(`[PrismaTenantMiddleware] Error setting tenant context:`, error);
-        // Se o SET falhar, as policies RLS impedirão o acesso.
       }
     }
 

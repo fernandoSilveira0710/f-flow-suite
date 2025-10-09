@@ -149,6 +149,33 @@ export async function bootstrap(): Promise<void> {
     app.useLogger(new StructuredLogger(logDir));
     logger.log('Structured logger configured successfully');
     
+    // Configure CORS
+    app.enableCors({
+      origin: [
+        'http://localhost:8080',
+        'http://127.0.0.1:8080',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000'
+      ],
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'Accept',
+        'Origin',
+        'X-Requested-With',
+        'Cache-Control',
+        'Pragma',
+        'Expires'
+      ],
+      credentials: true,
+      optionsSuccessStatus: 200,
+      preflightContinue: false,
+    });
+    logger.log('CORS configured successfully');
+    
     // Verificação de licença na inicialização
     try {
       logger.log('Checking license status on startup...');

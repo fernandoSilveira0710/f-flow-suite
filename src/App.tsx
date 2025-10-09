@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/contexts/auth-context";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 
 // Site pages
 import Home from "./pages/site/home";
@@ -101,25 +103,30 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            {/* Redirect root to ERP login */}
-            <Route path="/" element={<Navigate to="/erp/login" replace />} />
-            
-            {/* Site Routes (moved to /site prefix) */}
-            <Route path="/site" element={<Home />} />
-            <Route path="/site/planos" element={<Planos />} />
-            <Route path="/site/contato" element={<Contato />} />
-            <Route path="/site/login" element={<Login />} />
-            <Route path="/site/cadastro" element={<Cadastro />} />
-            <Route path="/site/pagamento" element={<Pagamento />} />
-            <Route path="/site/pagamento/sucesso" element={<PagamentoSucesso />} />
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <Routes>
+              {/* Site Routes (Public) */}
+              <Route path="/" element={<Navigate to="/erp/login" replace />} />
+              <Route path="/site" element={<Home />} />
+              <Route path="/site/planos" element={<Planos />} />
+              <Route path="/site/contato" element={<Contato />} />
+              <Route path="/site/login" element={<Login />} />
+              <Route path="/site/cadastro" element={<Cadastro />} />
+              <Route path="/site/pagamento" element={<Pagamento />} />
+              <Route path="/site/pagamento/sucesso" element={<PagamentoSucesso />} />
 
-          {/* ERP Routes */}
-          <Route path="/erp/login" element={<ErpLogin />} />
-          <Route path="/erp" element={<ErpLayout />}>
+              {/* ERP Login (Public) */}
+              <Route path="/erp/login" element={<ErpLogin />} />
+
+              {/* Protected ERP Routes */}
+              <Route path="/erp" element={
+                <ProtectedRoute requireAuth={true} requireLicense={true}>
+                  <ErpLayout />
+                </ProtectedRoute>
+              }>
             <Route index element={<Navigate to="/erp/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             
@@ -218,15 +225,16 @@ function App() {
             <Route path="import-export" element={<ImportExportSettings />} />
           </Route>
 
-          {/* PT-BR Aliases (redirect to EN canonical) */}
-          <Route path="configuracoes" element={<ConfiguracoesRedirect />} />
-          <Route path="configuracoes/*" element={<ConfiguracoesAlias />} />
-        </Route>
+              {/* PT-BR Aliases (redirect to EN canonical) */}
+              <Route path="configuracoes" element={<ConfiguracoesRedirect />} />
+              <Route path="configuracoes/*" element={<ConfiguracoesAlias />} />
+            </Route>
 
-            {/* 404 */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </TooltipProvider>
+              {/* 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TooltipProvider>
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );
