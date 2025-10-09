@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
+import { AuthProvider } from './auth-context'
 import HomePage from './pages/HomePage'
 import DocsPage from './pages/DocsPage'
 import InstallationPage from './pages/InstallationPage'
@@ -10,19 +11,21 @@ import NotFoundPage from './pages/NotFoundPage'
 
 function App() {
   return (
-    <div className="min-h-screen bg-white">
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/recursos" element={<FeaturesPage />} />
-        <Route path="/precos" element={<PricingPage />} />
-        <Route path="/planos" element={<PricingPage />} />
-        <Route path="/cadastro" element={<SignupPage />} />
-        <Route path="/docs" element={<DocsPage />} />
-        <Route path="/docs/instalacao" element={<InstallationPage />} />
-        <Route path="/contato" element={<ContactPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </div>
+    <AuthProvider>
+      <div className="min-h-screen bg-white">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/recursos" element={<FeaturesPage />} />
+          <Route path="/precos" element={<PricingPage />} />
+          <Route path="/planos" element={<PricingPage />} />
+          <Route path="/cadastro" element={<SignupPage />} />
+          <Route path="/docs" element={<DocsPage />} />
+          <Route path="/docs/instalacao" element={<InstallationPage />} />
+          <Route path="/contato" element={<ContactPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </div>
+    </AuthProvider>
   )
 }
 

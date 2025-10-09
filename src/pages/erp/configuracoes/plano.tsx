@@ -1,16 +1,12 @@
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import { Check, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import { getPlanInfo, updatePlan } from '@/lib/settings-api';
+import { getAllPlans } from '@/lib/entitlements';
+import { Check, Clock, X } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -19,37 +15,65 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getPlanInfo, updatePlan, PlanInfo } from '@/lib/settings-api';
-import { getAllPlans } from '@/lib/entitlements';
+
+interface PlanInfo {
+  plano: 'starter' | 'pro' | 'max';
+  seatLimit: number;
+  recursos: {
+    products: { enabled: boolean };
+    pdv: { enabled: boolean };
+    stock: { enabled: boolean };
+    agenda: { enabled: boolean };
+    banho_tosa: { enabled: boolean };
+    reports: { enabled: boolean };
+  };
+  ciclo: 'MENSAL' | 'ANUAL';
+  proximoCobranca?: string;
+}
 
 interface HubPlan {
   id: string;
   name: string;
   price: number;
+  currency: string;
   billingCycle: string;
-  features: string[];
-  active: boolean;
+  maxSeats: number;
+  maxDevices: number;
+  featuresEnabled: any;
+}
+
+interface Invoice {
+  id: string;
+  data: string;
+  valor: string;
+  status: string;
 }
 
 export default function PlanoPage() {
   const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
   const [hubPlans, setHubPlans] = useState<HubPlan[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingPlans, setLoadingPlans] = useState(true);
 
   useEffect(() => {
     loadPlan();
     loadHubPlans();
+    loadInvoices();
   }, []);
 
   const loadPlan = async () => {
-    const data = await getPlanInfo();
-    setPlanInfo(data);
-    setLoading(false);
+    try {
+      const info = await getPlanInfo();
+      setPlanInfo(info);
+    } catch (error) {
+      console.error('Erro ao carregar informações do plano:', error);
+      toast.error('Erro ao carregar informações do plano');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadHubPlans = async () => {
-    setLoadingPlans(true);
     try {
       // Buscar planos da API pública do Hub
       const response = await fetch('http://localhost:8081/public/plans?active=true');
@@ -64,9 +88,11 @@ export default function PlanoPage() {
           id: plan.id,
           name: plan.name,
           price: plan.price,
+          currency: 'BRL',
           billingCycle: 'monthly',
-          features: plan.features,
-          active: true
+          maxSeats: plan.entitlements.seatLimit,
+          maxDevices: 1,
+          featuresEnabled: plan.entitlements
         }));
         setHubPlans(mappedPlans);
       }
@@ -78,76 +104,144 @@ export default function PlanoPage() {
         id: plan.id,
         name: plan.name,
         price: plan.price,
+        currency: 'BRL',
         billingCycle: 'monthly',
-        features: plan.features,
-        active: true
+        maxSeats: plan.entitlements.seatLimit,
+        maxDevices: 1,
+        featuresEnabled: plan.entitlements
       }));
       setHubPlans(mappedPlans);
-    } finally {
-      setLoadingPlans(false);
     }
   };
 
-  const handleChangePlan = async (newPlan: 'starter' | 'pro' | 'max') => {
+  const loadInvoices = async () => {
     try {
-      await updatePlan(newPlan);
-      toast.success('Plano atualizado com sucesso');
-      loadPlan();
-      // Reload page to refresh entitlements in sidebar
-      setTimeout(() => window.location.reload(), 1000);
-    } catch (error) {
-      toast.error('Erro ao atualizar plano');
-    }
-  };
-
-  const handleSelectHubPlan = async (hubPlan: HubPlan) => {
-    try {
-      // Mapear plano do Hub para plano local
-      let localPlanId: 'starter' | 'pro' | 'max' = 'starter';
-      
-      // Mapear baseado no preço ou nome do plano
-      if (hubPlan.price <= 20) {
-        localPlanId = 'starter';
-      } else if (hubPlan.price <= 60) {
-        localPlanId = 'pro';
-      } else {
-        localPlanId = 'max';
-      }
-
-      // Persistir usuário + licença no Hub
-      const tenantId = localStorage.getItem('2f.tenantId') || 'demo';
-      const subscriptionResponse = await fetch('http://localhost:8081/plans/subscriptions', {
-        method: 'POST',
+      // Tentar buscar faturas do Hub primeiro
+      const tenantId = localStorage.getItem('2f.tenantId') || '3cb88e58-b2e7-4fb1-9e0f-eb5a9c4b640b';
+      const response = await fetch(`http://localhost:8081/plans/tenants/${tenantId}/invoices`, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'x-tenant-id': tenantId,
         },
-        body: JSON.stringify({
-          tenantId,
-          planId: hubPlan.id,
-          billingCycle: hubPlan.billingCycle,
-          status: 'active'
-        }),
       });
 
-      if (subscriptionResponse.ok) {
-        console.log('Assinatura criada no Hub com sucesso');
-        
-        // Atualizar plano local
-        await updatePlan(localPlanId);
-        toast.success('Plano selecionado e assinatura criada com sucesso');
-        loadPlan();
-        setTimeout(() => window.location.reload(), 1000);
+      if (response.ok) {
+        const hubInvoices = await response.json();
+        setInvoices(hubInvoices);
       } else {
-        console.warn('Falha ao criar assinatura no Hub, atualizando apenas localmente');
-        await updatePlan(localPlanId);
-        toast.success('Plano atualizado localmente');
-        loadPlan();
-        setTimeout(() => window.location.reload(), 1000);
+        // Fallback: não mostrar faturas se não conseguir buscar do Hub
+        setInvoices([]);
       }
     } catch (error) {
+      console.warn('Erro ao buscar faturas do Hub:', error);
+      // Fallback: não mostrar faturas se não conseguir buscar do Hub
+      setInvoices([]);
+    }
+  };
+
+  const handlePlanUpdate = async (planKey: 'starter' | 'pro' | 'max') => {
+    try {
+      await updatePlan(planKey);
+      toast.success('Plano atualizado com sucesso');
+      await loadPlan(); // Recarregar informações
+    } catch (error) {
+      console.error('Erro ao atualizar plano:', error);
+      toast.error('Erro ao atualizar plano');
+    }
+  };
+
+  const handleSelectPlan = async (planId: string) => {
+    try {
+      // Mapear plano do Hub para plano local
+      const planMapping: { [key: string]: 'starter' | 'pro' | 'max' } = {
+        'starter': 'starter',
+        'pro': 'pro', 
+        'max': 'max'
+      };
+
+      // Mapear baseado no preço ou nome do plano
+      let mappedPlan: 'starter' | 'pro' | 'max' = 'starter';
+      const selectedHubPlan = hubPlans.find(p => p.id === planId);
+      
+      if (selectedHubPlan) {
+        if (selectedHubPlan.name.toLowerCase().includes('pro')) {
+          mappedPlan = 'pro';
+        } else if (selectedHubPlan.name.toLowerCase().includes('max')) {
+          mappedPlan = 'max';
+        } else {
+          mappedPlan = 'starter';
+        }
+      }
+
+      // Tentar criar assinatura no Hub primeiro
+      const tenantId = localStorage.getItem('2f.tenantId') || '3cb88e58-b2e7-4fb1-9e0f-eb5a9c4b640b';
+      
+      try {
+        const subscriptionResponse = await fetch(`http://localhost:8081/tenants/${tenantId}/subscription`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': tenantId,
+          },
+          body: JSON.stringify({
+            planId: planId,
+            billingCycle: 'monthly',
+            status: 'active'
+          }),
+        });
+
+        if (subscriptionResponse.ok) {
+          // Atualizar plano local
+          await handlePlanUpdate(mappedPlan);
+          toast({
+            title: 'Sucesso',
+            description: 'Plano selecionado e assinatura criada com sucesso',
+          });
+          await loadPlan(); // Recarregar informações
+          await loadInvoices(); // Recarregar faturas
+          return;
+        } else {
+          const errorData = await subscriptionResponse.text();
+          console.warn('Falha ao criar assinatura no Hub:', subscriptionResponse.status, errorData);
+        }
+      } catch (hubError) {
+        console.warn('Hub não disponível, tentando fallback local:', hubError);
+      }
+
+      // Fallback: apenas atualizar localmente
+      try {
+        await handlePlanUpdate(mappedPlan);
+        toast({
+          title: 'Sucesso',
+          description: 'Plano atualizado localmente (Hub indisponível)',
+        });
+        await loadPlan();
+      } catch (localError) {
+        console.error('Erro ao atualizar plano localmente:', localError);
+        throw new Error('Falha ao atualizar plano tanto no Hub quanto localmente');
+      }
+
+    } catch (error) {
       console.error('Erro ao selecionar plano:', error);
-      toast.error('Erro ao selecionar plano');
+      
+      let errorMessage = 'Erro desconhecido ao selecionar plano';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('fetch')) {
+          errorMessage = 'Erro de conexão. Verifique se os serviços estão rodando.';
+        } else if (error.message.includes('JSON')) {
+          errorMessage = 'Erro ao processar dados do plano.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast({
+        title: 'Erro ao selecionar plano',
+        description: errorMessage,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -156,11 +250,7 @@ export default function PlanoPage() {
   const allPlans = getAllPlans();
   const currentPlanData = allPlans.find(p => p.id === planInfo.plano);
 
-  const mockInvoices = [
-    { id: '1', data: '2024-01-15', valor: 'R$ 79,00', status: 'Pago' },
-    { id: '2', data: '2023-12-15', valor: 'R$ 79,00', status: 'Pago' },
-    { id: '3', data: '2023-11-15', valor: 'R$ 79,00', status: 'Pago' },
-  ];
+
 
   return (
     <div className="space-y-6">
@@ -212,12 +302,31 @@ export default function PlanoPage() {
       {/* Available Plans from Hub */}
       <div>
         <h2 className="text-xl font-semibold mb-4">Planos Disponíveis no Hub</h2>
-        {loadingPlans ? (
-          <div>Carregando planos do Hub...</div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-3">
-            {hubPlans.map((plan) => (
-              <Card key={plan.id} className="relative">
+        <div className="grid gap-4 md:grid-cols-3">
+          {hubPlans.map((plan) => {
+            const isCurrentPlan = planInfo && (
+              plan.id === planInfo.plano || 
+              plan.name.toLowerCase() === planInfo.plano.toLowerCase()
+            );
+            
+            // Buscar features do plano local correspondente
+            const localPlan = allPlans.find(p => 
+              p.id === plan.id || 
+              p.name.toLowerCase() === plan.name.toLowerCase()
+            );
+            
+            return (
+              <Card 
+                key={plan.id} 
+                className={`relative ${isCurrentPlan ? 'ring-2 ring-primary bg-primary/5' : ''}`}
+              >
+                {isCurrentPlan && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <Badge variant="default" className="bg-primary text-primary-foreground">
+                      Plano Atual
+                    </Badge>
+                  </div>
+                )}
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     {plan.name}
@@ -228,25 +337,53 @@ export default function PlanoPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    {plan.features.slice(0, 4).map((feature) => (
-                      <div key={feature} className="flex items-center gap-2 text-sm">
-                        <Check className="h-4 w-4 text-secondary flex-shrink-0" />
-                        <span>{feature}</span>
-                      </div>
-                    ))}
+                    {/* Mostrar features do plano local se disponível */}
+                    {localPlan?.features ? (
+                      localPlan.features.slice(0, 4).map((feature, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          <span>{feature}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          <span>Até {plan.maxSeats} usuários</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          <span>{plan.maxDevices} dispositivo(s)</span>
+                        </div>
+                        {/* Mostrar features baseadas no featuresEnabled */}
+                        {plan.featuresEnabled?.products && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                            <span>Gestão de Produtos</span>
+                          </div>
+                        )}
+                        {plan.featuresEnabled?.pdv && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                            <span>PDV Completo</span>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                   <Button
                     className="w-full"
-                    onClick={() => handleSelectHubPlan(plan)}
+                    onClick={() => handleSelectPlan(plan.id)}
+                    disabled={isCurrentPlan}
+                    variant={isCurrentPlan ? "secondary" : "default"}
                   >
-                    Selecionar Plano
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    {isCurrentPlan ? 'Plano Atual' : 'Selecionar Plano'}
                   </Button>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
 
 
@@ -266,22 +403,30 @@ export default function PlanoPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockInvoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell>
-                      {new Date(invoice.data).toLocaleDateString('pt-BR')}
-                    </TableCell>
-                    <TableCell>{invoice.valor}</TableCell>
-                    <TableCell>
-                      <Badge variant="default">{invoice.status}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        Ver Recibo
-                      </Button>
+                {invoices.length > 0 ? (
+                  invoices.map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell>
+                        {new Date(invoice.data).toLocaleDateString('pt-BR')}
+                      </TableCell>
+                      <TableCell>{invoice.valor}</TableCell>
+                      <TableCell>
+                        <Badge variant="default">{invoice.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm">
+                          Ver Recibo
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      Nenhuma fatura encontrada
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </CardContent>
