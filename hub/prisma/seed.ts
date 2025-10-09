@@ -2,14 +2,13 @@ import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-type SeedEntitlement = { planKey: string; key: string; value: Prisma.JsonValue };
+type SeedEntitlement = { planKey: string; key: string; value: string };
 
 type SeedPaymentMethod = {
   tenantId: string;
-  code: string;
-  label: string;
+  name: string;
+  type: string;
   active: boolean;
-  position: number;
 };
 
 async function main() {
@@ -52,34 +51,34 @@ async function main() {
   // Entitlements para todos os planos
   const entitlements: SeedEntitlement[] = [
     // Starter Plan (R$ 19,99)
-    { planKey: 'starter', key: 'products', value: true },
-    { planKey: 'starter', key: 'pdv', value: true },
-    { planKey: 'starter', key: 'stock', value: true },
-    { planKey: 'starter', key: 'dashboards', value: true },
-    { planKey: 'starter', key: 'agenda', value: false },
-    { planKey: 'starter', key: 'banho_tosa', value: false },
-    { planKey: 'starter', key: 'reports', value: false },
-    { planKey: 'starter', key: 'max_users', value: 1 },
+    { planKey: 'starter', key: 'products', value: 'true' },
+    { planKey: 'starter', key: 'pdv', value: 'true' },
+    { planKey: 'starter', key: 'stock', value: 'true' },
+    { planKey: 'starter', key: 'dashboards', value: 'true' },
+    { planKey: 'starter', key: 'agenda', value: 'false' },
+    { planKey: 'starter', key: 'banho_tosa', value: 'false' },
+    { planKey: 'starter', key: 'reports', value: 'false' },
+    { planKey: 'starter', key: 'max_users', value: '1' },
     
     // Pro Plan (R$ 49,99)
-    { planKey: 'pro', key: 'products', value: true },
-    { planKey: 'pro', key: 'pdv', value: true },
-    { planKey: 'pro', key: 'stock', value: true },
-    { planKey: 'pro', key: 'dashboards', value: true },
-    { planKey: 'pro', key: 'agenda', value: true },
-    { planKey: 'pro', key: 'banho_tosa', value: true },
-    { planKey: 'pro', key: 'reports', value: false },
-    { planKey: 'pro', key: 'max_users', value: 5 },
+    { planKey: 'pro', key: 'products', value: 'true' },
+    { planKey: 'pro', key: 'pdv', value: 'true' },
+    { planKey: 'pro', key: 'stock', value: 'true' },
+    { planKey: 'pro', key: 'dashboards', value: 'true' },
+    { planKey: 'pro', key: 'agenda', value: 'true' },
+    { planKey: 'pro', key: 'banho_tosa', value: 'true' },
+    { planKey: 'pro', key: 'reports', value: 'false' },
+    { planKey: 'pro', key: 'max_users', value: '5' },
     
     // Max Plan (R$ 99,99)
-    { planKey: 'max', key: 'products', value: true },
-    { planKey: 'max', key: 'pdv', value: true },
-    { planKey: 'max', key: 'stock', value: true },
-    { planKey: 'max', key: 'dashboards', value: true },
-    { planKey: 'max', key: 'agenda', value: true },
-    { planKey: 'max', key: 'banho_tosa', value: true },
-    { planKey: 'max', key: 'reports', value: true },
-    { planKey: 'max', key: 'max_users', value: 15 },
+    { planKey: 'max', key: 'products', value: 'true' },
+    { planKey: 'max', key: 'pdv', value: 'true' },
+    { planKey: 'max', key: 'stock', value: 'true' },
+    { planKey: 'max', key: 'dashboards', value: 'true' },
+    { planKey: 'max', key: 'agenda', value: 'true' },
+    { planKey: 'max', key: 'banho_tosa', value: 'true' },
+    { planKey: 'max', key: 'reports', value: 'true' },
+    { planKey: 'max', key: 'max_users', value: '15' },
   ];
 
   for (const entitlement of entitlements) {
@@ -98,24 +97,23 @@ async function main() {
   }
 
   const paymentMethods: SeedPaymentMethod[] = [
-    { tenantId: tenant.id, code: 'DINHEIRO', label: 'Dinheiro', active: true, position: 1 },
-    { tenantId: tenant.id, code: 'PIX', label: 'PIX', active: true, position: 2 },
-    { tenantId: tenant.id, code: 'DEBITO', label: 'Débito', active: true, position: 3 },
-    { tenantId: tenant.id, code: 'CREDITO', label: 'Crédito', active: true, position: 4 },
+    { tenantId: tenant.id, name: 'Dinheiro', type: 'CASH', active: true },
+    { tenantId: tenant.id, name: 'PIX', type: 'PIX', active: true },
+    { tenantId: tenant.id, name: 'Débito', type: 'DEBIT_CARD', active: true },
+    { tenantId: tenant.id, name: 'Crédito', type: 'CREDIT_CARD', active: true },
   ];
 
   for (const method of paymentMethods) {
     await prisma.paymentMethod.upsert({
       where: {
-        code_tenantId: {
-          code: method.code,
+        tenantId_name: {
           tenantId: method.tenantId,
+          name: method.name,
         },
       },
       update: {
-        label: method.label,
+        type: method.type,
         active: method.active,
-        position: method.position,
       },
       create: method,
     });

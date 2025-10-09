@@ -10,6 +10,8 @@ import Planos from "./pages/site/planos";
 import Contato from "./pages/site/contato";
 import Login from "./pages/site/login";
 import Cadastro from "./pages/site/cadastro";
+import Pagamento from "./pages/site/pagamento";
+import PagamentoSucesso from "./pages/site/pagamento/sucesso";
 
 // ERP Layout & Pages
 import ErpLayout from "./layouts/erp-layout";
@@ -108,6 +110,8 @@ function App() {
             <Route path="/contato" element={<Contato />} />
             <Route path="/login" element={<Login />} />
             <Route path="/cadastro" element={<Cadastro />} />
+            <Route path="/pagamento" element={<Pagamento />} />
+            <Route path="/pagamento/sucesso" element={<PagamentoSucesso />} />
 
           {/* ERP Routes */}
           <Route path="/erp" element={<ErpLayout />}>
