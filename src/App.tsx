@@ -58,6 +58,10 @@ import EditarRecurso from './pages/erp/grooming/resources/[id]/editar';
 import TutorsIndex from './pages/erp/grooming/tutors/index';
 import NovoTutor from './pages/erp/grooming/tutors/novo';
 import GroomingProfissionaisIndex from './pages/erp/grooming/profissionais/index';
+import NovoGroomingProfissional from './pages/erp/grooming/profissionais/novo';
+import EditarGroomingProfissional from './pages/erp/grooming/profissionais/[id]/editar';
+import GroomingCategoriesIndex from './pages/erp/grooming/categories/index';
+import GroomingTicketDetails from './pages/erp/grooming/details';
 
 // Stock pages
 import StockPosition from "./pages/erp/estoque/index";
@@ -78,6 +82,7 @@ import PosSettings from "./pages/settings/pos";
 import ScheduleSettings from "./pages/settings/schedule";
 import GroomingSettings from "./pages/settings/grooming";
 import InventorySettings from "./pages/settings/inventory";
+import UnitsSettings from "./pages/settings/units";
 import PaymentsIndex from "./pages/settings/payments/index";
 import NotificationsSettings from "./pages/settings/notifications";
 import ImportExportSettings from "./pages/settings/import-export";
@@ -162,6 +167,7 @@ function App() {
           
           {/* Grooming Routes */}
           <Route path="grooming" element={<GroomingIndex />} />
+          <Route path="grooming/:id" element={<GroomingTicketDetails />} />
           <Route path="grooming/new" element={<GroomingCheckIn />} />
           <Route path="grooming/services" element={<GroomingServicesIndex />} />
           <Route path="grooming/services/novo" element={<NovoGroomingService />} />
@@ -175,6 +181,9 @@ function App() {
           <Route path="grooming/tutors" element={<TutorsIndex />} />
           <Route path="grooming/tutors/novo" element={<NovoTutor />} />
           <Route path="grooming/profissionais" element={<GroomingProfissionaisIndex />} />
+          <Route path="grooming/profissionais/novo" element={<NovoGroomingProfissional />} />
+          <Route path="grooming/profissionais/:id/editar" element={<EditarGroomingProfissional />} />
+          <Route path="grooming/categories" element={<GroomingCategoriesIndex />} />
           
           {/* Banho & Tosa (alias for Grooming) */}
           <Route path="banho-tosa" element={<GroomingIndex />} />
@@ -192,6 +201,7 @@ function App() {
             <Route path="schedule" element={<ScheduleSettings />} />
             <Route path="grooming" element={<GroomingSettings />} />
             <Route path="inventory" element={<InventorySettings />} />
+            <Route path="units" element={<UnitsSettings />} />
             <Route path="payments" element={<PaymentsIndex />} />
             <Route path="payments/new" element={<NovoPagamento />} />
             <Route path="payments/:id/edit" element={<NovoPagamento />} />

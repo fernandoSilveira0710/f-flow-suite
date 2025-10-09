@@ -211,6 +211,132 @@ function initMockData() {
     setStorage(KEYS.SERVICES, mockServices);
   }
 
+  // Initialize customers
+  const customers = getStorage<Customer[]>(KEYS.CUSTOMERS, []);
+  if (customers.length === 0) {
+    const mockCustomers: Customer[] = [
+      {
+        id: uuid(),
+        nome: 'Maria Silva',
+        documento: '123.456.789-00',
+        email: 'maria@email.com',
+        telefone: '(11) 99999-1111',
+        endereco: {
+          rua: 'Rua das Flores, 123',
+          bairro: 'Centro',
+          cidade: 'São Paulo',
+          uf: 'SP',
+          cep: '01234-567'
+        },
+        pets: [{
+          id: uuid(),
+          nome: 'Rex',
+          especie: 'Cachorro',
+          raca: 'Golden Retriever',
+          observacoes: 'Muito dócil'
+        }],
+        ativo: true,
+        isTutor: true,
+        createdAtISO: new Date().toISOString(),
+      },
+      {
+        id: uuid(),
+        nome: 'João Santos',
+        documento: '987.654.321-00',
+        email: 'joao@email.com',
+        telefone: '(11) 99999-2222',
+        endereco: {
+          rua: 'Av. Paulista, 456',
+          bairro: 'Bela Vista',
+          cidade: 'São Paulo',
+          uf: 'SP',
+          cep: '01310-100'
+        },
+        pets: [{
+          id: uuid(),
+          nome: 'Mimi',
+          especie: 'Gato',
+          raca: 'Persa',
+          observacoes: 'Precisa de cuidado especial'
+        }],
+        ativo: true,
+        isTutor: true,
+        createdAtISO: new Date().toISOString(),
+      }
+    ];
+    setStorage(KEYS.CUSTOMERS, mockCustomers);
+  }
+
+  // Initialize staff
+  const staff = getStorage<Staff[]>(KEYS.STAFF, []);
+  if (staff.length === 0) {
+    const mockStaff: Staff[] = [
+      {
+        id: uuid(),
+        nome: 'Dr. João Silva',
+        tipo: 'PROFISSIONAL',
+        funcoes: [],
+        cores: { agenda: '#3B82F6' },
+        ativo: true,
+      },
+      {
+        id: uuid(),
+        nome: 'Maria Santos',
+        tipo: 'PROFISSIONAL',
+        funcoes: [],
+        cores: { agenda: '#22C55E' },
+        ativo: true,
+      }
+    ];
+    setStorage(KEYS.STAFF, mockStaff);
+  }
+
+  // Initialize appointments
+  const appointments = getStorage<Appointment[]>(KEYS.APPOINTMENTS, []);
+  if (appointments.length === 0) {
+    const mockCustomers = getStorage<Customer[]>(KEYS.CUSTOMERS, []);
+    const mockServices = getStorage<Service[]>(KEYS.SERVICES, []);
+    const mockStaff = getStorage<Staff[]>(KEYS.STAFF, []);
+    
+    if (mockCustomers.length > 0 && mockServices.length > 0 && mockStaff.length > 0) {
+      const mockAppointments: Appointment[] = [
+        {
+          id: '5c3a6801-eb79-4dd3-840c-f0f52b37aff1',
+          customerId: mockCustomers[0].id,
+          customerName: mockCustomers[0].nome,
+          customerContact: mockCustomers[0].telefone,
+          petId: mockCustomers[0].pets?.[0]?.id,
+          serviceId: mockServices[0].id,
+          serviceName: mockServices[0].nome,
+          professionalId: mockStaff[0].id,
+          startTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 horas a partir de agora
+          endTime: new Date(Date.now() + 3.5 * 60 * 60 * 1000).toISOString(), // 3.5 horas a partir de agora
+          status: 'AGENDADO',
+          notes: 'Primeiro agendamento de exemplo',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: uuid(),
+          customerId: mockCustomers[1].id,
+          customerName: mockCustomers[1].nome,
+          customerContact: mockCustomers[1].telefone,
+          petId: mockCustomers[1].pets?.[0]?.id,
+          serviceId: mockServices[1].id,
+          serviceName: mockServices[1].nome,
+          professionalId: mockStaff[1].id,
+          startTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 horas a partir de agora
+          endTime: new Date(Date.now() + 4.75 * 60 * 60 * 1000).toISOString(), // 4.75 horas a partir de agora
+          status: 'CONFIRMADO',
+          notes: 'Segundo agendamento de exemplo',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+      ];
+      setStorage(KEYS.APPOINTMENTS, mockAppointments);
+    }
+  }
+
   const prefs = getStorage<SchedulePrefs | null>(KEYS.PREFS, null);
   if (!prefs) {
     const defaultPrefs: SchedulePrefs = {

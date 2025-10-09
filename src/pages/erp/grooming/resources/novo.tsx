@@ -8,13 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { createGroomResource, type ResourceType } from '@/lib/grooming-api';
+import { getResourceTypes } from '@/pages/erp/grooming/resource-types/index';
 import { toast } from 'sonner';
 
 const tipos: ResourceType[] = ['BOX', 'GAIOLA', 'MESA', 'SECADOR'];
 
 export default function NovoRecurso() {
   const navigate = useNavigate();
-  const [tipo, setTipo] = useState<ResourceType>('BOX');
+  const [resourceTypes] = useState(() => getResourceTypes().filter(rt => rt.active));
+  const [tipo, setTipo] = useState<ResourceType>(resourceTypes[0]?.name || 'BOX');
   const [nome, setNome] = useState('');
   const [capacidadeSimultanea, setCapacidadeSimultanea] = useState('1');
   const [ativo, setAtivo] = useState(true);
@@ -62,8 +64,8 @@ export default function NovoRecurso() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-background z-50">
-                  {tipos.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  {resourceTypes.map((rt) => (
+                    <SelectItem key={rt.name} value={rt.name}>{rt.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

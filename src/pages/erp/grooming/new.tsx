@@ -16,9 +16,12 @@ import {
   getPets,
   getGroomServices,
   getGroomResources,
+  getProfessionals,
   createGroomTicket,
   type Porte,
 } from '@/lib/grooming-api';
+import { createAppointment, getServices, getStaff } from '@/lib/schedule-api';
+import { addHours } from 'date-fns';
 import { toast } from 'sonner';
 
 const porteLabels = { PP: 'Mini', P: 'Pequeno', M: 'Médio', G: 'Grande', GG: 'Gigante' };
@@ -65,6 +68,7 @@ export default function GroomingCheckIn() {
   const allPets = getPets().filter((p) => p.ativo);
   const services = getGroomServices().filter((s) => s.ativo);
   const resources = getGroomResources().filter((r) => r.ativo);
+  const professionals = getProfessionals().filter((p) => p.ativo);
 
   // Mock payment methods
   const paymentMethods = [
@@ -83,6 +87,18 @@ export default function GroomingCheckIn() {
   // Get selected pet details
   const selectedPet = allPets.find((p) => p.id === petId);
   const selectedTutor = tutors.find((t) => t.id === tutorId);
+
+  // Auto-fill phone when tutor is selected
+  useEffect(() => {
+    if (selectedTutor?.telefone) {
+      setPhone(selectedTutor.telefone);
+    } else {
+      setPhone('');
+    }
+  }, [selectedTutor]);
+
+  // Check if phone should be disabled (when auto-filled from tutor)
+  const isPhoneDisabled = Boolean(selectedTutor?.telefone);
 
   // Check if Tosa service is selected
   const hasTosaService = useMemo(() => {
@@ -103,112 +119,129 @@ export default function GroomingCheckIn() {
       const service = services.find((s) => s.id === sId);
       if (service) {
         mins += service.duracaoBaseMin;
-        price += service.precoPorPorte[selectedPet.porte] || 0;
+        price += service.precoPorPorte[selectedPet.porte];
       }
     });
 
     return { totalMinutes: mins, subtotal: price };
-  }, [selectedServices, selectedPet, services]);
+  }, [selectedServices, services, selectedPet]);
 
-  const total = subtotal - discount;
+  // Calculate final total
+  const total = useMemo(() => {
+    const finalAmount = subtotal - discount;
+    return Math.max(0, finalAmount);
+  }, [subtotal, discount]);
 
   // Auto-calculate end time
   useEffect(() => {
-    if (startTime && totalMinutes > 0) {
-      const [hours, minutes] = startTime.split(':').map(Number);
-      const startMinutes = hours * 60 + minutes;
-      const endMinutes = startMinutes + totalMinutes;
-      const endHours = Math.floor(endMinutes / 60) % 24;
-      const endMins = endMinutes % 60;
-      setEndTime(`${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`);
+    if (startTime && typeof startTime === 'string' && startTime.includes(':') && totalMinutes > 0) {
+      try {
+        const [hours, minutes] = startTime.split(':').map(Number);
+        if (!isNaN(hours) && !isNaN(minutes)) {
+          const startMinutes = hours * 60 + minutes;
+          const endMinutes = startMinutes + totalMinutes;
+          const endHours = Math.floor(endMinutes / 60);
+          const endMins = endMinutes % 60;
+          setEndTime(`${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`);
+        }
+      } catch (error) {
+        console.error('Erro ao calcular horário de fim:', error);
+      }
     }
   }, [startTime, totalMinutes]);
 
-  // Pre-fill from query params
-  useEffect(() => {
-    const qTutor = searchParams.get('tutorId');
-    const qPet = searchParams.get('petId');
-    const qServices = searchParams.get('serviceIds');
-    const qResource = searchParams.get('resourceId');
-
-    if (qTutor) setTutorId(qTutor);
-    if (qPet) setPetId(qPet);
-    if (qServices) setSelectedServices(qServices.split(','));
-    if (qResource) setResourceId(qResource);
-  }, [searchParams]);
-
-  // Update phone when tutor changes
-  useEffect(() => {
-    if (selectedTutor) {
-      setPhone(selectedTutor.telefone || '');
-    }
-  }, [selectedTutor]);
-
   const handleServiceToggle = (serviceId: string) => {
-    setSelectedServices((prev) =>
-      prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId]
-    );
+    console.log('Toggling service:', serviceId, 'Current selected:', selectedServices);
+    setSelectedServices((prev) => {
+      const newSelected = prev.includes(serviceId) 
+        ? prev.filter((id) => id !== serviceId) 
+        : [...prev, serviceId];
+      console.log('New selected services:', newSelected);
+      return newSelected;
+    });
   };
 
-  const handleSubmit = (printLabel = false) => {
-    // Validation
-    if (!tutorId) {
-      toast.error('Selecione um tutor');
-      return;
-    }
-    if (!petId) {
-      toast.error('Selecione um pet');
-      return;
-    }
-    if (selectedServices.length === 0) {
-      toast.error('Selecione pelo menos um serviço');
-      return;
-    }
-    if (hasTosaService && !resourceId) {
-      toast.error('Recurso obrigatório para serviços de Tosa');
-      return;
-    }
-    if (deposit > 0 && !paymentMethodId) {
-      toast.error('Selecione um método de pagamento');
+  const handleSubmit = async (printLabel: boolean) => {
+    if (!tutorId || !petId || selectedServices.length === 0) {
+      toast.error('Preencha todos os campos obrigatórios');
       return;
     }
 
-    const selectedMethod = paymentMethods.find((m) => m.id === paymentMethodId);
-    if (selectedMethod?.exigeAutorizacao && !nsu) {
+    if (!startDate || !startTime) {
+      toast.error('Preencha a data e horário de início');
+      return;
+    }
+
+    if (hasTosaService && !resourceId) {
+      toast.error('Selecione um recurso para serviços de tosa');
+      return;
+    }
+
+    if (deposit > 0 && !paymentMethodId) {
+      toast.error('Selecione o método de pagamento para o sinal');
+      return;
+    }
+
+    if (deposit > 0 && paymentMethods.find((m) => m.id === paymentMethodId)?.exigeAutorizacao && !nsu) {
       toast.error('Informe o NSU/Autorização');
       return;
     }
 
-    const startISO = `${startDate}T${startTime}:00`;
-
-    // Build itens array
-    const itens = selectedServices.map((sId) => {
+    const items = selectedServices.map((sId) => {
       const service = services.find((s) => s.id === sId);
-      if (!service || !selectedPet) return null;
+      const price = service?.precoPorPorte[selectedPet!.porte] || 0;
       return {
-        serviceId: service.id,
-        nome: service.nome,
-        porte: selectedPet.porte as Porte,
-        preco: service.precoPorPorte[selectedPet.porte],
-        qtd: 1,
+        serviceId: sId,
+        name: service?.nome || '',
+        price: price,
+        qty: 1,
+        subtotal: price,
       };
-    }).filter(Boolean) as Array<{ serviceId: string; nome: string; porte: Porte; preco: number; qtd: number }>;
-
-    const ticket = createGroomTicket({
-      dataAberturaISO: startISO,
-      origem: 'WALKIN' as const,
-      tutorId,
-      tutorNome: selectedTutor?.nome || '',
-      petId,
-      petNome: selectedPet?.nome || '',
-      itens,
-      status: 'CHECKIN' as const,
-      observacoes: notes || undefined,
-      fotosAntes: includePhotos ? [] : undefined,
-      sinalRecebido: deposit > 0 ? deposit : undefined,
     });
 
-    toast.success('Check-in realizado!');
+    // Calculate total price from items
+    const totalPrice = items.reduce((total, item) => total + item.subtotal, 0);
+
+    const ticket = createGroomTicket({
+      petId,
+      tutorId,
+      status: 'CHECKIN' as const,
+      totalPrice,
+      items,
+      notes: notes || undefined,
+    });
+
+    // Create appointment in schedule automatically after ticket is created
+    try {
+      // Calculate end time if not provided
+      let calculatedEndTime = endTime ? `${startDate}T${endTime}:00` : undefined;
+      if (!calculatedEndTime) {
+        const startDateTime = new Date(`${startDate}T${startTime}:00`);
+        const endDateTime = addHours(startDateTime, 2);
+        calculatedEndTime = `${startDate}T${endDateTime.getHours().toString().padStart(2, '0')}:${endDateTime.getMinutes().toString().padStart(2, '0')}:00`;
+      }
+
+      const appointmentData = {
+        customerId: tutorId,
+        customerName: selectedTutor?.nome || '',
+        customerContact: selectedTutor?.telefone || '',
+        petId: petId,
+        serviceId: selectedServices[0] || 'grooming-service',
+        serviceName: items.map(i => i.name).join(', '),
+        professionalId: professionalId || 'default-professional',
+        startTime: `${startDate}T${startTime}:00`,
+        endTime: calculatedEndTime,
+        status: 'CONFIRMED' as const,
+        notes: notes ? `${notes} - Ticket: ${ticket.id}` : `Ticket de Grooming: ${ticket.id}`,
+      };
+      
+      await createAppointment(appointmentData);
+      toast.success('Check-in realizado e agendamento criado automaticamente!');
+    } catch (error) {
+      console.error('Erro ao criar agendamento:', error);
+      toast.success('Check-in realizado!');
+      toast.warning('Não foi possível criar o agendamento automaticamente');
+    }
 
     if (printLabel) {
       toast.info('Etiqueta enviada para impressão');
@@ -273,6 +306,7 @@ export default function GroomingCheckIn() {
                   placeholder="(00) 00000-0000"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  disabled={isPhoneDisabled}
                 />
               </div>
             </CardContent>
@@ -346,16 +380,19 @@ export default function GroomingCheckIn() {
               {services.map((service) => (
                 <div
                   key={service.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent cursor-pointer"
-                  onClick={() => handleServiceToggle(service.id)}
+                  className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent"
                 >
                   <input
                     type="checkbox"
+                    id={`service-${service.id}`}
                     checked={selectedServices.includes(service.id)}
-                    onChange={() => {}}
-                    className="h-4 w-4"
+                    onChange={() => handleServiceToggle(service.id)}
+                    className="h-4 w-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
                   />
-                  <div className="flex-1">
+                  <label 
+                    htmlFor={`service-${service.id}`}
+                    className="flex-1 cursor-pointer"
+                  >
                     <div className="flex items-center gap-2">
                       {service.cor && (
                         <div
@@ -380,7 +417,7 @@ export default function GroomingCheckIn() {
                         </span>
                       </div>
                     )}
-                  </div>
+                  </label>
                 </div>
               ))}
             </CardContent>
@@ -399,8 +436,11 @@ export default function GroomingCheckIn() {
                     <SelectValue placeholder="Selecionar profissional (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="prof-1">João Silva</SelectItem>
-                    <SelectItem value="prof-2">Maria Santos</SelectItem>
+                    {professionals.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nome} {p.especialidades && p.especialidades.length > 0 && `• ${p.especialidades.join(', ')}`}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -457,6 +497,100 @@ export default function GroomingCheckIn() {
             </CardContent>
           </Card>
 
+          {/* Preços por Porte */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Preços por Porte</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 grid-cols-5">
+                <div className="space-y-2">
+                  <Label htmlFor="precoPP">PP</Label>
+                  <Input
+                    id="precoPP"
+                    type="number"
+                    step="0.01"
+                    value={selectedServices.reduce((total, sId) => {
+                      const service = services.find(s => s.id === sId);
+                      return total + (service?.precoPorPorte.PP || 0);
+                    }, 0).toFixed(2)}
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="precoP">P</Label>
+                  <Input
+                    id="precoP"
+                    type="number"
+                    step="0.01"
+                    value={selectedServices.reduce((total, sId) => {
+                      const service = services.find(s => s.id === sId);
+                      return total + (service?.precoPorPorte.P || 0);
+                    }, 0).toFixed(2)}
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="precoM">M</Label>
+                  <Input
+                    id="precoM"
+                    type="number"
+                    step="0.01"
+                    value={selectedServices.reduce((total, sId) => {
+                      const service = services.find(s => s.id === sId);
+                      return total + (service?.precoPorPorte.M || 0);
+                    }, 0).toFixed(2)}
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="precoG">G</Label>
+                  <Input
+                    id="precoG"
+                    type="number"
+                    step="0.01"
+                    value={selectedServices.reduce((total, sId) => {
+                      const service = services.find(s => s.id === sId);
+                      return total + (service?.precoPorPorte.G || 0);
+                    }, 0).toFixed(2)}
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="precoGG">GG</Label>
+                  <Input
+                    id="precoGG"
+                    type="number"
+                    step="0.01"
+                    value={selectedServices.reduce((total, sId) => {
+                      const service = services.find(s => s.id === sId);
+                      return total + (service?.precoPorPorte.GG || 0);
+                    }, 0).toFixed(2)}
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+              
+              {selectedPet && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-900">
+                      Preço para {selectedPet.nome} ({porteLabels[selectedPet.porte]}):
+                    </span>
+                    <span className="text-lg font-bold text-blue-900">
+                      R$ {subtotal.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Pricing */}
           <Card>
             <CardHeader>
@@ -484,10 +618,21 @@ export default function GroomingCheckIn() {
               )}
 
               <div className="space-y-2">
+                <Label>Valor Total</Label>
+                <div className="p-3 bg-muted rounded-md">
+                  <span className="text-lg font-semibold">R$ {subtotal.toFixed(2)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Valor calculado automaticamente com base nos serviços selecionados
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label>Desconto (R$)</Label>
                 <Input
                   type="number"
                   min="0"
+                  step="0.01"
                   max={subtotal}
                   value={discount}
                   onChange={(e) => setDiscount(Number(e.target.value))}
@@ -501,6 +646,7 @@ export default function GroomingCheckIn() {
                 <Input
                   type="number"
                   min="0"
+                  step="0.01"
                   value={deposit}
                   onChange={(e) => setDeposit(Number(e.target.value))}
                 />

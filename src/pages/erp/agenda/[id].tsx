@@ -50,36 +50,62 @@ export default function AgendamentoDetalhe() {
   useEffect(() => {
     if (!id) return;
 
-    const apt = getAppointmentById(id);
-    if (!apt) {
-      toast.error('Agendamento não encontrado');
-      navigate('/erp/agenda');
-      return;
-    }
+    const loadAppointment = async () => {
+      try {
+        const apt = await getAppointmentById(id);
+        if (!apt) {
+          toast.error('Agendamento não encontrado');
+          navigate('/erp/agenda');
+          return;
+        }
 
-    setAppointment(apt);
-    setLoading(false);
+        setAppointment(apt);
+      } catch (error) {
+        console.error('Erro ao carregar agendamento:', error);
+        toast.error('Erro ao carregar agendamento');
+        navigate('/erp/agenda');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAppointment();
   }, [id, navigate]);
 
-  const handleCheckin = () => {
+  const handleCheckin = async () => {
     if (!id) return;
-    updateAppointment(id, { status: 'CHECKIN' });
-    setAppointment({ ...appointment, status: 'CHECKIN' });
-    toast.success('Check-in realizado');
+    try {
+      await updateAppointment(id, { status: 'CHECKIN' });
+      setAppointment({ ...appointment, status: 'CHECKIN' });
+      toast.success('Check-in realizado');
+    } catch (error) {
+      console.error('Erro ao realizar check-in:', error);
+      toast.error('Erro ao realizar check-in');
+    }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     if (!id) return;
-    updateAppointment(id, { status: 'CONCLUIDO' });
-    toast.success('Agendamento concluído');
-    navigate('/erp/pdv');
+    try {
+      await updateAppointment(id, { status: 'CONCLUIDO' });
+      toast.success('Agendamento concluído');
+      navigate('/erp/pdv');
+    } catch (error) {
+      console.error('Erro ao concluir agendamento:', error);
+      toast.error('Erro ao concluir agendamento');
+    }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!id) return;
-    updateAppointment(id, { status: 'CANCELADO' });
-    toast.success('Agendamento cancelado');
-    navigate('/erp/agenda');
+    try {
+      await updateAppointment(id, { status: 'CANCELADO' });
+      toast.success('Agendamento cancelado');
+      navigate('/erp/agenda');
+    } catch (error) {
+      console.error('Erro ao cancelar agendamento:', error);
+      toast.error('Erro ao cancelar agendamento');
+    }
   };
 
   if (loading) {
@@ -96,7 +122,7 @@ export default function AgendamentoDetalhe() {
   const customer = getCustomerById(appointment.customerId);
   const service = getServiceById(appointment.serviceId);
   const allStaff = getStaff();
-  const appointmentStaff = allStaff.filter(s => appointment.staffIds.includes(s.id));
+  const appointmentStaff = allStaff.filter(s => s.id === appointment.professionalId);
 
   const canCheckin = appointment.status === 'AGENDADO' || appointment.status === 'CONFIRMADO';
   const canComplete = appointment.status === 'CHECKIN';
@@ -116,7 +142,7 @@ export default function AgendamentoDetalhe() {
           <div>
             <h1 className="text-3xl font-bold">Detalhes do Agendamento</h1>
             <p className="text-muted-foreground mt-1">
-              #{appointment.id.slice(0, 8)}
+              #{appointment.id ? appointment.id.slice(0, 8) : 'N/A'}
             </p>
           </div>
         </div>
@@ -152,7 +178,7 @@ export default function AgendamentoDetalhe() {
                 <h3 className="font-semibold">Cliente</h3>
               </div>
               <div className="space-y-2">
-                <div className="text-lg font-medium">{appointment.customerNome}</div>
+                <div className="text-lg font-medium">{appointment.customerName}</div>
                 {customer?.email && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Mail className="h-4 w-4" />
@@ -182,11 +208,14 @@ export default function AgendamentoDetalhe() {
               </div>
               <div className="space-y-2">
                 <div className="text-lg">
-                  {format(parseISO(appointment.startISO), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  {appointment.startTime ? format(parseISO(appointment.startTime), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : 'Data não disponível'}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
-                  {format(parseISO(appointment.startISO), 'HH:mm')} - {format(parseISO(appointment.endISO), 'HH:mm')}
+                  {appointment.startTime && appointment.endTime ? 
+                    `${format(parseISO(appointment.startTime), 'HH:mm')} - ${format(parseISO(appointment.endTime), 'HH:mm')}` : 
+                    'Horário não disponível'
+                  }
                 </div>
               </div>
             </div>
@@ -196,7 +225,7 @@ export default function AgendamentoDetalhe() {
             <div className="space-y-4">
               <h3 className="font-semibold">Serviço</h3>
               <div className="space-y-2">
-                <div className="text-lg">{appointment.serviceNome}</div>
+                <div className="text-lg">{appointment.serviceName}</div>
                 {service && (
                   <div className="flex gap-2">
                     <Badge variant="secondary">

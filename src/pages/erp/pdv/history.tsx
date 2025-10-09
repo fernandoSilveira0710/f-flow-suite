@@ -39,7 +39,7 @@ export default function HistoryPage() {
 
   const filteredSales = sales.filter(sale =>
     sale.id.toLowerCase().includes(search.toLowerCase()) ||
-    sale.pagamento.toLowerCase().includes(search.toLowerCase())
+    sale.paymentMethod.toLowerCase().includes(search.toLowerCase())
   );
 
   const handlePrintReceipt = (sale: Sale) => {
@@ -101,16 +101,16 @@ export default function HistoryPage() {
                 <TableRow key={sale.id}>
                   <TableCell className="font-mono text-sm">{sale.id}</TableCell>
                   <TableCell>
-                    {new Date(sale.data).toLocaleString('pt-BR')}
+                    {new Date(sale.createdAt).toLocaleString('pt-BR')}
                   </TableCell>
-                  <TableCell>{sale.operador}</TableCell>
-                  <TableCell>{sale.itens.length}</TableCell>
+                  <TableCell>{sale.operator}</TableCell>
+                  <TableCell>{sale.items?.length || 0}</TableCell>
                   <TableCell className="font-semibold">
                     R$ {sale.total.toFixed(2)}
                   </TableCell>
-                  <TableCell>{sale.pagamento}</TableCell>
+                  <TableCell>{sale.paymentMethod}</TableCell>
                   <TableCell>
-                    <Badge variant={sale.status === 'Pago' ? 'default' : 'destructive'}>
+                    <Badge variant={sale.status === 'completed' ? 'default' : 'destructive'} className={sale.status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''}>
                       {sale.status}
                     </Badge>
                   </TableCell>
@@ -151,21 +151,21 @@ export default function HistoryPage() {
                 </div>
                 <div className="flex justify-between">
                   <span>Data:</span>
-                  <span>{new Date(selectedSale.data).toLocaleString('pt-BR')}</span>
+                  <span>{new Date(selectedSale.createdAt).toLocaleString('pt-BR')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Operador:</span>
-                  <span>{selectedSale.operador}</span>
+                  <span>{selectedSale.operator}</span>
                 </div>
               </div>
 
               <div className="border-t pt-4">
                 <h4 className="font-semibold mb-2">Itens</h4>
                 <div className="space-y-1 text-sm">
-                  {selectedSale.itens.map((item, index) => (
+                  {selectedSale.items?.map((item, index) => (
                     <div key={index} className="flex justify-between">
                       <span>
-                        {item.qtd}x {item.nome}
+                        {item.qty}x Produto ID: {item.productId}
                       </span>
                       <span>R$ {item.subtotal.toFixed(2)}</span>
                     </div>
@@ -176,21 +176,16 @@ export default function HistoryPage() {
               <div className="border-t pt-4 space-y-1">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
-                  <span>R$ {selectedSale.subtotal.toFixed(2)}</span>
+                  <span>R$ {selectedSale.total.toFixed(2)}</span>
                 </div>
-                {selectedSale.desconto > 0 && (
-                  <div className="flex justify-between text-secondary">
-                    <span>Desconto:</span>
-                    <span>- R$ {selectedSale.desconto.toFixed(2)}</span>
-                  </div>
-                )}
+                {/* Removendo desconto pois não está sendo usado */}
                 <div className="flex justify-between font-bold text-lg">
                   <span>Total:</span>
                   <span>R$ {selectedSale.total.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Pagamento:</span>
-                  <span>{selectedSale.pagamento}</span>
+                  <span>{selectedSale.paymentMethod}</span>
                 </div>
               </div>
 

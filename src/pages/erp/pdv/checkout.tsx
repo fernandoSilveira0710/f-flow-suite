@@ -139,9 +139,9 @@ export default function CheckoutPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {cart.map((item) => (
-                <div key={item.productId} className="flex justify-between text-sm">
+                <div key={item.produto.id} className="flex justify-between text-sm">
                   <span>
-                    {item.qtd}x {item.nome}
+                    {item.qtd}x {item.produto.nome}
                   </span>
                   <span>R$ {item.subtotal.toFixed(2)}</span>
                 </div>

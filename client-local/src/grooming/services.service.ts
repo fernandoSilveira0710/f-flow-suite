@@ -13,7 +13,14 @@ export class ServicesService {
 
   async create(createServiceDto: CreateServiceDto) {
     const service = await this.prisma.service.create({
-      data: createServiceDto,
+      data: {
+        name: createServiceDto.name,
+        description: createServiceDto.description,
+        price: createServiceDto.price,
+        duration: createServiceDto.duration || 0,
+        categoryId: createServiceDto.categoryId,
+        active: createServiceDto.active ?? true,
+      },
     });
 
     // Generate event for synchronization
@@ -46,7 +53,14 @@ export class ServicesService {
 
     const service = await this.prisma.service.update({
       where: { id },
-      data: updateServiceDto,
+      data: {
+        ...(updateServiceDto.name && { name: updateServiceDto.name }),
+        ...(updateServiceDto.description !== undefined && { description: updateServiceDto.description }),
+        ...(updateServiceDto.price !== undefined && { price: updateServiceDto.price }),
+        ...(updateServiceDto.duration !== undefined && { duration: updateServiceDto.duration }),
+        ...(updateServiceDto.categoryId !== undefined && { categoryId: updateServiceDto.categoryId }),
+        ...(updateServiceDto.active !== undefined && { active: updateServiceDto.active }),
+      },
     });
 
     // Generate event for synchronization

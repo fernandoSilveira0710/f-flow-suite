@@ -351,17 +351,17 @@ export default function SalesPage() {
               sales.map((sale) => (
                 <TableRow key={sale.id} className="cursor-pointer hover:bg-muted/50">
                   <TableCell className="font-mono text-xs">{sale.id.slice(0, 8)}</TableCell>
-                  <TableCell>{format(new Date(sale.data), 'dd/MM/yyyy HH:mm')}</TableCell>
-                  <TableCell>{sale.operador}</TableCell>
-                  <TableCell>{sale.itens.length}</TableCell>
+                  <TableCell>{format(new Date(sale.createdAt), 'dd/MM/yyyy HH:mm')}</TableCell>
+                  <TableCell>{sale.operator}</TableCell>
+                  <TableCell>{sale.items?.length || 0}</TableCell>
                   <TableCell className="font-semibold tabular-nums">{formatCurrency(sale.total)}</TableCell>
                   <TableCell>
-                    <Badge className={cn("text-xs", getPaymentBadgeColor(sale.pagamento))}>
-                      {sale.pagamento}
+                    <Badge className={cn("text-xs", getPaymentBadgeColor(sale.paymentMethod))}>
+                      {sale.paymentMethod}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={sale.status === 'Pago' ? 'default' : 'destructive'}>
+                    <Badge variant={sale.status === 'completed' ? 'default' : 'destructive'} className={sale.status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''}>
                       {sale.status}
                     </Badge>
                   </TableCell>
@@ -437,21 +437,21 @@ export default function SalesPage() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Data/Hora</p>
-                  <p className="font-medium">{format(new Date(selectedSale.data), 'dd/MM/yyyy HH:mm')}</p>
+                  <p className="font-medium">{format(new Date(selectedSale.createdAt), 'dd/MM/yyyy HH:mm')}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Operador</p>
-                  <p className="font-medium">{selectedSale.operador}</p>
+                  <p className="font-medium">{selectedSale.operator}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Forma de Pagamento</p>
-                  <Badge className={cn("mt-1", getPaymentBadgeColor(selectedSale.pagamento))}>
-                    {selectedSale.pagamento}
+                  <Badge className={cn("mt-1", getPaymentBadgeColor(selectedSale.paymentMethod))}>
+                    {selectedSale.paymentMethod}
                   </Badge>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Status</p>
-                  <Badge variant={selectedSale.status === 'Pago' ? 'default' : 'destructive'} className="mt-1">
+                  <Badge variant={selectedSale.status === 'completed' ? 'default' : 'destructive'} className="mt-1">
                     {selectedSale.status}
                   </Badge>
                 </div>
@@ -460,12 +460,12 @@ export default function SalesPage() {
               <div className="border-t pt-4">
                 <h4 className="font-semibold mb-2">Itens</h4>
                 <div className="space-y-2">
-                  {selectedSale.itens.map((item, i) => (
+                  {selectedSale.items?.map((item, i) => (
                     <div key={i} className="flex justify-between text-sm">
                       <span>
-                        {item.qtd}x {item.nome}
+                        {item.qty}x Produto {item.productId}
                       </span>
-                      <span className="font-medium tabular-nums">{formatCurrency(item.precoUnit * item.qtd)}</span>
+                      <span className="font-medium tabular-nums">{formatCurrency(item.unitPrice * item.qty)}</span>
                     </div>
                   ))}
                 </div>

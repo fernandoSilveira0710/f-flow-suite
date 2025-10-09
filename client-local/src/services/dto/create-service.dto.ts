@@ -19,7 +19,7 @@ export class CreateServiceDto {
 
   @IsOptional()
   @IsString()
-  category?: string;
+  categoryId?: string;
 
   @IsOptional()
   @IsBoolean()

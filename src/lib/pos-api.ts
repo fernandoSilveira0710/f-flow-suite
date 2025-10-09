@@ -114,40 +114,54 @@ const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> =
   return response.json();
 };
 
+// Import mockAPI to get products from the Products tab
+import { mockAPI } from './mock-data';
+
 // Products API
 export const searchProducts = async (query: string): Promise<Product[]> => {
   try {
-    const products = await apiCall<any[]>('/products');
+    // Get products from mockAPI (same data used in Products tab)
+    const products = mockAPI.getProducts();
+    const categories = mockAPI.getCategories();
     
     if (!query.trim()) {
-      return products.map(p => ({
-        id: p.id,
-        nome: p.name,
-        sku: p.sku,
-        preco: p.salePrice || p.price,
-        estoque: p.stockQty || 0,
-        categoria: p.category,
-        barcode: p.barcode,
-      }));
+      return products
+        .filter(p => p.active) // Only show active products
+        .map(p => {
+          const category = categories.find(c => c.id === p.categoryId);
+          return {
+            id: p.id,
+            nome: p.name,
+            sku: p.sku,
+            preco: p.price,
+            estoque: p.stock,
+            categoria: category?.name,
+            barcode: p.barcode,
+          };
+        });
     }
     
     const lowerQuery = query.toLowerCase();
     return products
       .filter(p => 
-        p.name?.toLowerCase().includes(lowerQuery) ||
-        p.sku?.toLowerCase().includes(lowerQuery) ||
-        p.barcode?.toLowerCase().includes(lowerQuery) ||
-        p.category?.toLowerCase().includes(lowerQuery)
+        p.active && (
+          p.name?.toLowerCase().includes(lowerQuery) ||
+          p.sku?.toLowerCase().includes(lowerQuery) ||
+          p.barcode?.toLowerCase().includes(lowerQuery)
+        )
       )
-      .map(p => ({
-        id: p.id,
-        nome: p.name,
-        sku: p.sku,
-        preco: p.salePrice || p.price,
-        estoque: p.stockQty || 0,
-        categoria: p.category,
-        barcode: p.barcode,
-      }));
+      .map(p => {
+        const category = categories.find(c => c.id === p.categoryId);
+        return {
+          id: p.id,
+          nome: p.name,
+          sku: p.sku,
+          preco: p.price,
+          estoque: p.stock,
+          categoria: category?.name,
+          barcode: p.barcode,
+        };
+      });
   } catch (error) {
     console.error('Error searching products:', error);
     return [];
@@ -156,18 +170,24 @@ export const searchProducts = async (query: string): Promise<Product[]> => {
 
 export const findProductByBarcode = async (barcode: string): Promise<Product | null> => {
   try {
-    const products = await apiCall<any[]>('/products');
-    const product = products.find(p => p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase());
+    // Get products from mockAPI (same data used in Products tab)
+    const products = mockAPI.getProducts();
+    const categories = mockAPI.getCategories();
+    
+    const product = products.find(p => 
+      p.active && (p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase())
+    );
     
     if (!product) return null;
     
+    const category = categories.find(c => c.id === product.categoryId);
     return {
       id: product.id,
       nome: product.name,
       sku: product.sku,
-      preco: product.salePrice || product.price,
-      estoque: product.stockQty || 0,
-      categoria: product.category,
+      preco: product.price,
+      estoque: product.stock,
+      categoria: category?.name,
       barcode: product.barcode,
     };
   } catch (error) {
@@ -196,14 +216,21 @@ export const getProducts = async (): Promise<Product[]> => {
 
 export const getProductById = async (id: string): Promise<Product | null> => {
   try {
-    const product = await apiCall<any>(`/products/${id}`);
+    // Get products from mockAPI (same data used in Products tab)
+    const products = mockAPI.getProducts();
+    const categories = mockAPI.getCategories();
+    
+    const product = products.find(p => p.active && p.id === id);
+    if (!product) return null;
+    
+    const category = categories.find(c => c.id === product.categoryId);
     return {
       id: product.id,
       nome: product.name,
       sku: product.sku,
-      preco: product.salePrice || product.price,
-      estoque: product.stockQty || 0,
-      categoria: product.category,
+      preco: product.price,
+      estoque: product.stock,
+      categoria: category?.name,
       barcode: product.barcode,
     };
   } catch (error) {
@@ -285,36 +312,43 @@ export const clearCart = async (): Promise<void> => {
 };
 
 // Sales API
-export const createSale = async (saleData: {
-  operator: string;
-  paymentMethod: string;
-  customerId?: string;
-  items: { productId: string; qty: number; unitPrice: number }[];
-}): Promise<Sale> => {
+export const createSale = async (
+  cart: CartItem[],
+  paymentMethod: string,
+  installments?: number,
+  discount?: number
+): Promise<Sale> => {
   try {
     // Get existing sales from localStorage
     const existingSales = getFromStorage<Sale[]>('2f.pos.sales', []);
     
-    // Calculate total
-    const total = saleData.items.reduce((sum, item) => sum + (item.qty * item.unitPrice), 0);
+    // Calculate subtotal from cart
+    const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+    
+    // Apply discount if provided
+    const total = subtotal - (discount || 0);
+    
+    // Get current session for operator
+    const currentSession = getCurrentSession();
+    const operator = currentSession?.operador?.nome || 'Sistema';
     
     // Create new sale
     const newSale: Sale = {
       id: `sale_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       code: `VND${String(existingSales.length + 1).padStart(6, '0')}`,
-      operator: saleData.operator,
-      paymentMethod: saleData.paymentMethod,
+      operator,
+      paymentMethod,
       status: 'completed',
       total,
-      customerId: saleData.customerId,
+      customerId: undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      items: saleData.items.map((item, index) => ({
+      items: cart.map((item, index) => ({
         id: `item_${Date.now()}_${index}`,
-        productId: item.productId,
-        qty: item.qty,
-        unitPrice: item.unitPrice,
-        subtotal: item.qty * item.unitPrice,
+        productId: item.produto.id,
+        qty: item.qtd,
+        unitPrice: item.produto.preco,
+        subtotal: item.subtotal,
         createdAt: new Date().toISOString(),
       })),
     };

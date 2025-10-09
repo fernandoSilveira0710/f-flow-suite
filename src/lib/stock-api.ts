@@ -1,3 +1,6 @@
+// Import mockAPI to use the same products data
+import { mockAPI, type Product as MockProduct } from './mock-data';
+
 /**
  * Stock/Inventory API - Real API Integration
  * Connects to client-local server for inventory operations
@@ -28,6 +31,8 @@ export interface CreateMovementDto {
   origem: string;
   motivo?: string;
   documento?: string;
+  observacao?: string;
+  estoqueMinimo?: number;
 }
 
 // Types and Interfaces
@@ -213,15 +218,53 @@ export const getMovements = (): StockMovement[] => {
 };
 
 export const createMovement = (data: CreateMovementDto): StockMovement => {
+  // Atualizar o estoque do produto no mockAPI
+  const product = mockAPI.getProduct(data.produtoId);
+  if (!product) {
+    throw new Error('Produto não encontrado');
+  }
+
+  let newStock = product.stock;
+  let quantidadeMovimento = data.quantidade || 0;
+  
+  if (data.tipo === 'ENTRADA') {
+    newStock += data.quantidade || 0;
+  } else if (data.tipo === 'SAIDA') {
+    newStock -= data.quantidade || 0;
+  } else if (data.tipo === 'AJUSTE') {
+    // Para ajuste, só alterar o estoque se quantidade foi fornecida
+    if (data.quantidade !== undefined) {
+      newStock = data.quantidade; // Para ajuste, a quantidade é o novo saldo
+    }
+    // Se não foi fornecida quantidade, manter o estoque atual
+    quantidadeMovimento = newStock; // Para o registro do movimento
+  }
+  
+  // Garantir que o estoque não fique negativo
+  newStock = Math.max(0, newStock);
+  
+  // Atualizar o produto no mockAPI
+  const updatedProduct = {
+    ...product,
+    stock: newStock,
+    minStock: data.estoqueMinimo !== undefined ? data.estoqueMinimo : product.minStock
+  };
+  
+  mockAPI.updateProduct(data.produtoId, updatedProduct);
+  
+  // Salvar no localStorage para persistência
+  const products = mockAPI.getProducts();
+  localStorage.setItem('mock_products', JSON.stringify(products));
+
   const movement: StockMovement = {
     id: Date.now().toString(),
     tipo: data.tipo,
     produtoId: data.produtoId,
-    produtoNome: `Produto ${data.produtoId}`, // In real app, would fetch product name
+    produtoNome: product.name,
     sku: data.sku,
-    quantidade: data.quantidade,
+    quantidade: quantidadeMovimento,
     custoUnit: data.custoUnit,
-    valorTotal: data.custoUnit ? data.custoUnit * data.quantidade : undefined,
+    valorTotal: data.custoUnit && quantidadeMovimento ? data.custoUnit * quantidadeMovimento : undefined,
     origem: data.origem,
     motivo: data.motivo,
     documento: data.documento,
@@ -230,6 +273,10 @@ export const createMovement = (data: CreateMovementDto): StockMovement => {
   };
 
   mockMovements.unshift(movement);
+  
+  // Salvar movimentos no localStorage
+  localStorage.setItem('stock_movements', JSON.stringify(mockMovements));
+  
   return movement;
 };
 
@@ -238,6 +285,8 @@ export interface StockPrefs {
   limiteMinimo: number;
   controlarLotes: boolean;
   controlarValidade: boolean;
+  estoqueMinimoPadrao?: number;
+  bloquearVendaSemEstoque?: boolean;
 }
 
 const mockStockPrefs: StockPrefs = {
@@ -245,60 +294,83 @@ const mockStockPrefs: StockPrefs = {
   limiteMinimo: 5,
   controlarLotes: false,
   controlarValidade: false,
+  estoqueMinimoPadrao: 10,
+  bloquearVendaSemEstoque: true,
 };
 
 export const getStockPrefs = (): StockPrefs => {
+  // Tentar carregar das configurações globais primeiro
+  try {
+    const globalPrefs = localStorage.getItem('2f.settings.stockPrefs');
+    if (globalPrefs) {
+      const parsed = JSON.parse(globalPrefs);
+      return {
+        ...mockStockPrefs,
+        estoqueMinimoPadrao: parsed.estoqueMinimoPadrao || mockStockPrefs.estoqueMinimoPadrao,
+        bloquearVendaSemEstoque: parsed.bloquearVendaSemEstoque ?? mockStockPrefs.bloquearVendaSemEstoque,
+      };
+    }
+  } catch (error) {
+    console.warn('Erro ao carregar preferências de estoque:', error);
+  }
+  
   return mockStockPrefs;
 };
 
-export const saveStockPrefs = (prefs: StockPrefs): void => {
+export const saveStockPrefs = (prefs: Partial<StockPrefs>): void => {
   Object.assign(mockStockPrefs, prefs);
+  
+  // Salvar também nas configurações globais se for estoqueMinimoPadrao ou bloquearVendaSemEstoque
+  if (prefs.estoqueMinimoPadrao !== undefined || prefs.bloquearVendaSemEstoque !== undefined) {
+    try {
+      const globalPrefs = {
+        estoqueMinimoPadrao: prefs.estoqueMinimoPadrao ?? mockStockPrefs.estoqueMinimoPadrao,
+        bloquearVendaSemEstoque: prefs.bloquearVendaSemEstoque ?? mockStockPrefs.bloquearVendaSemEstoque,
+      };
+      localStorage.setItem('2f.settings.stockPrefs', JSON.stringify(globalPrefs));
+    } catch (error) {
+      console.warn('Erro ao salvar preferências de estoque:', error);
+    }
+  }
 };
 
-// Product interface for compatibility
+// Product interface for compatibility with stock operations
 export interface Product {
   id: string;
   nome: string;
   sku: string;
   preco: number;
   estoque: number;
+  estoqueAtual: number;
+  estoqueMinimo?: number;
   categoria?: string;
   barcode?: string;
+  unidade?: string;
+  validade?: string;
 }
 
-// Mock products data
-const mockProducts: Product[] = [
-  {
-    id: '1',
-    nome: 'Ração Premium Cães',
-    sku: 'RAC001',
-    preco: 89.90,
-    estoque: 25,
-    categoria: 'Alimentação',
-    barcode: '7891234567890',
-  },
-  {
-    id: '2',
-    nome: 'Shampoo Antipulgas',
-    sku: 'SHP001',
-    preco: 24.50,
-    estoque: 15,
-    categoria: 'Higiene',
-    barcode: '7891234567891',
-  },
-  {
-    id: '3',
-    nome: 'Brinquedo Mordedor',
-    sku: 'BRQ001',
-    preco: 12.90,
-    estoque: 8,
-    categoria: 'Brinquedos',
-    barcode: '7891234567892',
-  },
-];
-
 export const getProducts = (): Product[] => {
-  return mockProducts;
+  // Get products from mockAPI (same data used in Products tab)
+  const products = mockAPI.getProducts();
+  const categories = mockAPI.getCategories();
+  const prefs = getStockPrefs();
+  
+  return products.map(p => {
+    const category = categories.find(c => c.id === p.categoryId);
+    return {
+      id: p.id,
+      nome: p.name,
+      sku: p.sku,
+      preco: p.price,
+      estoque: p.stock,
+      estoqueAtual: p.stock,
+      estoqueMinimo: p.minStock || prefs.estoqueMinimoPadrao || 10, // Use product's minStock or default
+      categoria: category?.name,
+      barcode: p.barcode,
+      unidade: 'un',
+      validade: undefined, // Can be added later if needed
+    };
+  });
 };
 
 // Supplier interface and functions
@@ -396,28 +468,32 @@ export const getStockAlerts = (): StockAlert[] => {
   // Generate alerts based on current stock levels vs minimum stock
   const alerts: StockAlert[] = [];
   
-  mockProducts.forEach(product => {
+  // Get products from mockAPI (same data used in Products tab)
+  const products = mockAPI.getProducts();
+  const categories = mockAPI.getCategories();
+  
+  products.forEach(product => {
     const minStock = 10; // Default minimum stock level
     
-    if (product.estoque === 0) {
+    if (product.stock === 0) {
       alerts.push({
         id: `alert-${product.id}`,
         productId: product.id,
-        productName: product.nome,
+        productName: product.name,
         sku: product.sku,
-        currentStock: product.estoque,
+        currentStock: product.stock,
         minStock,
         alertType: 'OUT_OF_STOCK',
         severity: 'critical',
         createdAt: new Date().toISOString(),
       });
-    } else if (product.estoque <= minStock) {
+    } else if (product.stock <= minStock) {
       alerts.push({
         id: `alert-${product.id}`,
         productId: product.id,
-        productName: product.nome,
+        productName: product.name,
         sku: product.sku,
-        currentStock: product.estoque,
+        currentStock: product.stock,
         minStock,
         alertType: 'LOW_STOCK',
         severity: 'warning',

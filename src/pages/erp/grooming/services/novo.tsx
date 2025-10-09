@@ -1,30 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { createGroomService, type ServiceCategory } from '@/lib/grooming-api';
+import { createGroomService, getServiceCategories, type ServiceCategory } from '@/lib/grooming-api';
 import { toast } from 'sonner';
-
-const categories: { value: ServiceCategory; label: string }[] = [
-  { value: 'BANHO', label: 'Banho' },
-  { value: 'TOSA', label: 'Tosa' },
-  { value: 'HIGIENE', label: 'Higiene' },
-  { value: 'HIDRATACAO', label: 'Hidratação' },
-  { value: 'COMBO', label: 'Combo' },
-  { value: 'OUTROS', label: 'Outros' },
-];
-
-const recursos = [
-  { value: '', label: 'Nenhum' },
-  { value: 'BOX', label: 'Box' },
-  { value: 'MESA', label: 'Mesa' },
-  { value: 'SECADOR', label: 'Secador' },
-];
 
 export default function NovoGroomingService() {
   const navigate = useNavigate();
@@ -36,9 +20,19 @@ export default function NovoGroomingService() {
   const [precoG, setPrecoG] = useState('');
   const [precoGG, setPrecoGG] = useState('');
   const [duracaoBaseMin, setDuracaoBaseMin] = useState('');
-  const [requerRecurso, setRequerRecurso] = useState('');
+  const [requerRecurso, setRequerRecurso] = useState('NENHUM');
   const [cor, setCor] = useState('#3B82F6');
   const [ativo, setAtivo] = useState(true);
+
+  // Get categories from API
+  const categories = getServiceCategories().filter(c => c.ativo);
+
+  const recursos = [
+    { value: 'NENHUM', label: 'Nenhum' },
+    { value: 'BOX', label: 'Box' },
+    { value: 'MESA', label: 'Mesa' },
+    { value: 'SECADOR', label: 'Secador' },
+  ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +53,7 @@ export default function NovoGroomingService() {
         GG: parseFloat(precoGG) || 0,
       },
       duracaoBaseMin: parseInt(duracaoBaseMin) || 60,
-      requerRecurso: requerRecurso ? (requerRecurso as any) : null,
+      requerRecurso: requerRecurso !== 'NENHUM' ? (requerRecurso as any) : null,
       cor,
       ativo,
     });
@@ -116,6 +110,16 @@ export default function NovoGroomingService() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full mt-2"
+                onClick={() => navigate('/erp/settings/grooming')}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Categoria
+              </Button>
             </div>
           </div>
 

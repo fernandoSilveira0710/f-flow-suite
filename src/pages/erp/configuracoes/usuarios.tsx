@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -39,19 +39,36 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useEntitlements } from '@/hooks/use-entitlements';
 import { UpgradeDialog } from '@/components/erp/upgrade-dialog';
-import { getUsers, createUser, updateUser, deleteUser, getRoles, User } from '@/lib/settings-api';
+import { 
+  getUsers, 
+  createUser, 
+  updateUser, 
+  deleteUser, 
+  getRoles, 
+  getSeats,
+  createSeat,
+  updateSeat,
+  deleteSeat,
+  User,
+  Seat 
+} from '@/lib/settings-api';
 
 export default function UsuariosPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [seats, setSeats] = useState<Seat[]>([]);
   const [roles, setRoles] = useState<{ id: string; nome: string }[]>([]);
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('users');
   const [showDialog, setShowDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingSeat, setEditingSeat] = useState<Seat | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [deletingSeat, setDeletingSeat] = useState<Seat | null>(null);
   const [formData, setFormData] = useState({ nome: '', email: '', roleId: '', ativo: true });
   const { entitlements } = useEntitlements();
 
@@ -59,55 +76,95 @@ export default function UsuariosPage() {
     loadData();
   }, []);
 
+  // Escutar mudanças de plano
+  useEffect(() => {
+    const handlePlanChange = () => {
+      // Recarregar entitlements quando o plano mudar
+      window.location.reload();
+    };
+
+    window.addEventListener('planChanged', handlePlanChange);
+    return () => window.removeEventListener('planChanged', handlePlanChange);
+  }, []);
+
   const loadData = async () => {
-    const [usersData, rolesData] = await Promise.all([getUsers(), getRoles()]);
+    const [usersData, rolesData, seatsData] = await Promise.all([getUsers(), getRoles(), getSeats()]);
     setUsers(usersData);
     setRoles(rolesData);
+    setSeats(seatsData);
   };
 
   const handleCreate = () => {
-    const activeUsers = users.filter(u => u.ativo).length;
-    if (activeUsers >= entitlements.seatLimit) {
-      setShowUpgradeDialog(true);
-      return;
+    if (activeTab === 'users') {
+      const activeUsers = users.filter(u => u.ativo).length;
+      if (activeUsers >= entitlements.seatLimit) {
+        setShowUpgradeDialog(true);
+        return;
+      }
+      setEditingUser(null);
+      setFormData({ nome: '', email: '', roleId: roles[0]?.id || '', ativo: true });
+      setShowDialog(true);
+    } else {
+      setEditingSeat(null);
+      setFormData({ nome: '', email: '', roleId: roles[0]?.id || '', ativo: true });
+      setShowDialog(true);
     }
-    setEditingUser(null);
-    setFormData({ nome: '', email: '', roleId: roles[0]?.id || '', ativo: true });
-    setShowDialog(true);
   };
 
-  const handleEdit = (user: User) => {
-    setEditingUser(user);
-    setFormData({ nome: user.nome, email: user.email, roleId: user.roleId, ativo: user.ativo });
+  const handleEdit = (item: User | Seat) => {
+    if (activeTab === 'users') {
+      const user = item as User;
+      setEditingUser(user);
+      setFormData({ nome: user.nome, email: user.email, roleId: user.roleId, ativo: user.ativo });
+    } else {
+      const seat = item as Seat;
+      setEditingSeat(seat);
+      setFormData({ nome: seat.nome, email: '', roleId: seat.roleId, ativo: seat.ativo });
+    }
     setShowDialog(true);
   };
 
   const handleSave = async () => {
     try {
-      if (editingUser) {
-        await updateUser(editingUser.id, formData);
-        toast.success('Usuário atualizado com sucesso');
+      if (activeTab === 'users') {
+        if (editingUser) {
+          await updateUser(editingUser.id, formData);
+          toast.success('Usuário atualizado com sucesso');
+        } else {
+          await createUser(formData);
+          toast.success('Usuário criado com sucesso');
+        }
       } else {
-        await createUser(formData);
-        toast.success('Usuário criado com sucesso');
+        if (editingSeat) {
+          await updateSeat(editingSeat.id, { nome: formData.nome, roleId: formData.roleId, ativo: formData.ativo });
+          toast.success('Assento atualizado com sucesso');
+        } else {
+          await createSeat({ nome: formData.nome, roleId: formData.roleId, ativo: formData.ativo });
+          toast.success('Assento criado com sucesso');
+        }
       }
       setShowDialog(false);
       loadData();
     } catch (error) {
-      toast.error('Erro ao salvar usuário');
+      toast.error(`Erro ao salvar ${activeTab === 'users' ? 'usuário' : 'assento'}`);
     }
   };
 
   const handleDelete = async () => {
-    if (!deletingUser) return;
     try {
-      await deleteUser(deletingUser.id);
-      toast.success('Usuário removido com sucesso');
+      if (activeTab === 'users' && deletingUser) {
+        await deleteUser(deletingUser.id);
+        toast.success('Usuário excluído com sucesso');
+      } else if (activeTab === 'seats' && deletingSeat) {
+        await deleteSeat(deletingSeat.id);
+        toast.success('Assento excluído com sucesso');
+      }
       setShowDeleteDialog(false);
       setDeletingUser(null);
+      setDeletingSeat(null);
       loadData();
     } catch (error) {
-      toast.error('Erro ao remover usuário');
+      toast.error(`Erro ao excluir ${activeTab === 'users' ? 'usuário' : 'assento'}`);
     }
   };
 
@@ -116,86 +173,161 @@ export default function UsuariosPage() {
     u.email.toLowerCase().includes(search.toLowerCase())
   );
 
+  const filteredSeats = seats.filter(s =>
+    s.nome.toLowerCase().includes(search.toLowerCase())
+  );
+
   const activeUsers = users.filter(u => u.ativo).length;
+  const activeSeats = seats.filter(s => s.ativo).length;
+
+  const currentCount = activeTab === 'users' ? users.length : seats.length;
+  const maxCount = entitlements.seatLimit;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Usuários & Assentos</h1>
-          <p className="text-muted-foreground mt-1">
-            {activeUsers} de {entitlements.seatLimit} assentos em uso
-          </p>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">Usuários & Assentos</h1>
+          <Badge variant="secondary" className="text-sm">
+            {currentCount} de {maxCount} {activeTab === 'users' ? 'usuários' : 'assentos'} em uso
+          </Badge>
         </div>
         <Button onClick={handleCreate}>
           <Plus className="h-4 w-4 mr-2" />
-          Novo Usuário
+          {activeTab === 'users' ? 'Novo Usuário' : 'Novo Assento'}
         </Button>
       </div>
 
-      <div>
-        <Input
-          placeholder="Buscar usuários..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-md"
-        />
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Usuários
+          </TabsTrigger>
+          <TabsTrigger value="seats" className="flex items-center gap-2">
+            <UserCheck className="h-4 w-4" />
+            Assentos
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>E-mail</TableHead>
-              <TableHead>Papel</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredUsers.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium">{user.nome}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>
-                  {roles.find(r => r.id === user.roleId)?.nome || user.roleId}
-                </TableCell>
-                <TableCell>
-                  {user.ativo ? (
-                    <Badge variant="default">Ativo</Badge>
-                  ) : (
-                    <Badge variant="secondary">Inativo</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => handleEdit(user)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      setDeletingUser(user);
-                      setShowDeleteDialog(true);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+        <div className="mt-4">
+          <Input
+            placeholder={`Buscar ${activeTab === 'users' ? 'usuários' : 'assentos'}...`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-md"
+          />
+        </div>
 
-      {/* User Dialog */}
+        <TabsContent value="users" className="space-y-4">
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>E-mail</TableHead>
+                  <TableHead>Papel</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{user.nome}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      {roles.find(r => r.id === user.roleId)?.nome || user.roleId}
+                    </TableCell>
+                    <TableCell>
+                      {user.ativo ? (
+                        <Badge variant="default">Ativo</Badge>
+                      ) : (
+                        <Badge variant="secondary">Inativo</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(user)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setDeletingUser(user);
+                          setShowDeleteDialog(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="seats" className="space-y-4">
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Papel</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSeats.map((seat) => (
+                  <TableRow key={seat.id}>
+                    <TableCell className="font-medium">{seat.nome}</TableCell>
+                    <TableCell>
+                      {roles.find(r => r.id === seat.roleId)?.nome || seat.roleId}
+                    </TableCell>
+                    <TableCell>
+                      {seat.ativo ? (
+                        <Badge variant="default">Ativo</Badge>
+                      ) : (
+                        <Badge variant="secondary">Inativo</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(seat)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setDeletingSeat(seat);
+                          setShowDeleteDialog(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* User/Seat Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingUser ? 'Editar Usuário' : 'Novo Usuário'}</DialogTitle>
+            <DialogTitle>
+              {activeTab === 'users' 
+                ? (editingUser ? 'Editar Usuário' : 'Novo Usuário')
+                : (editingSeat ? 'Editar Assento' : 'Novo Assento')
+              }
+            </DialogTitle>
             <DialogDescription>
-              Preencha os dados do usuário abaixo
+              Preencha os dados {activeTab === 'users' ? 'do usuário' : 'do assento'} abaixo
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -207,15 +339,17 @@ export default function UsuariosPage() {
                 onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
+            {activeTab === 'users' && (
+              <div className="space-y-2">
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="roleId">Papel</Label>
               <Select
@@ -258,7 +392,9 @@ export default function UsuariosPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja remover o usuário <strong>{deletingUser?.nome}</strong>?
+              Tem certeza que deseja remover {activeTab === 'users' ? 'o usuário' : 'o assento'} <strong>
+                {activeTab === 'users' ? deletingUser?.nome : deletingSeat?.nome}
+              </strong>?
               Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>

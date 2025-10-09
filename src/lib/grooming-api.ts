@@ -43,16 +43,33 @@ export interface Pet {
 
 export type ServiceCategory = 'BANHO' | 'TOSA' | 'HIGIENE' | 'HIDRATACAO' | 'COMBO' | 'OUTROS';
 
+export interface ServiceCategoryConfig {
+  id: string;
+  value: ServiceCategory;
+  label: string;
+  ativo: boolean;
+  criadoEm?: string;
+  atualizadoEm?: string;
+}
+
 export interface GroomService {
   id: string;
-  name: string;
-  description?: string;
-  price: number;
-  duration: number;
-  category: string;
-  active: boolean;
-  createdAt?: string;
-  updatedAt?: string;
+  nome: string;
+  descricao?: string;
+  categoria: ServiceCategory;
+  precoPorPorte: {
+    PP: number;
+    P: number;
+    M: number;
+    G: number;
+    GG: number;
+  };
+  duracaoBaseMin: number;
+  requerRecurso?: string | null;
+  cor?: string;
+  ativo: boolean;
+  criadoEm?: string;
+  atualizadoEm?: string;
 }
 
 export type ResourceType = 'BOX' | 'GAIOLA' | 'MESA' | 'SECADOR';
@@ -65,7 +82,7 @@ export interface GroomResource {
   ativo: boolean;
 }
 
-export type TicketStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type TicketStatus = 'CHECKIN' | 'BANHO' | 'SECAGEM' | 'TOSA' | 'FINALIZACAO' | 'PRONTO' | 'ENTREGUE' | 'CANCELADO';
 export type TicketOrigem = 'AGENDADO' | 'WALKIN';
 export type IncidentType = 'CORTE' | 'REACAO' | 'FUGA' | 'OUTRO';
 
@@ -141,6 +158,7 @@ const STORAGE_KEYS = {
   TUTORS: 'grooming_tutors',
   PETS: 'grooming_pets',
   PREFS: 'grooming_prefs',
+  CATEGORIES: 'grooming_categories',
 };
 
 // ============ HELPERS ============
@@ -229,6 +247,69 @@ export function initGroomingMockData(): void {
     ];
     setStorage(STORAGE_KEYS.PETS, mockPets);
   }
+
+  // Init tickets with example data
+  if (!localStorage.getItem('grooming_tickets')) {
+    const tutors = getTutors();
+    const pets = getPets();
+    const services = getGroomServices();
+    
+    if (tutors.length > 0 && pets.length > 0 && services.length > 0) {
+      const mockTickets: GroomTicket[] = [
+        {
+          id: uuid(),
+          code: `GT${Date.now().toString().slice(-6)}`,
+          petId: pets[0].id,
+          tutorId: tutors[0].id,
+          status: 'CHECKIN',
+          totalPrice: 65,
+          notes: 'Pet muito dócil, sem restrições',
+          items: [
+            {
+              id: uuid(),
+              serviceId: services[1]?.id,
+              name: 'Banho + Tosa Higiênica',
+              price: 65,
+              qty: 1,
+              subtotal: 65,
+            }
+          ],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: uuid(),
+          code: `GT${(Date.now() + 1000).toString().slice(-6)}`,
+          petId: pets[1]?.id || pets[0].id,
+          tutorId: tutors[1]?.id || tutors[0].id,
+          status: 'BANHO',
+          totalPrice: 45,
+          notes: 'Gato nervoso, cuidado ao manusear',
+          items: [
+            {
+              id: uuid(),
+              serviceId: services[0]?.id,
+              name: 'Banho Simples',
+              price: 30,
+              qty: 1,
+              subtotal: 30,
+            },
+            {
+              id: uuid(),
+              serviceId: services[3]?.id,
+              name: 'Hidratação',
+              price: 15,
+              qty: 1,
+              subtotal: 15,
+            }
+          ],
+          createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+          updatedAt: new Date().toISOString(),
+        }
+      ];
+      setStorage('grooming_tickets', mockTickets);
+    }
+  }
 }
 
 // ============ TUTORS API (Local for now) ============
@@ -295,35 +376,44 @@ export function deletePet(id: string): void {
   setStorage(STORAGE_KEYS.PETS, pets);
 }
 
-// ============ SERVICES API (Local for now) ============
+// ============ SERVICES API ============
 export function getGroomServices(): GroomService[] {
   const services = getStorage<GroomService[]>('grooming_services', [
-    {
-      id: uuid(),
-      name: 'Banho Simples',
-      description: 'Banho básico com shampoo neutro',
-      price: 35.00,
-      duration: 60,
-      category: 'BANHO',
-      active: true,
+    { 
+      id: uuid(), 
+      nome: 'Banho Simples', 
+      descricao: 'Banho com shampoo neutro', 
+      categoria: 'BANHO',
+      precoPorPorte: { PP: 25, P: 30, M: 35, G: 40, GG: 45 },
+      duracaoBaseMin: 60,
+      ativo: true 
     },
-    {
-      id: uuid(),
-      name: 'Tosa Higiênica',
-      description: 'Tosa das partes íntimas e patas',
-      price: 25.00,
-      duration: 30,
-      category: 'HIGIENE',
-      active: true,
+    { 
+      id: uuid(), 
+      nome: 'Banho + Tosa Higiênica', 
+      descricao: 'Banho completo com tosa higiênica', 
+      categoria: 'COMBO',
+      precoPorPorte: { PP: 35, P: 45, M: 55, G: 65, GG: 75 },
+      duracaoBaseMin: 90,
+      ativo: true 
     },
-    {
-      id: uuid(),
-      name: 'Banho + Tosa',
-      description: 'Banho completo com tosa',
-      price: 65.00,
-      duration: 120,
-      category: 'COMBO',
-      active: true,
+    { 
+      id: uuid(), 
+      nome: 'Tosa Completa', 
+      descricao: 'Tosa na tesoura ou máquina', 
+      categoria: 'TOSA',
+      precoPorPorte: { PP: 45, P: 60, M: 75, G: 90, GG: 105 },
+      duracaoBaseMin: 120,
+      ativo: true 
+    },
+    { 
+      id: uuid(), 
+      nome: 'Hidratação', 
+      descricao: 'Tratamento hidratante para pelos ressecados', 
+      categoria: 'HIDRATACAO',
+      precoPorPorte: { PP: 20, P: 25, M: 30, G: 35, GG: 40 },
+      duracaoBaseMin: 45,
+      ativo: true 
     },
   ]);
   return Array.isArray(services) ? services : [];
@@ -333,12 +423,12 @@ export function getGroomServiceById(id: string): GroomService | undefined {
   return getGroomServices().find((s) => s.id === id);
 }
 
-export function createGroomService(data: Omit<GroomService, 'id' | 'createdAt' | 'updatedAt'>): GroomService {
+export function createGroomService(data: Omit<GroomService, 'id' | 'criadoEm' | 'atualizadoEm'>): GroomService {
   const service: GroomService = { 
     id: uuid(), 
     ...data,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    criadoEm: new Date().toISOString(),
+    atualizadoEm: new Date().toISOString()
   };
   const services = getGroomServices();
   services.push(service);
@@ -346,14 +436,14 @@ export function createGroomService(data: Omit<GroomService, 'id' | 'createdAt' |
   return service;
 }
 
-export function updateGroomService(id: string, data: Partial<Omit<GroomService, 'id' | 'createdAt' | 'updatedAt'>>): GroomService | undefined {
+export function updateGroomService(id: string, data: Partial<Omit<GroomService, 'id' | 'criadoEm' | 'atualizadoEm'>>): GroomService | undefined {
   const services = getGroomServices();
   const index = services.findIndex((s) => s.id === id);
   if (index !== -1) {
     services[index] = { 
       ...services[index], 
       ...data,
-      updatedAt: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
     };
     setStorage('grooming_services', services);
     return services[index];
@@ -363,44 +453,30 @@ export function updateGroomService(id: string, data: Partial<Omit<GroomService, 
 
 export function deleteGroomService(id: string): GroomService | undefined {
   const services = getGroomServices();
-  const service = services.find((s) => s.id === id);
-  if (service) {
-    const filteredServices = services.filter((s) => s.id !== id);
-    setStorage('grooming_services', filteredServices);
-    return service;
+  const index = services.findIndex((s) => s.id === id);
+  if (index !== -1) {
+    const deletedService = services[index];
+    services.splice(index, 1);
+    setStorage('grooming_services', services);
+    return deletedService;
   }
   return undefined;
 }
 
 export function duplicateGroomService(id: string): GroomService | undefined {
   const service = getGroomServiceById(id);
-  if (!service) return undefined;
-  const duplicated = createGroomService({
-    ...service,
-    name: `${service.name} (Cópia)`,
-  });
-  return duplicated;
+  if (service) {
+    return createGroomService({ ...service, nome: `${service.nome} (Cópia)` });
+  }
+  return undefined;
 }
 
-// ============ PROFESSIONALS API (Local for now) ============
+// ============ PROFESSIONALS API ============
 export function getProfessionals(): Professional[] {
   const professionals = getStorage<Professional[]>('grooming_professionals', [
-    {
-      id: uuid(),
-      name: 'Ana Silva',
-      role: 'Tosadora',
-      phone: '(11) 99999-3333',
-      email: 'ana@petshop.com',
-      active: true,
-    },
-    {
-      id: uuid(),
-      name: 'Carlos Santos',
-      role: 'Banhista',
-      phone: '(11) 99999-4444',
-      email: 'carlos@petshop.com',
-      active: true,
-    },
+    { id: uuid(), name: 'Maria Silva', role: 'Tosadora', phone: '(11) 99999-1111', email: 'maria@petshop.com', active: true },
+    { id: uuid(), name: 'João Santos', role: 'Banhista', phone: '(11) 99999-2222', email: 'joao@petshop.com', active: true },
+    { id: uuid(), name: 'Ana Costa', role: 'Veterinária', phone: '(11) 99999-3333', email: 'ana@petshop.com', active: true },
   ]);
   return Array.isArray(professionals) ? professionals : [];
 }
@@ -414,7 +490,7 @@ export function createProfessional(data: Omit<Professional, 'id' | 'createdAt' |
     id: uuid(), 
     ...data,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
   const professionals = getProfessionals();
   professionals.push(professional);
@@ -429,7 +505,7 @@ export function updateProfessional(id: string, data: Partial<Omit<Professional, 
     professionals[index] = { 
       ...professionals[index], 
       ...data,
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
     setStorage('grooming_professionals', professionals);
     return professionals[index];
@@ -439,16 +515,17 @@ export function updateProfessional(id: string, data: Partial<Omit<Professional, 
 
 export function deleteProfessional(id: string): Professional | undefined {
   const professionals = getProfessionals();
-  const professional = professionals.find((p) => p.id === id);
-  if (professional) {
-    const filteredProfessionals = professionals.filter((p) => p.id !== id);
-    setStorage('grooming_professionals', filteredProfessionals);
-    return professional;
+  const index = professionals.findIndex((p) => p.id === id);
+  if (index !== -1) {
+    const deletedProfessional = professionals[index];
+    professionals.splice(index, 1);
+    setStorage('grooming_professionals', professionals);
+    return deletedProfessional;
   }
   return undefined;
 }
 
-// ============ RESOURCES API (Local for now - could be moved to API) ============
+// ============ RESOURCES API ============
 export function getGroomResources(): GroomResource[] {
   const resources = getStorage<GroomResource[]>('grooming_resources', [
     { id: uuid(), tipo: 'BOX', nome: 'Box 1', capacidadeSimultanea: 1, ativo: true },
@@ -553,6 +630,105 @@ export function getGroomPrefs(): GroomPrefs {
 
 export function saveGroomPrefs(prefs: GroomPrefs): void {
   setStorage(STORAGE_KEYS.PREFS, prefs);
+}
+
+// ============ CATEGORIES API ============
+export function getServiceCategories(): ServiceCategoryConfig[] {
+  const categories = getStorage<ServiceCategoryConfig[]>(STORAGE_KEYS.CATEGORIES, [
+    { 
+      id: uuid(), 
+      value: 'BANHO', 
+      label: 'Banho', 
+      ativo: true,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    },
+    { 
+      id: uuid(), 
+      value: 'TOSA', 
+      label: 'Tosa', 
+      ativo: true,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    },
+    { 
+      id: uuid(), 
+      value: 'HIGIENE', 
+      label: 'Higiene', 
+      ativo: true,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    },
+    { 
+      id: uuid(), 
+      value: 'HIDRATACAO', 
+      label: 'Hidratação', 
+      ativo: true,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    },
+    { 
+      id: uuid(), 
+      value: 'COMBO', 
+      label: 'Combo', 
+      ativo: true,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    },
+    { 
+      id: uuid(), 
+      value: 'OUTROS', 
+      label: 'Outros', 
+      ativo: true,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    },
+  ]);
+  return Array.isArray(categories) ? categories : [];
+}
+
+export function getServiceCategoryById(id: string): ServiceCategoryConfig | undefined {
+  return getServiceCategories().find((c) => c.id === id);
+}
+
+export function createServiceCategory(data: Omit<ServiceCategoryConfig, 'id' | 'criadoEm' | 'atualizadoEm'>): ServiceCategoryConfig {
+  const category: ServiceCategoryConfig = { 
+    id: uuid(), 
+    ...data,
+    criadoEm: new Date().toISOString(),
+    atualizadoEm: new Date().toISOString()
+  };
+  const categories = getServiceCategories();
+  categories.push(category);
+  setStorage(STORAGE_KEYS.CATEGORIES, categories);
+  return category;
+}
+
+export function updateServiceCategory(id: string, data: Partial<Omit<ServiceCategoryConfig, 'id' | 'criadoEm' | 'atualizadoEm'>>): ServiceCategoryConfig | undefined {
+  const categories = getServiceCategories();
+  const index = categories.findIndex((c) => c.id === id);
+  if (index !== -1) {
+    categories[index] = { 
+      ...categories[index], 
+      ...data,
+      atualizadoEm: new Date().toISOString()
+    };
+    setStorage(STORAGE_KEYS.CATEGORIES, categories);
+    return categories[index];
+  }
+  return undefined;
+}
+
+export function deleteServiceCategory(id: string): ServiceCategoryConfig | undefined {
+  const categories = getServiceCategories();
+  const index = categories.findIndex((c) => c.id === id);
+  if (index !== -1) {
+    const deletedCategory = categories[index];
+    categories.splice(index, 1);
+    setStorage(STORAGE_KEYS.CATEGORIES, categories);
+    return deletedCategory;
+  }
+  return undefined;
 }
 
 // Initialize on load
