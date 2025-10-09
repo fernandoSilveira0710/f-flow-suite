@@ -22,6 +22,7 @@ import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 import { ConfigurationsModule } from './configurations/configurations.module';
+import { PlansModule } from './plans/plans.module';
 import { HealthController } from './health/health.controller';
 import { JwksController } from './auth/jwks.controller';
 import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
@@ -50,6 +51,7 @@ import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
     RolesModule,
     PaymentMethodsModule,
     ConfigurationsModule,
+    PlansModule,
   ],
   controllers: [HealthController, JwksController],
   providers: [PrismaService],
