@@ -144,12 +144,39 @@ export class LicensesService {
       throw new Error('MISSING_LICENSE_PRIVATE_KEY_PEM');
     }
 
-    const privateKey = await jose.importPKCS8(privateKeyPem, 'RS256');
+    // Ler a chave privada do arquivo diretamente
+    const fs = require('fs');
+    const path = require('path');
+    const keyPath = path.join(process.cwd(), 'license_private.pem');
+    const privateKeyFromFile = fs.readFileSync(keyPath, 'utf8');
+
+    const privateKey = await jose.importPKCS8(privateKeyFromFile, 'RS256');
 
     const token = await new jose.SignJWT(payload)
       .setProtectedHeader({ alg: 'RS256', kid: 'license-key' })
       .setExpirationTime(payload.exp)
       .sign(privateKey);
+
+    // Persistir o token no banco de dados
+    await this.prisma.licenseToken.upsert({
+      where: {
+        tenantId_deviceId: {
+          tenantId,
+          deviceId
+        }
+      },
+      update: {
+        token,
+        expiresAt: new Date(payload.exp * 1000),
+        revokedAt: null
+      },
+      create: {
+        tenantId,
+        deviceId,
+        token,
+        expiresAt: new Date(payload.exp * 1000)
+      }
+    });
 
     return token;
   }

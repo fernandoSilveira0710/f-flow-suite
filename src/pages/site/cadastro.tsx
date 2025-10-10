@@ -6,31 +6,16 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Package2, CreditCard, Check } from 'lucide-react';
+import { Package2, CreditCard, Check, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-
-const PLANS = {
-  starter: {
-    name: 'Starter',
-    price: 97,
-    features: ['PDV Básico', 'Estoque', 'Clientes', 'Pets', 'Serviços']
-  },
-  pro: {
-    name: 'Pro',
-    price: 197,
-    features: ['Tudo do Starter', 'Agenda', 'Profissionais', 'Relatórios', 'Dashboard']
-  },
-  max: {
-    name: 'Max',
-    price: 297,
-    features: ['Tudo do Pro', 'Multi-lojas', 'API Avançada', 'Suporte Premium']
-  }
-};
+import { useHubPlans, HubPlan } from '@/hooks/use-hub-plans';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function Cadastro() {
   const navigate = useNavigate();
   const location = useLocation();
   const selectedPlan = location.state?.selectedPlan || 'starter';
+  const { plans, loading: plansLoading, error: plansError, isHubAvailable } = useHubPlans();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -65,27 +50,67 @@ export default function Cadastro() {
     }
 
     try {
-      // Simular criação de conta e redirecionamento para pagamento
-      console.log('Registration data:', formData);
-      
-      toast({
-        title: 'Conta criada!',
-        description: 'Redirecionando para o pagamento...',
+      // Chamar endpoint do HUB para cadastro
+      const response = await fetch('http://localhost:8081/public/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          cpf: formData.cpf,
+          password: formData.password,
+          planId: formData.plan,
+        }),
       });
 
-      // Redirecionar para página de pagamento com dados do usuário
-      setTimeout(() => {
-        navigate('/pagamento', { 
-          state: { 
-            userData: formData,
-            plan: PLANS[formData.plan as keyof typeof PLANS]
-          } 
+      if (response.ok) {
+        const result = await response.json();
+        
+        toast({
+          title: 'Conta criada com sucesso!',
+          description: 'Redirecionando para o login...',
         });
-      }, 1000);
+
+        // Redirecionar para login com mensagem de sucesso
+        setTimeout(() => {
+          navigate('/site/login', { 
+            state: { 
+              message: 'Conta criada com sucesso! Faça login para acessar o sistema.',
+              email: formData.email
+            } 
+          });
+        }, 1500);
+      } else {
+        const errorData = await response.json();
+        
+        // Tratar erros específicos
+        if (response.status === 409) {
+          toast({
+            title: 'Erro de duplicação',
+            description: errorData.message || 'Email ou CPF já cadastrado.',
+            variant: 'destructive',
+          });
+        } else if (response.status === 400) {
+          toast({
+            title: 'Dados inválidos',
+            description: errorData.message || 'Verifique os dados informados.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Erro no servidor',
+            description: 'Erro interno do servidor. Tente novamente.',
+            variant: 'destructive',
+          });
+        }
+      }
     } catch (error) {
+      console.error('Erro ao criar conta:', error);
       toast({
-        title: 'Erro',
-        description: 'Erro ao criar conta. Tente novamente.',
+        title: 'Erro de conexão',
+        description: 'Não foi possível conectar ao servidor. Verifique sua conexão.',
         variant: 'destructive',
       });
     }
@@ -101,7 +126,21 @@ export default function Cadastro() {
     setFormData({ ...formData, cpf: formatted });
   };
 
-  const currentPlan = PLANS[formData.plan as keyof typeof PLANS];
+  const currentPlan = plans.find(plan => plan.id === formData.plan) || plans[0];
+
+  // Loading state
+  if (plansLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin mb-4" />
+            <p className="text-muted-foreground">Carregando planos...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
@@ -121,6 +160,16 @@ export default function Cadastro() {
         </CardHeader>
         
         <CardContent>
+          {/* Alert para status do HUB */}
+          {plansError && (
+            <Alert className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {isHubAvailable ? plansError : 'HUB offline - usando planos locais'}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="name">Nome Completo</Label>
@@ -188,8 +237,8 @@ export default function Cadastro() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(PLANS).map(([key, plan]) => (
-                    <SelectItem key={key} value={key}>
+                  {plans.map((plan) => (
+                    <SelectItem key={plan.id} value={plan.id}>
                       {plan.name} - R$ {plan.price}/mês
                     </SelectItem>
                   ))}
@@ -233,16 +282,16 @@ export default function Cadastro() {
         <CardContent className="space-y-4">
           <div className="p-4 border rounded-lg">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-lg">{currentPlan.name}</h3>
+              <h3 className="font-semibold text-lg">{currentPlan?.name}</h3>
               <Badge variant="secondary">Mensal</Badge>
             </div>
             <div className="text-2xl font-bold text-primary mb-4">
-              R$ {currentPlan.price}/mês
+              R$ {currentPlan?.price}/mês
             </div>
             
             <div className="space-y-2">
               <h4 className="font-medium text-sm text-muted-foreground">Recursos inclusos:</h4>
-              {currentPlan.features.map((feature, index) => (
+              {currentPlan?.features.map((feature, index) => (
                 <div key={index} className="flex items-center gap-2 text-sm">
                   <Check className="h-4 w-4 text-green-500" />
                   {feature}

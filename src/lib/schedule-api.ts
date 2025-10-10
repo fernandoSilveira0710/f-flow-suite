@@ -141,7 +141,7 @@ function uuid(): string {
 
 // API Helper
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const baseUrl = 'http://localhost:3010';
+  const baseUrl = 'http://localhost:3001';
   const response = await fetch(`${baseUrl}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',

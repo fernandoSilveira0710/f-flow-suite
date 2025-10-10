@@ -82,8 +82,29 @@ export class LicensingService implements OnModuleInit {
       // Validate and decode the token
       const decodedToken = await this.validateAndDecodeToken(licenseToken);
 
-      // Store the token securely
+      // Store the token securely in TokenStore
       await this.tokenStore.saveToken(tenantId, deviceId, licenseToken);
+
+      // Also persist the token in the database
+      await this.prisma.licenseToken.upsert({
+        where: {
+          tenantId_deviceId: {
+            tenantId,
+            deviceId
+          }
+        },
+        update: {
+          token: licenseToken,
+          expiresAt: new Date(decodedToken.exp * 1000),
+          revokedAt: null
+        },
+        create: {
+          tenantId,
+          deviceId,
+          token: licenseToken,
+          expiresAt: new Date(decodedToken.exp * 1000)
+        }
+      });
 
       this.logger.log(`License activated successfully for tenant ${tenantId}`);
 
@@ -112,16 +133,88 @@ export class LicensingService implements OnModuleInit {
 
   async getInstallStatus(): Promise<InstallStatusResponse> {
     try {
-      // Try to get stored token - pass deviceId for proper token retrieval
-      const token = await this.tokenStore.getToken(undefined, this.deviceId);
+      // First try to get stored token from TokenStore - pass deviceId for proper token retrieval
+      let token = await this.tokenStore.getToken(undefined, this.deviceId);
       
+      // If no token in TokenStore, try to get from database
       if (!token) {
+        const dbToken = await this.prisma.licenseToken.findFirst({
+          where: {
+            deviceId: this.deviceId,
+            revokedAt: null,
+            expiresAt: {
+              gt: new Date()
+            }
+          },
+          orderBy: {
+            issuedAt: 'desc'
+          }
+        });
+        
+        if (dbToken) {
+          token = dbToken.token;
+          // Sync token back to TokenStore for future use
+          await this.tokenStore.saveToken(dbToken.tenantId, dbToken.deviceId, token);
+        }
+      }
+      
+      if (token) {
+        if (!this.licensingEnforced) {
+          return { 
+            isInstalled: true,
+            hasLicense: false,
+            planKey: 'development'
+          };
+        }
+
+        // Validate the token
+        const decodedToken = await this.validateAndDecodeToken(token);
+        const now = Math.floor(Date.now() / 1000);
+        
+        // Check if token is still valid
+        if (now <= decodedToken.exp) {
+          return {
+            isInstalled: true,
+            hasLicense: true,
+            planKey: decodedToken.plan,
+            expiresAt: new Date(decodedToken.exp * 1000).toISOString()
+          };
+        }
+        
+        // Check if token is expired but within grace period
+        const graceEndTime = decodedToken.exp + (decodedToken.grace * 86400); // grace in seconds
+        
+        if (now <= graceEndTime) {
+          return {
+            isInstalled: true,
+            hasLicense: true,
+            planKey: decodedToken.plan,
+            expiresAt: new Date(decodedToken.exp * 1000).toISOString()
+          };
+        }
+        
+        // Token expired and outside grace period
         return { 
           isInstalled: false,
           hasLicense: false
         };
       }
 
+      // If no token found, check license cache
+      const tenantId = process.env.TENANT_ID;
+      if (tenantId) {
+        const cachedLicense = await this.getLicenseFromCache(tenantId);
+        if (cachedLicense && cachedLicense.licensed) {
+          return {
+            isInstalled: true,
+            hasLicense: true,
+            planKey: cachedLicense.planKey,
+            expiresAt: cachedLicense.expiresAt?.toISOString()
+          };
+        }
+      }
+
+      // If licensing is not enforced and no token/cache found, return development mode
       if (!this.licensingEnforced) {
         return { 
           isInstalled: true,
@@ -130,34 +223,7 @@ export class LicensingService implements OnModuleInit {
         };
       }
 
-      // Validate the token
-      const decodedToken = await this.validateAndDecodeToken(token);
-      const now = Math.floor(Date.now() / 1000);
-      
-      // Check if token is still valid
-      if (now <= decodedToken.exp) {
-        return {
-          isInstalled: true,
-          hasLicense: true,
-          planKey: decodedToken.plan,
-          expiresAt: new Date(decodedToken.exp * 1000).toISOString()
-        };
-      }
-      
-      // Check if token is expired but within grace period
-      const graceEndTime = decodedToken.exp + (decodedToken.grace * 86400); // grace in seconds
-      
-      if (now <= graceEndTime) {
-        return {
-          isInstalled: true,
-          hasLicense: true,
-          planKey: decodedToken.plan,
-          expiresAt: new Date(decodedToken.exp * 1000).toISOString()
-        };
-      }
-      
-      // Token expired and outside grace period
-      this.logger.warn('License expired and outside grace period');
+      // No token and no cache found
       return { 
         isInstalled: false,
         hasLicense: false
@@ -165,6 +231,16 @@ export class LicensingService implements OnModuleInit {
 
     } catch (error) {
       this.logger.error('Failed to check install status', error);
+      
+      // If licensing is not enforced, return development mode even on error
+      if (!this.licensingEnforced) {
+        return { 
+          isInstalled: true,
+          hasLicense: false,
+          planKey: 'development'
+        };
+      }
+      
       return { 
         isInstalled: false,
         hasLicense: false

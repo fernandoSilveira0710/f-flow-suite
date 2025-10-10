@@ -48,6 +48,8 @@ export class LicensesController {
 
       return { licenseToken };
     } catch (error: any) {
+      console.error('Erro na ativação da licença:', error);
+      
       if (error?.message === 'LICENSE_NOT_FOUND') {
         throw new HttpException(
           'Licença não encontrada para o tenant especificado',
@@ -63,7 +65,7 @@ export class LicensesController {
       }
 
       throw new HttpException(
-        'Erro interno do servidor',
+        `Erro interno do servidor: ${error.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }

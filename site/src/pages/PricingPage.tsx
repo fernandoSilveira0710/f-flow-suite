@@ -7,42 +7,51 @@ interface HubPlan {
   id: string;
   name: string;
   price: number;
-  billingCycle: string;
-  features: string[];
+  currency: string;
+  description: string;
+  maxSeats: number;
+  maxDevices: number;
+  featuresEnabled: string; // JSON string
   active: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const PricingPage = () => {
   const [hubPlans, setHubPlans] = useState<HubPlan[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fallback plans (hardcoded)
-  const fallbackPlans = [
+  // Fallback plans (hardcoded) - ajustados para o formato HubPlan
+  const fallbackPlans: HubPlan[] = [
     {
       id: 'starter',
       name: 'Básico',
       price: 19.99,
-      billingCycle: 'monthly',
+      currency: 'BRL',
       description: 'Ideal para pet shops pequenos',
-      features: [
+      maxSeats: 2,
+      maxDevices: 1,
+      featuresEnabled: JSON.stringify([
         'Até 2 usuários',
         'Agendamento básico',
         'PDV simples',
         'Controle de estoque',
         'Relatórios básicos',
         'Suporte por email'
-      ],
-      popular: false,
-      cta: 'Começar Teste',
-      active: true
+      ]),
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     },
     {
       id: 'pro',
       name: 'Profissional',
       price: 59.99,
-      billingCycle: 'monthly',
+      currency: 'BRL',
       description: 'Para pet shops em crescimento',
-      features: [
+      maxSeats: 5,
+      maxDevices: 2,
+      featuresEnabled: JSON.stringify([
         'Até 5 usuários',
         'Agendamento avançado',
         'PDV completo',
@@ -51,18 +60,20 @@ const PricingPage = () => {
         'Relatórios avançados',
         'Notificações automáticas',
         'Suporte prioritário'
-      ],
-      popular: true,
-      cta: 'Começar Teste',
-      active: true
+      ]),
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     },
     {
       id: 'max',
       name: 'Enterprise',
       price: 99.99,
-      billingCycle: 'monthly',
+      currency: 'BRL',
       description: 'Para grandes operações',
-      features: [
+      maxSeats: 15,
+      maxDevices: 5,
+      featuresEnabled: JSON.stringify([
         'Usuários ilimitados',
         'Todos os recursos',
         'Multi-loja',
@@ -71,10 +82,10 @@ const PricingPage = () => {
         'Treinamento incluído',
         'Suporte 24/7',
         'Gerente de conta dedicado'
-      ],
-      popular: false,
-      cta: 'Falar com Vendas',
-      active: true
+      ]),
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
   ];
 
@@ -105,35 +116,42 @@ const PricingPage = () => {
 
   // Mapear planos do Hub para formato da página
   const mapHubPlanToDisplay = (plan: HubPlan) => {
-    let description = 'Plano personalizado';
     let popular = false;
     let cta = 'Começar Teste';
 
     // Mapear baseado no preço ou nome
     if (plan.price <= 20) {
-      description = 'Ideal para pet shops pequenos';
       popular = false;
     } else if (plan.price <= 60) {
-      description = 'Para pet shops em crescimento';
       popular = true;
     } else {
-      description = 'Para grandes operações';
       cta = 'Falar com Vendas';
+    }
+
+    // Parse features from JSON string
+    let features: string[] = [];
+    try {
+      features = JSON.parse(plan.featuresEnabled);
+    } catch (error) {
+      console.error('Error parsing features:', error);
+      features = ['Recursos disponíveis'];
     }
 
     return {
       id: plan.id,
       name: plan.name,
       price: `R$ ${plan.price.toFixed(2).replace('.', ',')}`,
-      period: plan.billingCycle === 'monthly' ? '/mês' : '/ano',
-      description,
-      features: plan.features,
+      period: '/mês',
+      description: plan.description,
+      features: features,
       popular,
       cta
     };
   };
 
-  const displayPlans = hubPlans.map(mapHubPlanToDisplay);
+  const displayPlans = (hubPlans && hubPlans.length > 0) 
+    ? hubPlans.map(mapHubPlanToDisplay) 
+    : fallbackPlans.map(mapHubPlanToDisplay);
 
   if (loading) {
     return (

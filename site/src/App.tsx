@@ -7,6 +7,7 @@ import FeaturesPage from './pages/FeaturesPage'
 import PricingPage from './pages/PricingPage'
 import ContactPage from './pages/ContactPage'
 import SignupPage from './pages/SignupPage'
+import RenewalPage from './pages/RenewalPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
           <Route path="/precos" element={<PricingPage />} />
           <Route path="/planos" element={<PricingPage />} />
           <Route path="/cadastro" element={<SignupPage />} />
+          <Route path="/renovacao" element={<RenewalPage />} />
           <Route path="/docs" element={<DocsPage />} />
           <Route path="/docs/instalacao" element={<InstallationPage />} />
           <Route path="/contato" element={<ContactPage />} />

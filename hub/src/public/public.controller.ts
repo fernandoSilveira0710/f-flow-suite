@@ -1,23 +1,24 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { PlansService } from '../plans/plans.service';
+import { Body, Controller, Get, Post } from '@nestjs/common';
+import { PublicService } from './public.service';
+import { RegisterTenantDto } from './dto/register-tenant.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Controller('public')
 export class PublicController {
-  constructor(private readonly plansService: PlansService) {}
+  constructor(private readonly publicService: PublicService) {}
+
+  @Post('register')
+  async registerTenant(@Body() registerTenantDto: RegisterTenantDto) {
+    return this.publicService.registerTenant(registerTenantDto);
+  }
+
+  @Post('login')
+  async login(@Body() loginDto: LoginDto) {
+    return this.publicService.login(loginDto);
+  }
 
   @Get('plans')
-  async getPlans(@Query('active') active?: string) {
-    const isActive = active === 'true';
-    const plans = await this.plansService.findAllPlans(isActive);
-    
-    // Mapear para formato esperado pelo frontend
-    return plans.map(plan => ({
-      id: plan.id,
-      name: plan.name,
-      price: plan.price,
-      billingCycle: 'monthly', // Assumindo mensal por padrão
-      features: JSON.parse(plan.featuresEnabled || '[]'),
-      active: plan.active
-    }));
+  async getPlans() {
+    return this.publicService.getPlans();
   }
 }
