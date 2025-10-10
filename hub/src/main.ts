@@ -11,17 +11,18 @@ async function bootstrap() {
   });
 
   // Configurar CORS para permitir requisições do frontend
+  const allowedOrigins = [
+    process.env.FRONTEND_URL || 'http://localhost:8080',
+    process.env.CLIENT_LOCAL_API_URL || 'http://localhost:3001',
+    process.env.SITE_URL || 'http://localhost:5173',
+    // Incluir variações com 127.0.0.1 para compatibilidade
+    (process.env.FRONTEND_URL || 'http://localhost:8080').replace('localhost', '127.0.0.1'),
+    (process.env.CLIENT_LOCAL_API_URL || 'http://localhost:3001').replace('localhost', '127.0.0.1'),
+    (process.env.SITE_URL || 'http://localhost:5173').replace('localhost', '127.0.0.1'),
+  ];
+
   app.enableCors({
-    origin: [
-      'http://localhost:8080',
-      'http://127.0.0.1:8080',
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'http://localhost:3001',
-      'http://127.0.0.1:3001',
-      'http://localhost:5173',
-      'http://127.0.0.1:5173'
-    ],
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
     credentials: true

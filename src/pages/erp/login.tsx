@@ -223,7 +223,7 @@ export default function Login() {
       {/* Modal de Planos */}
       <PlansModal 
         open={showPlansModal} 
-        onClose={() => setShowPlansModal(false)}
+        onOpenChange={setShowPlansModal}
         onPlanSelected={handlePlanSelected}
       />
     </div>

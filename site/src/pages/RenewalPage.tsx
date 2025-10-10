@@ -38,7 +38,7 @@ const RenewalPage = () => {
   useEffect(() => {
     const checkHubStatus = async () => {
       try {
-        const response = await fetch('http://localhost:8081/health')
+        const response = await fetch(`${import.meta.env.VITE_HUB_API_URL}/health`)
         setHubOnline(response.ok)
       } catch (error) {
         setHubOnline(false)
@@ -53,7 +53,7 @@ const RenewalPage = () => {
     if (!hubOnline) return
     
     try {
-      const response = await fetch('http://localhost:8081/plans')
+      const response = await fetch(`${import.meta.env.VITE_HUB_API_URL}/plans`)
       if (response.ok) {
         const hubPlans = await response.json()
         setPlans(hubPlans.map((plan: any) => ({
@@ -82,7 +82,7 @@ const RenewalPage = () => {
     setIsLoading(true)
     
     try {
-      const response = await fetch('http://localhost:8081/public/login', {
+      const response = await fetch(`${import.meta.env.VITE_HUB_API_URL}/public/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -122,7 +122,7 @@ const RenewalPage = () => {
     
     try {
       // Atualizar plano no Hub
-      const response = await fetch(`http://localhost:8081/licenses/${user.tenantId}/plan`, {
+      const response = await fetch(`${import.meta.env.VITE_HUB_API_URL}/licenses/${user.tenantId}/plan`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -57,7 +57,7 @@ const InstallationPage = () => {
                     Após o pagamento, você receberá um email com os dados de acesso.
                   </p>
                   <a
-                    href="http://localhost:5173/planos"
+                    href={`${import.meta.env.VITE_SITE_URL}/planos`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn-primary inline-flex items-center"

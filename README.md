@@ -196,15 +196,19 @@ curl -X POST http://localhost:8080/licenses/activate \
 
 Para validar RLS, execute uma query com `x-tenant-id` incorreto: o select deve retornar zero linhas.
 
-#### Autenticação OIDC e Licenciamento
+#### Sistema de Autenticação
 
-O Hub implementa autenticação dupla:
-1. **OIDC (OpenID Connect)**: Validação de identidade via token JWT do IdP
-2. **Licenciamento**: Validação de licença e entitlements via token próprio
+O F-Flow Suite implementa um sistema de autenticação robusto que suporta dois modos de operação:
 
-##### Configuração OIDC
+##### 🌐 Modo Online (Hub + Client-Local)
 
-Variáveis de ambiente necessárias no `hub/.env`:
+**Fluxo de Autenticação Completo:**
+1. **Tentativa no Hub**: O frontend tenta autenticar no Hub (localhost:8081)
+2. **Validação OIDC + Licenciamento**: Hub valida credenciais e licença
+3. **Sincronização Local**: Dados são sincronizados com o client-local
+4. **Acesso Completo**: Usuário tem acesso a todas as funcionalidades
+
+**Configuração Hub (`hub/.env`):**
 ```bash
 # OIDC Configuration
 OIDC_REQUIRED=true                                    # Habilita validação OIDC
@@ -217,38 +221,79 @@ LICENSING_ENFORCED=true                               # Habilita validação de 
 LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
 ```
 
-##### Rotas Protegidas
+##### 💻 Modo Offline (Client-Local Apenas)
 
-As seguintes rotas requerem ambos os tokens:
-- `/tenants/*` - Gestão de tenants
-- `/tenants/{id}/sync/*` - Sincronização de dados
+**Fluxo de Autenticação Offline:**
+1. **Hub Indisponível**: Frontend detecta que o Hub não está acessível
+2. **Fallback Automático**: Sistema tenta autenticação no client-local (localhost:3001)
+3. **Validação Local**: Client-local valida credenciais usando dados em cache
+4. **Verificação de Licença**: Valida licença local e período de graça
+5. **Acesso Limitado**: Usuário acessa funcionalidades offline disponíveis
 
-**Headers necessários:**
+**Endpoint de Autenticação Offline:**
+```bash
+POST /auth/offline-login
+Content-Type: application/json
+
+{
+  "email": "usuario@exemplo.com",
+  "password": "senha123"
+}
+```
+
+**Respostas Possíveis:**
+- `201 Created`: Login offline bem-sucedido
+- `401 Unauthorized`: Credenciais inválidas ou usuário não encontrado
+- `403 Forbidden`: Licença expirada sem período de graça
+- `404 Not Found`: Endpoint não disponível (client-local não configurado)
+
+##### 🔄 Mensagens de Erro Amigáveis
+
+O sistema fornece feedback claro para diferentes cenários:
+
+**Hub Indisponível:**
+- "Servidor principal indisponível. Tentando login offline com dados em cache..."
+
+**Falha no Client-Local:**
+- "Serviço local não está executando. Verifique se o F-Flow Client está instalado e ativo."
+- "Credenciais inválidas para login offline."
+- "Usuário não encontrado nos dados locais."
+- "Licença expirada. Entre em contato com o suporte."
+
+##### 🛡️ Rotas Protegidas
+
+**Headers necessários (Modo Online):**
 ```bash
 Authorization: Bearer <oidc-token>      # Token do IdP (Auth0, Keycloak, etc.)
 X-License-Token: <license-token>        # Token de licença obtido via /licenses/activate
 ```
 
-**Nota sobre Headers:**
-- O cabeçalho `X-License-Token` é preferido para tokens de licença
-- Por compatibilidade, o `Authorization: Bearer` ainda funciona quando apenas licença é necessária
-- Quando ambos OIDC e licença são necessários, use `Authorization` para OIDC e `X-License-Token` para licença
-
-##### Cenários de Teste (Postman)
-
-A coleção Postman inclui cenários para validar:
-1. **Sem tokens** → 401 Unauthorized
-2. **Apenas OIDC** → 403 Forbidden (falta licença)
-3. **OIDC + Licença** → 200 Success
-
-##### Rollback para Desenvolvimento
-
-Para desabilitar autenticação durante desenvolvimento:
+**Headers necessários (Modo Offline):**
 ```bash
-# Desabilita OIDC (apenas licença será validada)
+Authorization: Bearer <offline-token>   # Token gerado pelo client-local
+```
+
+##### 🧪 Cenários de Teste
+
+**Teste Modo Online:**
+1. Hub e Client-Local executando
+2. Login com credenciais válidas
+3. Verificar sincronização de dados
+
+**Teste Modo Offline:**
+1. Parar o Hub (`npm run dev:down` no diretório hub)
+2. Manter Client-Local executando
+3. Tentar login - deve funcionar com dados em cache
+4. Verificar funcionalidades offline disponíveis
+
+##### ⚙️ Configuração para Desenvolvimento
+
+**Desabilitar autenticação (desenvolvimento):**
+```bash
+# Hub - Desabilita OIDC (apenas licença será validada)
 OIDC_REQUIRED=false
 
-# Desabilita ambos (acesso livre)
+# Hub - Desabilita ambos (acesso livre)
 OIDC_REQUIRED=false
 LICENSING_ENFORCED=false
 ```

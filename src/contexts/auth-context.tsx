@@ -22,6 +22,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   checkLicenseStatus: () => Promise<void>;
+  refreshLicenseStatus: () => Promise<void>;
   isFirstInstallation: () => Promise<boolean>;
   hasLocalUsers: () => Promise<boolean>;
 }
@@ -104,6 +105,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshLicenseStatus = useCallback(async () => {
+    console.log('🔄 Forçando atualização do status da licença...');
+    await checkLicenseStatus();
+  }, [checkLicenseStatus]);
+
   const login = async (email: string, password: string): Promise<boolean> => {
     console.log('🔐 INÍCIO DO LOGIN - Email:', email);
     setIsLoading(true);
@@ -128,6 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (hubError) {
         console.warn('❌ Hub não disponível:', hubError);
         hubAvailable = false;
+        
+        // Mostrar mensagem informativa sobre tentativa offline
+        toast({
+          title: "Servidor principal indisponível",
+          description: "Tentando fazer login offline com dados em cache...",
+          variant: "default",
+        });
       }
 
       // ETAPA 2: Se Hub disponível, processar resposta
@@ -280,70 +293,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const offlineResult = await offlineResponse.json();
             console.log('💻 Dados do usuário offline:', offlineResult.user);
             
-            // Verificar se licença local ainda é válida
-            console.log('🎫 Verificando licença offline...');
-            const licenseValidation = await fetch(`http://localhost:3001/licensing/validate-offline?email=${email}`);
-            console.log('🎫 Validação offline - Status:', licenseValidation.status, 'OK:', licenseValidation.ok);
-            
-            if (licenseValidation.ok) {
-              const validationData = await licenseValidation.json();
-              console.log('🎫 Dados de validação offline:', validationData);
+            if (offlineResult.success) {
+              console.log('✅ Login offline bem-sucedido');
+              const userData: User = {
+                id: offlineResult.user.id,
+                email: offlineResult.user.email,
+                name: offlineResult.user.displayName || offlineResult.user.email.split('@')[0]
+              };
               
-              if (validationData.valid) {
-                console.log('✅ Licença offline válida - fazendo login...');
-                const userData: User = {
-                  id: offlineResult.user.id,
-                  email: offlineResult.user.email,
-                  name: offlineResult.user.name
-                };
-                
-                setUser(userData);
-                localStorage.setItem('auth_user', JSON.stringify(userData));
-                
-                // Definir status de licença offline
-                setLicenseStatus({
-                  isValid: true,
-                  isInstalled: true,
-                  plan: validationData.license?.planKey || 'starter',
-                  expiresAt: validationData.license?.expiresAt
-                });
-                
-                toast({
-                  title: "Login offline",
-                  description: `Conectado em modo offline. ${validationData.status === 'offline_grace' ? 'Período de tolerância ativo.' : ''}`,
-                  variant: "default",
-                });
-                
-                console.log('🎉 LOGIN OFFLINE CONCLUÍDO COM SUCESSO!');
-                return true;
-              } else {
-                console.log('⚠️ Licença local expirada mas Hub offline - permitindo login com aviso');
-                // Licença local expirada e Hub offline - permitir login mas marcar status
-                const userData: User = {
-                  id: offlineResult.user.id,
-                  email: offlineResult.user.email,
-                  name: offlineResult.user.name
-                };
-                
-                setUser(userData);
-                localStorage.setItem('auth_user', JSON.stringify(userData));
-                localStorage.setItem('license_expired_offline', 'true');
-                
-                // Definir status de licença como expirada
-                setLicenseStatus({
-                  isValid: false,
-                  isInstalled: true,
-                  plan: validationData.license?.planKey || 'expired',
-                  expiresAt: validationData.license?.expiresAt
-                });
-                
-                console.log('🎉 LOGIN CONCLUÍDO - mas licença expirada offline');
-                return true; // Permitir login para mostrar aviso na tela
-              }
+              setUser(userData);
+              localStorage.setItem('auth_user', JSON.stringify(userData));
+              
+              // Definir status de licença offline
+              setLicenseStatus({
+                isValid: true,
+                isInstalled: true,
+                plan: offlineResult.license?.planKey || 'starter',
+                expiresAt: offlineResult.license?.expiresAt
+              });
+              
+              toast({
+                title: "Login offline realizado",
+                description: "Conectado usando dados em cache. Funcionalidade limitada.",
+                variant: "default",
+              });
+              
+              return true;
+            } else {
+              // Mostrar mensagem específica do serviço offline
+              toast({
+                title: "Login offline falhou",
+                description: offlineResult.message || "Não foi possível fazer login offline.",
+                variant: "destructive",
+              });
+            }
+          } else {
+            // Tratar diferentes códigos de status HTTP
+            if (offlineResponse.status === 404) {
+              toast({
+                title: "Serviço offline não encontrado",
+                description: "O endpoint de login offline não está disponível. Verifique se o client-local está atualizado.",
+                variant: "destructive",
+              });
+            } else {
+              toast({
+                title: "Erro no serviço offline",
+                description: `Falha na comunicação com o serviço local (${offlineResponse.status}).`,
+                variant: "destructive",
+              });
             }
           }
         } catch (offlineError) {
           console.warn('❌ Erro na verificação offline:', offlineError);
+          
+          // Mostrar mensagem específica baseada no tipo de erro
+          if (offlineError instanceof TypeError && offlineError.message.includes('fetch')) {
+            toast({
+              title: "Serviço offline indisponível",
+              description: "O serviço local não está funcionando. Verifique se o client-local está rodando.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Erro no login offline",
+              description: "Não foi possível fazer login offline. Tente conectar-se à internet.",
+              variant: "destructive",
+            });
+          }
         }
       }
 
@@ -368,10 +384,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             description: "Usuário não está registrado no sistema.",
             variant: "destructive",
           });
-          
-          console.log('❌ LOGIN FALHOU - usuário não encontrado');
-          return false; // Não fazer login, mas não redirecionar automaticamente
         }
+      } else {
+        // Caso geral de falha no login
+        toast({
+          title: "Falha no login",
+          description: "Não foi possível fazer login. Verifique sua conexão e tente novamente.",
+          variant: "destructive",
+        });
       }
       
       console.log('❌ LOGIN FALHOU - retornando false');
@@ -442,7 +462,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user,
+      licenseStatus,
+      isLoading,
+      login,
+      logout,
+      checkLicenseStatus,
+      refreshLicenseStatus,
+      isFirstInstallation,
+      hasLocalUsers
+    }}>
       {children}
     </AuthContext.Provider>
   );

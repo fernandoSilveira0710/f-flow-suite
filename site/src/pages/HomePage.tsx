@@ -73,7 +73,7 @@ const HomePage = () => {
             </p>
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <a
-                href="http://localhost:5173/planos"
+                href={`${import.meta.env.VITE_SITE_URL}/planos`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-primary px-8 py-3 text-lg"
@@ -150,7 +150,7 @@ const HomePage = () => {
               </p>
               <div className="space-y-4">
                 <a
-                  href="http://localhost:5173/planos"
+                  href={`${import.meta.env.VITE_SITE_URL}/planos`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-primary w-full text-center py-3"

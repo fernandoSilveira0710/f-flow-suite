@@ -150,15 +150,16 @@ export async function bootstrap(): Promise<void> {
     logger.log('Structured logger configured successfully');
     
     // Configure CORS
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || 'http://localhost:8080',
+      process.env.SITE_URL || 'http://localhost:5173',
+      // Incluir variações com 127.0.0.1 para compatibilidade
+      (process.env.FRONTEND_URL || 'http://localhost:8080').replace('localhost', '127.0.0.1'),
+      (process.env.SITE_URL || 'http://localhost:5173').replace('localhost', '127.0.0.1'),
+    ];
+
     app.enableCors({
-      origin: [
-        'http://localhost:8080',
-        'http://127.0.0.1:8080',
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'http://localhost:3000',
-        'http://127.0.0.1:3000'
-      ],
+      origin: allowedOrigins,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: [
         'Content-Type', 
@@ -168,7 +169,8 @@ export async function bootstrap(): Promise<void> {
         'X-Requested-With',
         'Cache-Control',
         'Pragma',
-        'Expires'
+        'Expires',
+        'x-tenant-id'
       ],
       credentials: true,
       optionsSuccessStatus: 200,

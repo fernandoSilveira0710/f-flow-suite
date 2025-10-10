@@ -208,7 +208,7 @@ const FeaturesPage = () => {
             </p>
             <div className="mt-8">
               <a
-                href="http://localhost:5173/planos"
+                href={`${import.meta.env.VITE_SITE_URL}/planos`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-white text-primary-600 hover:bg-gray-50 px-8 py-3 rounded-md font-semibold text-lg transition-colors"
