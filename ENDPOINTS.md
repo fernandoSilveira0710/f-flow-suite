@@ -55,6 +55,9 @@ curl -X POST http://localhost:8081/public/login \
 - `GET /users/has-users` - **Verifica usuários cadastrados**
 - `POST /users/sync` - Sincronização com HUB
 
+### Endpoints de Autenticação Offline
+- `POST /auth/offline-login` - **Autenticação offline quando Hub indisponível**
+
 ### Endpoints POS
 - `GET /pos/sales` - Listar vendas
 - `POST /pos/sales` - Criar venda
@@ -78,6 +81,14 @@ curl -X POST http://localhost:8081/public/login \
 ### Exemplo de Verificação
 ```bash
 curl http://localhost:3001/users/has-users
+```
+
+### Exemplo de Autenticação Offline
+```bash
+# Autenticação offline (quando Hub indisponível)
+curl -X POST http://localhost:3001/auth/offline-login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "logintest@2fsolutions.com.br", "password": "123456"}'
 ```
 
 ## 🗄️ Prisma Studio
@@ -114,10 +125,18 @@ Todos os usuários abaixo estão cadastrados no HUB (localhost:5555):
 
 ## 🔄 Fluxo de Autenticação
 
+### Modo Online (Hub + Client-Local)
 1. **Login no ERP**: http://localhost:8080/erp/login
 2. **Autenticação via HUB**: POST http://localhost:8081/public/login
 3. **Sincronização Local**: POST http://localhost:3001/users/sync
 4. **Redirecionamento**: http://localhost:8080/erp/dashboard
+
+### Modo Offline (Client-Local apenas)
+1. **Login no ERP**: http://localhost:8080/erp/login
+2. **Detecção de Hub indisponível**: Timeout/erro de conexão
+3. **Autenticação offline**: POST http://localhost:3001/auth/offline-login
+4. **Validação local**: Cache de usuários + licença offline
+5. **Redirecionamento**: http://localhost:8080/erp/dashboard
 
 ## 🛠️ Comandos de Teste
 
@@ -135,8 +154,13 @@ curl http://localhost:8080/erp/login
 
 ### Testar Autenticação
 ```bash
-# Login via HUB
+# Login via HUB (modo online)
 curl -X POST http://localhost:8081/public/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "logintest@2fsolutions.com.br", "password": "123456"}'
+
+# Login offline (quando Hub indisponível)
+curl -X POST http://localhost:3001/auth/offline-login \
   -H "Content-Type: application/json" \
   -d '{"email": "logintest@2fsolutions.com.br", "password": "123456"}'
 

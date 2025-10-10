@@ -76,7 +76,7 @@ export function ProtectedRoute({
 
   // Redirecionar para site institucional (primeira instalação)
   if (shouldRedirectToSite && (!user || licenseStatus !== 'valid')) {
-    window.location.href = 'http://localhost:8080';
+    window.location.href = import.meta.env.VITE_FRONTEND_URL;
     return null;
   }
 

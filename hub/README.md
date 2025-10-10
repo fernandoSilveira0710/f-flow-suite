@@ -48,6 +48,7 @@ Hub central do F-Flow Suite responsável por gerenciar licenças, tenants e sinc
 - **JWKS Endpoint**: Exposição de chaves públicas para validação de licenças
 - **Gerenciamento de Licenças**: Ativação e validação de licenças
 - **API de Tenants**: Gerenciamento de inquilinos
+- **Integração Offline**: Suporte a autenticação offline via Client-Local
 
 ## Configuração
 
@@ -149,6 +150,33 @@ Este endpoint é usado pelos clientes locais para:
 2. Validar assinaturas de licenças offline
 3. Verificar integridade de tokens JWT
 
+## Integração Offline
+
+O Hub suporta operação offline através do Client-Local, permitindo que usuários continuem trabalhando mesmo quando a conexão com o Hub está indisponível.
+
+### Como Funciona
+
+1. **Sincronização Prévia**: Usuários e licenças são sincronizados do Hub para o Client-Local
+2. **Cache Local**: Client-Local mantém cache de usuários e licenças válidas
+3. **Detecção Automática**: Sistema detecta quando Hub está indisponível
+4. **Fallback Offline**: Autenticação é redirecionada para Client-Local (`/auth/offline-login`)
+5. **Validação Local**: Credenciais são validadas contra cache local
+6. **Licença Offline**: Licenças são validadas usando chave pública JWKS
+
+### Configuração para Offline
+
+Para habilitar operação offline, o Client-Local precisa:
+
+1. **Chave Pública JWKS**: Baixada do endpoint `/.well-known/jwks.json`
+2. **Cache de Usuários**: Sincronizado via `/users/sync`
+3. **Licença Válida**: Persistida localmente com assinatura verificável
+
+### Endpoints Relacionados
+
+- `GET /.well-known/jwks.json` - Chave pública para validação offline
+- `POST /public/login` - Autenticação online (fallback para offline se indisponível)
+- `GET /users` - Sincronização de usuários para cache local
+
 ## Desenvolvimento
 
 ### Instalação
@@ -206,6 +234,7 @@ Os testes de integração verificam:
 
 - `GET /tenants` - Listar tenants
 - `POST /licenses/activate` - Ativar licença
+- `GET /users` - Listar usuários (usado para sincronização offline)
 - Outros endpoints da API
 
 ## Segurança
@@ -234,3 +263,17 @@ Verifique se `LICENSE_PUBLIC_KEY_PEM` está configurado corretamente no `.env`.
 1. Verifique se `RLS_ENFORCED=true` no `.env`
 2. Execute as migrations: `npm run prisma:migrate`
 3. Aplique as políticas SQL: execute `sql/002-rls-policies.sql`
+
+### Problemas de Integração Offline
+
+#### Client-Local não consegue validar licenças offline
+
+1. Verifique se o endpoint JWKS está acessível: `curl http://localhost:8081/.well-known/jwks.json`
+2. Confirme se `LICENSE_PUBLIC_KEY_PEM` está configurado no Hub
+3. Verifique se o Client-Local baixou a chave pública corretamente
+
+#### Usuários não sincronizados para cache local
+
+1. Teste o endpoint de usuários: `curl -H "x-tenant-id: your-tenant" http://localhost:8081/users`
+2. Verifique se o Client-Local está executando a sincronização
+3. Confirme se há usuários cadastrados no tenant específico

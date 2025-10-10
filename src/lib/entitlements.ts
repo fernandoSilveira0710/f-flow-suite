@@ -103,11 +103,11 @@ const PLANS: Record<PlanType, Plan> = {
 
 const STORAGE_KEY = '2f.plan';
 
-// Função para buscar plano atual do Hub
+// Função para buscar plano atual do Client-Local
 async function fetchCurrentPlanFromHub(): Promise<PlanType | null> {
   try {
     const tenantId = localStorage.getItem('2f.tenantId') || '3cb88e58-b2e7-4fb1-9e0f-eb5a9c4b640b';
-    const response = await fetch(`http://localhost:8081/plans/tenants/${tenantId}/subscription`, {
+    const response = await fetch(`http://localhost:3001/plans/tenants/${tenantId}/subscription`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

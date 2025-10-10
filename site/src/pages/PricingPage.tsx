@@ -97,7 +97,7 @@ const PricingPage = () => {
     setLoading(true);
     try {
       // Buscar planos da API pública do Hub
-      const response = await fetch('http://localhost:8081/public/plans?active=true');
+      const response = await fetch(`${import.meta.env.VITE_HUB_API_URL}/public/plans?active=true`);
       if (response.ok) {
         const plans = await response.json();
         setHubPlans(plans);

@@ -78,7 +78,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       // Site institucional não precisa verificar client-local
       // Apenas verifica se o Hub está disponível
-      const response = await fetch('http://localhost:8081/health');
+      const response = await fetch(`${import.meta.env.VITE_HUB_API_URL}/health`);
       if (response.ok) {
         setLicenseStatus({ needsSetup: false, status: 'hub_available' });
       } else {

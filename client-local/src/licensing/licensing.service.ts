@@ -31,7 +31,7 @@ export class LicensingService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService
   ) {
-    this.hubBaseUrl = this.configService.get<string>('HUB_BASE_URL', 'http://localhost:3000');
+    this.hubBaseUrl = this.configService.get<string>('HUB_BASE_URL', process.env.HUB_API_URL || 'http://localhost:8081');
     this.licensingEnforced = this.configService.get<string>('LICENSING_ENFORCED', 'false') === 'true';
     this.deviceId = this.configService.get<string>('DEVICE_ID', 'dev-device');
     
@@ -456,6 +456,7 @@ export class LicensingService implements OnModuleInit {
       });
 
       const licenseData = response.data;
+      const license = licenseData.license || {};
 
       // Atualiza ou cria o registro no cache
       await this.prisma.licenseCache.upsert({
@@ -464,10 +465,10 @@ export class LicensingService implements OnModuleInit {
           registered: licenseData.registered || false,
           licensed: licenseData.licensed || false,
           status: licenseData.status || 'not_registered',
-          planKey: licenseData.planKey,
-          maxSeats: licenseData.maxSeats,
-          expiresAt: licenseData.expiresAt ? new Date(licenseData.expiresAt) : null,
-          graceDays: licenseData.graceDays || 7,
+          planKey: license.planKey || licenseData.planKey,
+          maxSeats: license.maxSeats || licenseData.maxSeats,
+          expiresAt: license.expiresAt ? new Date(license.expiresAt) : (licenseData.expiresAt ? new Date(licenseData.expiresAt) : null),
+          graceDays: license.graceDays || licenseData.graceDays || 7,
           lastChecked: new Date(),
           updatedAt: new Date()
         },
@@ -476,10 +477,10 @@ export class LicensingService implements OnModuleInit {
           registered: licenseData.registered || false,
           licensed: licenseData.licensed || false,
           status: licenseData.status || 'not_registered',
-          planKey: licenseData.planKey,
-          maxSeats: licenseData.maxSeats,
-          expiresAt: licenseData.expiresAt ? new Date(licenseData.expiresAt) : null,
-          graceDays: licenseData.graceDays || 7,
+          planKey: license.planKey || licenseData.planKey,
+          maxSeats: license.maxSeats || licenseData.maxSeats,
+          expiresAt: license.expiresAt ? new Date(license.expiresAt) : (licenseData.expiresAt ? new Date(licenseData.expiresAt) : null),
+          graceDays: license.graceDays || licenseData.graceDays || 7,
           lastChecked: new Date()
         }
       });

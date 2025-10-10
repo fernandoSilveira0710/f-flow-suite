@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { getPlanInfo, updatePlan } from '@/lib/settings-api';
 import { getAllPlans } from '@/lib/entitlements';
 import { Check, Clock, X } from 'lucide-react';
+import { ENDPOINTS } from '@/lib/env';
 import {
   Table,
   TableBody,
@@ -54,6 +55,7 @@ export default function PlanoPage() {
   const [hubPlans, setHubPlans] = useState<HubPlan[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isHubOnline, setIsHubOnline] = useState(false);
 
   useEffect(() => {
     loadPlan();
@@ -63,6 +65,46 @@ export default function PlanoPage() {
 
   const loadPlan = async () => {
     try {
+      // Primeiro, tentar buscar informações do plano atual do Client-Local
+      const tenantId = localStorage.getItem('2f.tenantId') || '3cb88e58-b2e7-4fb1-9e0f-eb5a9c4b640b';
+      
+      try {
+        // Buscar subscription do Client-Local (que busca do Hub quando online)
+        const subscriptionResponse = await fetch(ENDPOINTS.CLIENT_PLANS_SUBSCRIPTION(tenantId), {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': tenantId,
+          },
+        });
+
+        if (subscriptionResponse.ok) {
+          const subscription = await subscriptionResponse.json();
+          
+          // Mapear dados da subscription para o formato esperado
+          const mappedPlanInfo: PlanInfo = {
+            plano: subscription.planKey || 'starter',
+            seatLimit: subscription.maxSeats || 1,
+            recursos: {
+              products: { enabled: true },
+              pdv: { enabled: true },
+              stock: { enabled: true },
+              agenda: { enabled: subscription.planKey !== 'starter' },
+              banho_tosa: { enabled: subscription.planKey !== 'starter' },
+              reports: { enabled: subscription.planKey !== 'starter' },
+            },
+            ciclo: subscription.billingCycle === 'yearly' ? 'ANUAL' : 'MENSAL',
+            proximoCobranca: subscription.nextBillingDate,
+          };
+          
+          setPlanInfo(mappedPlanInfo);
+          return;
+        }
+      } catch (subscriptionError) {
+        console.warn('Erro ao buscar subscription do Client-Local:', subscriptionError);
+      }
+
+      // Fallback: usar método original se o novo endpoint falhar
       const info = await getPlanInfo();
       setPlanInfo(info);
     } catch (error) {
@@ -76,12 +118,15 @@ export default function PlanoPage() {
   const loadHubPlans = async () => {
     try {
       // Buscar planos da API pública do Hub
-      const response = await fetch('http://localhost:8081/public/plans?active=true');
+      const response = await fetch(ENDPOINTS.HUB_PLANS);
       if (response.ok) {
         const plans = await response.json();
         setHubPlans(plans);
+        setIsHubOnline(true);
+        console.log('✅ Planos carregados do Hub:', plans.length);
       } else {
-        console.warn('Falha ao buscar planos do Hub, usando planos locais');
+        console.warn('⚠️ Falha ao buscar planos do Hub, usando planos locais');
+        setIsHubOnline(false);
         // Fallback para planos locais
         const localPlans = getAllPlans();
         const mappedPlans = localPlans.map(plan => ({
@@ -95,9 +140,11 @@ export default function PlanoPage() {
           featuresEnabled: plan.entitlements
         }));
         setHubPlans(mappedPlans);
+        console.log('📱 Usando planos locais como fallback:', mappedPlans.length);
       }
     } catch (error) {
-      console.error('Erro ao buscar planos do Hub:', error);
+      console.error('❌ Erro ao buscar planos do Hub:', error);
+      setIsHubOnline(false);
       // Fallback para planos locais
       const localPlans = getAllPlans();
       const mappedPlans = localPlans.map(plan => ({
@@ -111,14 +158,15 @@ export default function PlanoPage() {
         featuresEnabled: plan.entitlements
       }));
       setHubPlans(mappedPlans);
+      console.log('📱 Hub indisponível, usando planos locais:', mappedPlans.length);
     }
   };
 
   const loadInvoices = async () => {
     try {
-      // Tentar buscar faturas do Hub primeiro
+      // Tentar buscar faturas do Client-Local primeiro
       const tenantId = localStorage.getItem('2f.tenantId') || '3cb88e58-b2e7-4fb1-9e0f-eb5a9c4b640b';
-      const response = await fetch(`http://localhost:8081/plans/tenants/${tenantId}/invoices`, {
+      const response = await fetch(ENDPOINTS.CLIENT_PLANS_INVOICES(tenantId), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -178,7 +226,7 @@ export default function PlanoPage() {
       const tenantId = localStorage.getItem('2f.tenantId') || '3cb88e58-b2e7-4fb1-9e0f-eb5a9c4b640b';
       
       try {
-        const subscriptionResponse = await fetch(`http://localhost:8081/tenants/${tenantId}/subscription`, {
+        const subscriptionResponse = await fetch(ENDPOINTS.HUB_TENANTS_SUBSCRIPTION(tenantId), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -301,7 +349,24 @@ export default function PlanoPage() {
 
       {/* Available Plans from Hub */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">Planos Disponíveis no Hub</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Planos Disponíveis</h2>
+          {!isHubOnline && (
+            <Badge variant="outline" className="text-orange-600 border-orange-600">
+              Modo Offline
+            </Badge>
+          )}
+        </div>
+        
+        {!isHubOnline && (
+          <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <p className="text-sm text-orange-800">
+              <strong>Modo Offline:</strong> O Hub não está disponível. Apenas seu plano atual está sendo exibido. 
+              Para alterar planos ou ver todas as opções, verifique sua conexão com o Hub.
+            </p>
+          </div>
+        )}
+        
         <div className="grid gap-4 md:grid-cols-3">
           {hubPlans.map((plan) => {
             const isCurrentPlan = planInfo && (
@@ -315,15 +380,25 @@ export default function PlanoPage() {
               p.name.toLowerCase() === plan.name.toLowerCase()
             );
             
+            // No modo offline, desabilitar planos que não são o atual
+            const isDisabled = !isHubOnline && !isCurrentPlan;
+            
             return (
               <Card 
                 key={plan.id} 
-                className={`relative ${isCurrentPlan ? 'ring-2 ring-primary bg-primary/5' : ''}`}
+                className={`relative ${isCurrentPlan ? 'ring-2 ring-primary bg-primary/5' : ''} ${isDisabled ? 'opacity-60' : ''}`}
               >
                 {isCurrentPlan && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                     <Badge variant="default" className="bg-primary text-primary-foreground">
                       Plano Atual
+                    </Badge>
+                  </div>
+                )}
+                {isDisabled && (
+                  <div className="absolute -top-3 right-4">
+                    <Badge variant="outline" className="text-gray-500 border-gray-400">
+                      Indisponível Offline
                     </Badge>
                   </div>
                 )}
@@ -374,10 +449,10 @@ export default function PlanoPage() {
                   <Button
                     className="w-full"
                     onClick={() => handleSelectPlan(plan.id)}
-                    disabled={isCurrentPlan}
+                    disabled={isCurrentPlan || isDisabled}
                     variant={isCurrentPlan ? "secondary" : "default"}
                   >
-                    {isCurrentPlan ? 'Plano Atual' : 'Selecionar Plano'}
+                    {isCurrentPlan ? 'Plano Atual' : isDisabled ? 'Indisponível Offline' : 'Selecionar Plano'}
                   </Button>
                 </CardContent>
               </Card>
@@ -390,47 +465,70 @@ export default function PlanoPage() {
 
       {/* Invoice History */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">Histórico de Cobranças</h2>
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.length > 0 ? (
-                  invoices.map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell>
-                        {new Date(invoice.data).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell>{invoice.valor}</TableCell>
-                      <TableCell>
-                        <Badge variant="default">{invoice.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">
-                          Ver Recibo
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Histórico de Cobranças</h2>
+          {!isHubOnline && (
+            <Badge variant="outline" className="text-orange-600 border-orange-600">
+              Indisponível Offline
+            </Badge>
+          )}
+        </div>
+        
+        {!isHubOnline ? (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <div className="space-y-2">
+                <Clock className="h-12 w-12 text-gray-400 mx-auto" />
+                <h3 className="text-lg font-medium text-gray-900">Histórico Indisponível</h3>
+                <p className="text-sm text-gray-600">
+                  O histórico de cobranças não está disponível no modo offline. 
+                  Conecte-se ao Hub para visualizar suas faturas.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      Nenhuma fatura encontrada
+                    <TableHead>Data</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.length > 0 ? (
+                    invoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell>
+                          {new Date(invoice.data).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell>{invoice.valor}</TableCell>
+                        <TableCell>
+                          <Badge variant="default">{invoice.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm">
+                            Ver Recibo
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        Nenhuma fatura encontrada
                     </TableCell>
                   </TableRow>
                 )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

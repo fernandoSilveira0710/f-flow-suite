@@ -3,6 +3,8 @@
  * Connects to client-local server for POS operations
  */
 
+import { API_URLS } from './env';
+
 // Types and Interfaces
 export interface Product {
   id: string;
@@ -74,7 +76,7 @@ export interface Session {
 }
 
 // API Configuration
-const API_BASE_URL = 'http://127.0.0.1:3001';
+const API_BASE_URL = API_URLS.CLIENT_LOCAL;
 
 // Storage keys for cart and session (still needed for frontend state)
 const STORAGE_KEYS = {

@@ -4,6 +4,7 @@
  */
 
 import { getCurrentPlan, setPlan as setEntitlementsPlan, getEntitlements } from './entitlements';
+import { ENDPOINTS } from './env';
 
 // Types
 export interface Organization {
@@ -409,10 +410,10 @@ export const getSeatsByRole = async (roleId: string): Promise<Seat[]> => {
   return seats.filter(s => s.roleId === roleId);
 };
 
-// Função para buscar assinatura ativa do tenant no Hub
+// Função para buscar assinatura ativa do tenant no Client-Local
 const fetchTenantSubscription = async (tenantId: string) => {
   try {
-    const response = await fetch(`http://localhost:8081/plans/tenants/${tenantId}/subscription`, {
+    const response = await fetch(ENDPOINTS.CLIENT_PLANS_SUBSCRIPTION(tenantId), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -499,7 +500,7 @@ export const updatePlan = async (planKey: 'starter' | 'pro' | 'max') => {
   
   try {
     // 1. Tentar atualizar no Hub primeiro
-    const hubResponse = await fetch(`http://localhost:8081/tenants/${tenantId}/subscription`, {
+    const hubResponse = await fetch(ENDPOINTS.HUB_TENANTS_SUBSCRIPTION(tenantId), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -516,7 +517,7 @@ export const updatePlan = async (planKey: 'starter' | 'pro' | 'max') => {
       
       // 2. Tentar sincronizar com o client-local
       try {
-        const clientLocalResponse = await fetch('http://localhost:3001/licensing/sync-plan', {
+        const clientLocalResponse = await fetch(ENDPOINTS.CLIENT_LICENSING_SYNC_PLAN, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -539,7 +540,7 @@ export const updatePlan = async (planKey: 'starter' | 'pro' | 'max') => {
       console.warn('Failed to update plan in Hub, trying client-local fallback');
       
       // 3. Fallback para client-local se Hub falhar
-      const clientLocalResponse = await fetch('http://localhost:3001/licensing/sync-plan', {
+      const clientLocalResponse = await fetch(ENDPOINTS.CLIENT_LICENSING_SYNC_PLAN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -561,7 +562,7 @@ export const updatePlan = async (planKey: 'starter' | 'pro' | 'max') => {
     
     try {
       // Fallback para client-local se Hub não estiver disponível
-      const clientLocalResponse = await fetch('http://localhost:3001/licensing/sync-plan', {
+      const clientLocalResponse = await fetch(ENDPOINTS.CLIENT_LICENSING_SYNC_PLAN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

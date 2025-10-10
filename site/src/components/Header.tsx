@@ -45,7 +45,7 @@ const Header = () => {
               </Link>
             ))}
             <a
-              href="http://localhost:5173/planos"
+              href={`${import.meta.env.VITE_SITE_URL}/planos`}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-primary px-4 py-2"
@@ -86,7 +86,7 @@ const Header = () => {
               ))}
               <div className="px-3 py-2">
                 <a
-                  href="http://localhost:5173/planos"
+                  href={`${import.meta.env.VITE_SITE_URL}/planos`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-primary px-4 py-2 w-full text-center"

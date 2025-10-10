@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, Zap, Crown, Star } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/auth-context';
 
 interface Plan {
   id: string;
@@ -88,8 +89,10 @@ const FALLBACK_PLANS: Plan[] = [
 
 export function PlansModal({ open, onOpenChange, onPlanSelected }: PlansModalProps) {
   const [plans, setPlans] = useState<Plan[]>(FALLBACK_PLANS);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const [loadingPlans, setLoadingPlans] = useState(true);
+  const { refreshLicenseStatus } = useAuth();
 
   useEffect(() => {
     if (open) {
@@ -134,8 +137,8 @@ export function PlansModal({ open, onOpenChange, onPlanSelected }: PlansModalPro
       }
 
       // Tentar atualizar plano no Hub
-      const response = await fetch(`http://localhost:8081/licenses/tenant/${tenantId}/update-plan`, {
-        method: 'POST',
+      const response = await fetch(`http://localhost:8081/licenses/${tenantId}/plan`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -165,6 +168,10 @@ export function PlansModal({ open, onOpenChange, onPlanSelected }: PlansModalPro
           console.warn('Erro ao persistir licença localmente:', localError);
         }
 
+        // Forçar atualização do status da licença
+        console.log('🔄 Atualizando status da licença...');
+        await refreshLicenseStatus();
+
         toast({
           title: "Plano ativado com sucesso!",
           description: `Seu plano ${plans.find(p => p.id === planId)?.name} foi ativado.`,
@@ -173,22 +180,15 @@ export function PlansModal({ open, onOpenChange, onPlanSelected }: PlansModalPro
 
         // Remover flag do modal e chamar callback
         localStorage.removeItem('show_plans_modal');
-        onPlanSelected(planId);
         onOpenChange(false);
-        
-        // Recarregar a página para aplicar as mudanças
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-        
       } else {
-        throw new Error('Falha ao ativar plano no Hub');
+        throw new Error(`Erro ao ativar plano: ${response.status}`);
       }
     } catch (error) {
       console.error('Erro ao selecionar plano:', error);
       toast({
         title: "Erro ao ativar plano",
-        description: "Não foi possível ativar o plano. Tente novamente.",
+        description: error instanceof Error ? error.message : "Tente novamente mais tarde.",
         variant: "destructive",
       });
     } finally {
@@ -229,7 +229,7 @@ export function PlansModal({ open, onOpenChange, onPlanSelected }: PlansModalPro
           <div className="grid gap-6 md:grid-cols-3 mt-6">
             {plans.map((plan) => {
               const isPopular = plan.popular;
-              const isLoading = isLoading === plan.id;
+              const isPlanLoading = isLoading === plan.id;
 
               return (
                 <Card 
@@ -279,9 +279,9 @@ export function PlansModal({ open, onOpenChange, onPlanSelected }: PlansModalPro
                       }`}
                       variant={isPopular ? 'default' : 'outline'}
                       onClick={() => handleSelectPlan(plan.id)}
-                      disabled={isLoading}
+                      disabled={isPlanLoading}
                     >
-                      {isLoading ? (
+                      {isPlanLoading ? (
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                           Ativando...
