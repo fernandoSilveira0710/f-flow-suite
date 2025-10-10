@@ -47,7 +47,7 @@
 **Escopo**
 
 * ✅ Empacotar `client-local` com **pkg**/**nexe** (Win/Mac/Linux).
-* ✅ Bootstrap: resolve pastas por SO → roda migrations → sobe HTTP `127.0.0.1:3010`.
+* ✅ Bootstrap: resolve pastas por SO → roda migrations → sobe HTTP `127.0.0.1:3001`.
 * ✅ Serviço do SO: Windows Service / launchd / systemd (scripts básicos).
 * ✅ Logs estruturados (JSON) com rotação.
   **Flags**
@@ -105,11 +105,11 @@
    ```
 3. **Ativação Manual**: 
    ```bash
-   curl -X POST http://localhost:3010/licensing/activate \
+   curl -X POST http://localhost:3001/licensing/activate \
      -H "Content-Type: application/json" \
      -d '{"tenantId": "test-tenant", "deviceId": "test-device"}'
    ```
-4. **Verificar Status**: `curl http://localhost:3010/licensing/install/status`
+4. **Verificar Status**: `curl http://localhost:3001/licensing/install/status`
 5. **Modo Offline**: Desconectar rede e verificar grace period
 6. **Testes**: `npm test` e `npm run test:e2e`
 
@@ -136,13 +136,13 @@ npm run start:dev
 ### 4. Testar Endpoints (PowerShell)✅
 ```powershell
 # Status da instalação
-Invoke-RestMethod -Uri "http://localhost:3010/licensing/install/status" -Method GET
+Invoke-RestMethod -Uri "http://localhost:3001/licensing/install/status" -Method GET
 
 # Ativação manual
-Invoke-RestMethod -Uri "http://localhost:3010/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "test-tenant", "deviceId": "test-device"}'
+Invoke-RestMethod -Uri "http://localhost:3001/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "test-tenant", "deviceId": "test-device"}'
 
 # Verificar licença
-Invoke-RestMethod -Uri "http://localhost:3010/licensing/license" -Method GET
+Invoke-RestMethod -Uri "http://localhost:3001/licensing/license" -Method GET
 ```
 
 ### 5. Verificar Status
@@ -396,7 +396,7 @@ Incremental PRs: cada sub-etapa pode ser submetida em um PR, garantindo que test
 **Objetivo:** trocar mocks por client-local e expor status na UI sem travar o uso.
 **Escopo**
 
-* `web`: `VITE_API_BASE=http://127.0.0.1:3010`.
+* `web`: `VITE_API_BASE=http://127.0.0.1:3001`.
 * Rota `/setup`: usa `GET /install/status` e `POST /licensing/activate`.
 * Integrar CRUDs do **POS/Inventory** via **React Query**.
 * Banner/Badge de status: **Online/Offline/Syncing**.

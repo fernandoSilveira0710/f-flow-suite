@@ -72,7 +72,7 @@ export interface BulkStockAdjustmentDto {
 }
 
 // API Configuration
-const API_BASE_URL = 'http://127.0.0.1:3010';
+const API_BASE_URL = 'http://127.0.0.1:3001';
 
 // API Helper function
 const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> => {

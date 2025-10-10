@@ -116,16 +116,16 @@ npm test -- auto-update
 
 ```bash
 # Verificar versão atual
-curl http://localhost:3010/auto-update/version
+curl http://localhost:3001/auto-update/version
 
 # Verificar atualizações
-curl http://localhost:3010/auto-update/check
+curl http://localhost:3001/auto-update/check
 
-# Iniciar instalação
-curl -X POST http://localhost:3010/auto-update/install
+# Instalar atualização
+curl -X POST http://localhost:3001/auto-update/install
 
-# Monitorar progresso
-curl http://localhost:3010/auto-update/progress
+# Verificar progresso
+curl http://localhost:3001/auto-update/progress
 ```
 
 ## Troubleshooting

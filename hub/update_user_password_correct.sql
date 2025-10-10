@@ -1,0 +1,1 @@
+UPDATE User SET password = '$2b$10$ZrHwsrHeh44bIXZaPqrDjegddi4lAqFtug0ZcbUg7MGOlD6Yt74l6' WHERE email = 'fernando@2fsolutions.com.br';

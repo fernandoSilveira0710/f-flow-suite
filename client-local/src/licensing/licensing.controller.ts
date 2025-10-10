@@ -138,6 +138,31 @@ export class LicensingController {
     }
   }
 
+  @Post('persist')
+  async persistLicense(@Body() body: { 
+    tenantId: string; 
+    userId: string; 
+    licenseData: any 
+  }) {
+    try {
+      // Persistir dados de licença localmente para uso offline futuro
+      await this.licensingService.updateLicenseCache(body.tenantId);
+      
+      this.logger.log(`Licença persistida localmente para tenant ${body.tenantId}`);
+      
+      return {
+        success: true,
+        message: 'Licença persistida com sucesso para uso offline'
+      };
+    } catch (error: any) {
+      this.logger.error('Falha ao persistir licença', error);
+      throw new HttpException(
+        `Falha ao persistir licença: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
   @Get('status')
   async getLicenseStatus(): Promise<LicenseStatusResponse> {
     try {

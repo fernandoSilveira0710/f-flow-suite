@@ -133,7 +133,7 @@ async function fetchCurrentPlanFromHub(): Promise<PlanType | null> {
 // Função para buscar plano do client-local
 async function fetchCurrentPlanFromClientLocal(): Promise<PlanType | null> {
   try {
-    const response = await fetch('http://localhost:3010/licensing/plan/current', {
+    const response = await fetch('http://localhost:3001/licensing/plan/current', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

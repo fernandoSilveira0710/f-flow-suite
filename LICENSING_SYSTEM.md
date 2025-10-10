@@ -273,13 +273,13 @@ node test-sqlite-license.js
 
 ```powershell
 # Status da instalação
-Invoke-RestMethod -Uri "http://localhost:3010/licensing/install/status"
+Invoke-RestMethod -Uri "http://localhost:3001/licensing/install/status"
 
 # Ativação
-Invoke-RestMethod -Uri "http://localhost:3010/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "demo", "deviceId": "test-device"}'
+Invoke-RestMethod -Uri "http://localhost:3001/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "demo", "deviceId": "test-device"}'
 
 # Verificar licença
-Invoke-RestMethod -Uri "http://localhost:3010/licensing/license"
+Invoke-RestMethod -Uri "http://localhost:3001/licensing/license"
 ```
 
 ## Monitoramento
@@ -331,7 +331,7 @@ node generate-keys.js
 **Erro: "License expired"**
 ```bash
 # Forçar renovação
-curl -X POST http://localhost:3010/licensing/activate
+curl -X POST http://localhost:3001/licensing/activate
 ```
 
 ### 2. Logs de Debug

@@ -7,7 +7,10 @@ interface User {
   displayName: string;
 }
 
-type LicenseStatus = 'valid' | 'invalid' | 'expired' | 'not_found';
+interface LicenseStatus {
+  needsSetup: boolean;
+  status: string;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -26,23 +29,16 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
-  const [licenseStatus, setLicenseStatus] = useState<LicenseStatus>('not_found');
+  const [licenseStatus, setLicenseStatus] = useState<LicenseStatus>({ needsSetup: true, status: 'hub_unavailable' });
 
-  // Verificar se é primeira instalação baseado na contagem de usuários no client-local
+  // Verificar se é primeira instalação baseado no Hub
   const isFirstInstallation = async (): Promise<boolean> => {
     try {
-      const response = await fetch('http://localhost:3002/users');
-      if (!response.ok) {
-        // Se não conseguir conectar ao client-local, assume que é primeira instalação
-        return true;
-      }
-      
-      const users = await response.json();
-      // Se não há usuários cadastrados, é primeira instalação
-      return !users || users.length === 0;
+      // Para o site institucional, sempre permitir cadastro
+      // O Hub gerenciará se é primeira instalação ou não
+      return true;
     } catch (error) {
       console.error('Erro ao verificar primeira instalação:', error);
-      // Em caso de erro, assume que é primeira instalação
       return true;
     }
   };
@@ -74,26 +70,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = () => {
     setUser(null);
-    setLicenseStatus('not_found');
+    setLicenseStatus({ needsSetup: true, status: 'hub_unavailable' });
     localStorage.removeItem('user');
   };
 
   const checkLicenseStatus = async () => {
     try {
-      const response = await fetch('http://localhost:3002/licensing/install-status');
+      // Site institucional não precisa verificar client-local
+      // Apenas verifica se o Hub está disponível
+      const response = await fetch('http://localhost:8081/health');
       if (response.ok) {
-        const data = await response.json();
-        if (data.hasLicense && data.isInstalled) {
-          setLicenseStatus('valid');
-        } else {
-          setLicenseStatus('invalid');
-        }
+        setLicenseStatus({ needsSetup: false, status: 'hub_available' });
       } else {
-        setLicenseStatus('not_found');
+        setLicenseStatus({ needsSetup: true, status: 'hub_unavailable' });
       }
     } catch (error) {
-      console.error('Erro ao verificar licença:', error);
-      setLicenseStatus('not_found');
+      console.error('Erro ao verificar status do Hub:', error);
+      setLicenseStatus({ needsSetup: true, status: 'hub_unavailable' });
     }
   };
 

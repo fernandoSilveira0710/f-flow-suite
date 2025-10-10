@@ -252,11 +252,14 @@ model User {
   email       String   @unique
   role        String   @default("user")
   active      Boolean  @default(true)
+  tenantId    String?
+  hubUserId   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([email])
   @@index([active])
+  @@index([tenantId])
 }
 
 model Role {
@@ -339,4 +342,19 @@ model LicenseCache {
   @@index([tenantId])
   @@index([status])
   @@index([lastChecked])
+}
+
+model LicenseToken {
+  id        String   @id @default(uuid())
+  tenantId  String
+  deviceId  String
+  token     String
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  @@unique([tenantId, deviceId])
+  @@index([tenantId])
+  @@index([deviceId])
+  @@index([expiresAt])
 }

@@ -2,6 +2,46 @@
 
 Hub central do F-Flow Suite responsável por gerenciar licenças, tenants e sincronização de dados.
 
+## 🚀 Acesso Rápido
+
+- **API Hub**: http://localhost:8081
+- **Prisma Studio**: http://localhost:5555
+- **Health Check**: http://localhost:8081/health
+- **JWKS Endpoint**: http://localhost:8081/.well-known/jwks.json
+
+## 👥 Usuários de Teste
+
+### Usuários cadastrados no sistema:
+1. **Admin Principal**
+   - Email: `luisfernando@email.com`
+   - Senha: `123456`
+   - Role: `admin`
+
+2. **Usuário de Teste**
+   - Email: `teste@exemplo.com`
+   - Senha: `123456`
+   - Role: `admin`
+
+3. **Login de Teste**
+   - Email: `logintest@2fsolutions.com.br`
+   - Senha: `123456`
+   - Role: `admin`
+
+4. **Terceiro Usuário**
+   - Email: `terceiro@exemplo.com`
+   - Senha: `123456`
+   - Role: `admin`
+
+## 🔗 Endpoints Principais
+
+| Endpoint | Método | Descrição |
+| -------- | ------ | --------- |
+| `/health` | GET | Status da API |
+| `/public/login` | POST | Autenticação de usuários |
+| `/tenants` | GET/POST | Gerenciamento de tenants |
+| `/licenses` | GET/POST | Gerenciamento de licenças |
+| `/.well-known/jwks.json` | GET | Chaves públicas JWKS |
+
 ## Funcionalidades
 
 - **Row Level Security (RLS)**: Isolamento de dados por tenant

@@ -516,7 +516,7 @@ export const updatePlan = async (planKey: 'starter' | 'pro' | 'max') => {
       
       // 2. Tentar sincronizar com o client-local
       try {
-        const clientLocalResponse = await fetch('http://localhost:3010/licensing/sync-plan', {
+        const clientLocalResponse = await fetch('http://localhost:3001/licensing/sync-plan', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -539,7 +539,7 @@ export const updatePlan = async (planKey: 'starter' | 'pro' | 'max') => {
       console.warn('Failed to update plan in Hub, trying client-local fallback');
       
       // 3. Fallback para client-local se Hub falhar
-      const clientLocalResponse = await fetch('http://localhost:3010/licensing/sync-plan', {
+      const clientLocalResponse = await fetch('http://localhost:3001/licensing/sync-plan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -561,7 +561,7 @@ export const updatePlan = async (planKey: 'starter' | 'pro' | 'max') => {
     
     try {
       // Fallback para client-local se Hub não estiver disponível
-      const clientLocalResponse = await fetch('http://localhost:3010/licensing/sync-plan', {
+      const clientLocalResponse = await fetch('http://localhost:3001/licensing/sync-plan', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

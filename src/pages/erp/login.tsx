@@ -1,14 +1,13 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Package2, Eye, EyeOff, AlertCircle, Check } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Eye, EyeOff, Loader2, Package2, AlertTriangle, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { toast } from '@/hooks/use-toast';
+import { PlansModal } from '@/components/erp/plans-modal';
 
 interface Plan {
   id: string;
@@ -19,194 +18,107 @@ interface Plan {
   popular?: boolean;
 }
 
-export default function ErpLogin() {
+export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPlansModal, setShowPlansModal] = useState(false);
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [licenseWarning, setLicenseWarning] = useState<string | null>(null);
+  const { login, user, licenseStatus } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { login, user, licenseStatus, checkLicenseStatus } = useAuth();
 
-  // Redirecionar se já estiver logado e com licença válida
+  // Verificar se deve mostrar modal de planos ao carregar
   useEffect(() => {
-    if (user && licenseStatus?.isValid) {
+    const shouldShowPlansModal = localStorage.getItem('show_plans_modal');
+    if (shouldShowPlansModal === 'true' && user) {
+      setShowPlansModal(true);
+    }
+  }, [user]);
+
+  // Verificar avisos de licença
+  useEffect(() => {
+    const licenseExpiredOffline = localStorage.getItem('license_expired_offline');
+    const userNotFound = localStorage.getItem('user_not_found');
+    
+    if (licenseExpiredOffline === 'true') {
+      setLicenseWarning('Sua licença expirou e o sistema está offline. Conecte-se à internet para renovar.');
+      localStorage.removeItem('license_expired_offline');
+    } else if (userNotFound === 'true') {
+      setLicenseWarning('Usuário não encontrado no sistema. Cadastre-se no site institucional.');
+      localStorage.removeItem('user_not_found');
+    } else if (user && licenseStatus && !licenseStatus.isValid) {
+      setLicenseWarning('Sua licença está vencida ou inválida. Renove para continuar usando o sistema.');
+    }
+  }, [user, licenseStatus]);
+
+  // Redirecionar se já estiver logado e não precisar do modal
+  useEffect(() => {
+    if (user && !localStorage.getItem('show_plans_modal') && licenseStatus?.isValid) {
       navigate('/erp/dashboard');
     }
-  }, [user, licenseStatus, navigate]);
+  }, [user, navigate, licenseStatus]);
 
-  // Verificar licença ao carregar a página
-  useEffect(() => {
-    checkLicenseStatus();
-  }, [checkLicenseStatus]);
-
-  const checkLicense = async () => {
-    try {
-      const response = await fetch('http://localhost:3010/licensing/status');
-      const data = await response.json();
-      
-      // Se não há licença válida ou está expirada
-      if (!data.valid || data.expired) {
-        // Verificar se há tenant registrado
-        const installResponse = await fetch('http://localhost:3010/licensing/install-status');
-        const installData = await installResponse.json();
-        
-        // Se não está instalado ou não tem licença, redireciona para cadastro
-        if (!installData.isInstalled || !installData.hasLicense) {
-          toast({
-            title: "Cadastro necessário",
-            description: "Você precisa se cadastrar para usar o sistema.",
-            variant: "destructive",
-          });
-          // Redireciona para a página de cadastro do site
-          navigate('/site/cadastro');
-          return;
-        }
-        
-        // Se tem cadastro mas licença expirada, mostra planos
-        setShowPlansModal(true);
-        await fetchPlans();
-      }
-    } catch (error) {
-      console.error('Erro ao verificar licença:', error);
-      // Se não conseguir verificar a licença, redireciona para cadastro
-      toast({
-        title: "Erro de conexão",
-        description: "Não foi possível verificar sua licença. Redirecionando para cadastro.",
-        variant: "destructive",
-      });
-      navigate('/site/cadastro');
-    }
-  };
-
-  const fetchPlans = async () => {
-    setLoadingPlans(true);
-    try {
-      // Tentar buscar planos do Hub primeiro
-      const response = await fetch('http://localhost:8081/plans?active=true');
-      if (response.ok) {
-        const data = await response.json();
-        // Mapear os dados do Hub para o formato esperado
-        const mappedPlans = data.map((plan: any) => ({
-          id: plan.id,
-          name: plan.name,
-          price: plan.price || 0,
-          period: plan.billingCycle || 'mês',
-          features: plan.features || [],
-          popular: plan.popular || false
-        }));
-        setPlans(mappedPlans);
-      } else {
-        throw new Error('Hub não disponível');
-      }
-    } catch (error) {
-      console.error('Erro ao buscar planos do Hub:', error);
-      // Planos de fallback caso o Hub não esteja disponível
-      setPlans([
-        {
-          id: 'basico',
-          name: 'Básico',
-          price: 19.99,
-          period: 'mês',
-          features: [
-            'Até 2 usuários',
-            'Agendamento básico',
-            'PDV simples',
-            'Controle de estoque',
-            'Relatórios básicos',
-            'Suporte por email'
-          ]
-        },
-        {
-          id: 'profissional',
-          name: 'Profissional',
-          price: 59.99,
-          period: 'mês',
-          popular: true,
-          features: [
-            'Até 5 usuários',
-            'Agendamento avançado',
-            'PDV completo',
-            'Gestão de estoque avançada',
-            'CRM completo',
-            'Relatórios avançados',
-            'Notificações automáticas',
-            'Suporte prioritário'
-          ]
-        },
-        {
-          id: 'enterprise',
-          name: 'Enterprise',
-          price: 99.99,
-          period: 'mês',
-          features: [
-            'Usuários ilimitados',
-            'Todos os recursos',
-            'Multi-loja',
-            'API personalizada',
-            'Relatórios personalizados',
-            'Treinamento incluído',
-            'Suporte 24/7',
-            'Gerente de conta dedicado'
-          ]
-        }
-      ]);
-    } finally {
-      setLoadingPlans(false);
-    }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🚀 INICIANDO PROCESSO DE LOGIN NO COMPONENTE');
+    console.log('📧 Email:', email);
+    console.log('🔑 Senha fornecida:', password ? 'SIM' : 'NÃO');
+    
+    if (!email || !password) {
+      console.log('❌ Email ou senha não fornecidos');
+      toast({
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha email e senha.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
+    console.log('⏳ Estado de loading ativado');
 
     try {
+      console.log('🔐 Chamando função login do AuthContext...');
       const success = await login(email, password);
-      
+      console.log('🔐 Resultado do login:', success ? 'SUCESSO' : 'FALHA');
+
       if (success) {
-        toast({
-          title: "Login realizado com sucesso!",
-          description: "Redirecionando para o dashboard...",
-        });
-        navigate('/erp/dashboard');
+        console.log('✅ Login bem-sucedido - verificando se deve mostrar modal de planos...');
+        
+        // Verificar se deve mostrar modal de planos
+        const showPlansModal = localStorage.getItem('show_plans_modal');
+        console.log('📋 Flag show_plans_modal:', showPlansModal);
+        
+        if (showPlansModal === 'true') {
+          console.log('📋 Mostrando modal de planos...');
+          localStorage.removeItem('show_plans_modal');
+          setShowPlansModal(true);
+        } else {
+          console.log('🎯 Navegando para dashboard...');
+          navigate('/erp/dashboard');
+        }
       } else {
-        toast({
-          title: "Erro no login",
-          description: "Por favor, verifique suas credenciais.",
-          variant: "destructive",
-        });
+        console.log('❌ Login falhou - permanecendo na tela de login');
+        // O erro já foi tratado no AuthContext
       }
     } catch (error) {
+      console.error('💥 ERRO CRÍTICO NO COMPONENTE DE LOGIN:', error);
       toast({
-        title: "Erro no login",
-        description: "Verifique suas credenciais e tente novamente.",
+        title: "Erro inesperado",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
         variant: "destructive",
       });
     } finally {
+      console.log('🏁 Finalizando processo no componente - desativando loading');
       setIsLoading(false);
     }
   };
 
-  const handleSelectPlan = async (planId: string) => {
-    try {
-      toast({
-        title: "Plano selecionado",
-        description: "Redirecionando para pagamento...",
-      });
-      
-      // Aqui seria implementada a integração com o sistema de pagamento
-      // Por enquanto, apenas fecha o modal e permite o login
-      setShowPlansModal(false);
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível processar a seleção do plano.",
-        variant: "destructive",
-      });
-    }
+  const handlePlanSelected = (planKey: string) => {
+    console.log('Plano selecionado:', planKey);
+    setShowPlansModal(false);
+    navigate('/erp/dashboard');
   };
 
   return (
@@ -224,7 +136,7 @@ export default function ErpLogin() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -267,6 +179,29 @@ export default function ErpLogin() {
             </Button>
           </form>
           
+          {/* Aviso de Licença */}
+          {licenseWarning && (
+            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-yellow-800 mb-2">
+                    {licenseWarning}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-yellow-800 border-yellow-300 hover:bg-yellow-100"
+                    onClick={() => window.open('http://localhost:5173/renovacao', '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Renovar Licença
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="mt-6 text-center space-y-2">
             <Button variant="link" className="text-sm text-muted-foreground">
               Esqueceu sua senha?
@@ -286,61 +221,11 @@ export default function ErpLogin() {
       </Card>
 
       {/* Modal de Planos */}
-      <Dialog open={showPlansModal} onOpenChange={setShowPlansModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-amber-500" />
-              Licença Expirada ou Inválida
-            </DialogTitle>
-            <DialogDescription>
-              Para continuar usando o F-Flow Suite, selecione um plano abaixo:
-            </DialogDescription>
-          </DialogHeader>
-          
-          {loadingPlans ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-              {plans.map((plan) => (
-                <Card key={plan.id} className={`relative ${plan.popular ? 'border-primary shadow-lg' : ''}`}>
-                  {plan.popular && (
-                    <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-                      Mais Popular
-                    </Badge>
-                  )}
-                  <CardHeader className="text-center">
-                    <CardTitle className="text-xl">{plan.name}</CardTitle>
-                    <div className="text-3xl font-bold text-primary">
-                      R$ {plan.price.toFixed(2)}
-                      <span className="text-sm font-normal text-muted-foreground">/{plan.period}</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2 mb-6">
-                      {plan.features.map((feature, index) => (
-                        <li key={index} className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                    <Button 
-                      className="w-full" 
-                      variant={plan.popular ? "default" : "outline"}
-                      onClick={() => handleSelectPlan(plan.id)}
-                    >
-                      Selecionar Plano
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <PlansModal 
+        open={showPlansModal} 
+        onClose={() => setShowPlansModal(false)}
+        onPlanSelected={handlePlanSelected}
+      />
     </div>
   );
 }

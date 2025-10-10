@@ -12,6 +12,11 @@ export class UsersController {
     return this.usersService.findAll(isActive);
   }
 
+  @Get('roles/list')
+  async getRoles() {
+    return this.usersService.getRoles();
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
@@ -30,11 +35,6 @@ export class UsersController {
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.usersService.remove(id);
-  }
-
-  @Get('roles/list')
-  async getRoles() {
-    return this.usersService.getRoles();
   }
 
   @Post('roles')
