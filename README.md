@@ -29,8 +29,8 @@ npm run check:all
 Após o setup, você terá:
 - **Frontend ERP**: http://localhost:8080/erp/login
 - **Site Institucional**: http://localhost:5173
-- **Hub API**: http://localhost:8081 (NestJS + PostgreSQL)
-- **Client-local API**: http://localhost:3002 (NestJS + SQLite)
+- **Hub API**: http://localhost:3001 (NestJS + PostgreSQL)
+- **Client-local API**: http://localhost:8081 (NestJS + SQLite)
 - **Prisma Studio HUB**: http://localhost:5555 (Base de dados do HUB)
 - **Prisma Studio Client-Local**: http://localhost:5556 (Base de dados local)
 - **Adminer**: http://localhost:8080 (PostgreSQL UI)
@@ -66,8 +66,8 @@ Após o setup, você terá:
 | **ERP Login** | http://localhost:8080/erp/login | Interface de login do ERP |
 | **ERP Dashboard** | http://localhost:8080/erp/dashboard | Dashboard principal do ERP |
 | **Site Institucional** | http://localhost:5173 | Site público da empresa |
-| **Hub API** | http://localhost:8081 | API do HUB (autenticação, licenças) |
-| **Client-Local API** | http://localhost:3002 | API local (POS, estoque, grooming) |
+| **Hub API** | http://localhost:3001 | API do HUB (autenticação, licenças) |
+| **Client-Local API** | http://localhost:8081 | API local (POS, estoque, grooming) |
 | **Prisma Studio HUB** | http://localhost:5555 | Interface do banco HUB |
 | **Prisma Studio Local** | http://localhost:5556 | Interface do banco local |
 | **Adminer** | http://localhost:8080 | Interface PostgreSQL |
@@ -85,10 +85,10 @@ Após o setup, você terá:
 ### Teste de saúde
 ```bash
 # Verificar se o Hub está funcionando
-curl http://localhost:8081/health
+curl http://localhost:3001/health
 
 # Verificar se o Client-local está funcionando  
-curl http://localhost:3002/pos/sales -X POST -H "Content-Type: application/json" -d "{}"
+curl http://localhost:8081/pos/sales -X POST -H "Content-Type: application/json" -d "{}"
 ```
 
 ### Configuração de ambiente
@@ -225,7 +225,7 @@ LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY----
 
 **Fluxo de Autenticação Offline:**
 1. **Hub Indisponível**: Frontend detecta que o Hub não está acessível
-2. **Fallback Automático**: Sistema tenta autenticação no client-local (localhost:3001)
+2. **Fallback Automático**: Sistema tenta autenticação no client-local (localhost:8081)
 3. **Validação Local**: Client-local valida credenciais usando dados em cache
 4. **Verificação de Licença**: Valida licença local e período de graça
 5. **Acesso Limitado**: Usuário acessa funcionalidades offline disponíveis
@@ -317,7 +317,7 @@ npm run start:dev
 NODE_ENV=development
 PORT=3001
 DATABASE_URL="file:./local.db"
-HUB_BASE_URL=http://localhost:8081
+HUB_BASE_URL=http://localhost:3001
 LICENSE_FILE=./license.jwt
 LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
 DEVICE_ID=<guid-da-maquina>
@@ -356,7 +356,7 @@ POST /sync/push/pending
 Envia todos os eventos não processados para o Hub e os marca como processados:
 ```bash
 # Exemplo de uso
-curl -X POST http://localhost:3001/sync/push/pending
+curl -X POST http://localhost:8081/sync/push/pending
 # Resposta: número de eventos sincronizados
 ```
 
@@ -389,7 +389,7 @@ Busca comandos pendentes do Hub para execução local.
 
 1. **Criar uma venda** (gera evento `sale.created.v1`):
 ```bash
-curl -X POST http://localhost:3001/pos/sales \
+curl -X POST http://localhost:8081/pos/sales \
   -H "Content-Type: application/json" \
   -d '{
     "operator": "Operador Teste",
@@ -406,17 +406,17 @@ curl -X POST http://localhost:3001/pos/sales \
 
 2. **Verificar eventos pendentes**:
 ```bash
-curl http://localhost:3001/sync/events
+curl http://localhost:8081/sync/events
 ```
 
 3. **Sincronizar com o Hub**:
 ```bash
-curl -X POST http://localhost:3001/sync/push/pending
+curl -X POST http://localhost:8081/sync/push/pending
 ```
 
 4. **Confirmar processamento**:
 ```bash
-curl http://localhost:3001/sync/events
+curl http://localhost:8081/sync/events
 # Verificar se "processed": true
 ```
 

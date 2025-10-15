@@ -35,7 +35,7 @@ DATABASE_URL="file:./local.db"
 ```bash
 # Configuração de licenciamento
 LICENSING_ENFORCED=true
-HUB_BASE_URL=http://localhost:8081
+HUB_BASE_URL=http://localhost:3001
 DEVICE_ID=test-device-123
 TENANT_ID=cf0fee8c-5cb6-493b-8f02-d4fc045b114b
 
@@ -50,7 +50,7 @@ DATABASE_URL="file:./local.db"
 
 ### 1. ✅ Ativação de Licença no Hub
 
-**Endpoint:** `POST http://localhost:8081/licenses/activate`
+**Endpoint:** `POST http://localhost:3001/licenses/activate`
 
 **Payload:**
 ```json
@@ -81,7 +81,7 @@ DATABASE_URL="file:./local.db"
 
 ### 3. ✅ Funcionamento Offline
 
-**Endpoint:** `GET http://localhost:3001/licensing/status?tenantId=...`
+**Endpoint:** `GET http://localhost:8081/licensing/status?tenantId=...`
 
 **Resultado:** ✅ **SUCESSO**
 ```json

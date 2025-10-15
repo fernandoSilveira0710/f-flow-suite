@@ -3,7 +3,8 @@
  * Preparado para trocar por API externa (2F License Hub) via .env
  */
 
-const BASE_URL = import.meta.env.VITE_LICENSE_HUB_URL || '';
+import { API_URLS } from './env';
+const BASE_URL = import.meta.env.VITE_LICENSE_HUB_URL || API_URLS.HUB;
 const TENANT_KEY = '2f.tenantId';
 
 export function getTenantId(): string {

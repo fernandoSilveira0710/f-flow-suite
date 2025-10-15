@@ -1,5 +1,6 @@
 // Import mockAPI to use the same products data
 import { mockAPI, type Product as MockProduct } from './mock-data';
+import { API_URLS } from './env';
 
 /**
  * Stock/Inventory API - Real API Integration
@@ -72,7 +73,7 @@ export interface BulkStockAdjustmentDto {
 }
 
 // API Configuration
-const API_BASE_URL = 'http://127.0.0.1:3001';
+const API_BASE_URL = API_URLS.CLIENT_LOCAL;
 
 // API Helper function
 const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> => {

@@ -13,11 +13,11 @@ async function bootstrap() {
   // Configurar CORS para permitir requisições do frontend
   const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:8080',
-    process.env.CLIENT_LOCAL_API_URL || 'http://localhost:3001',
+    process.env.CLIENT_LOCAL_API_URL || 'http://localhost:8081',
     process.env.SITE_URL || 'http://localhost:5173',
     // Incluir variações com 127.0.0.1 para compatibilidade
     (process.env.FRONTEND_URL || 'http://localhost:8080').replace('localhost', '127.0.0.1'),
-    (process.env.CLIENT_LOCAL_API_URL || 'http://localhost:3001').replace('localhost', '127.0.0.1'),
+    (process.env.CLIENT_LOCAL_API_URL || 'http://localhost:8081').replace('localhost', '127.0.0.1'),
     (process.env.SITE_URL || 'http://localhost:5173').replace('localhost', '127.0.0.1'),
   ];
 

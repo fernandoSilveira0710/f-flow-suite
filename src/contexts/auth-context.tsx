@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { PlanSyncService } from '@/services/plan-sync.service';
+import { API_URLS, ENDPOINTS } from '../lib/env';
 
 interface User {
   id: string;
@@ -69,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLicenseStatus(null);
       
       // Consulta DIRETA ao client-local - SEM CACHE
-      const statusResponse = await fetch(`http://localhost:3001/licensing/status?t=${Date.now()}`, {
+      const statusResponse = await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
         method: 'GET',
         cache: 'no-cache',
         headers: {
@@ -89,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const statusData = await statusResponse.json();
       console.log('📊 Status data from client-local:', statusData);
       
-      const installResponse = await fetch(`http://localhost:3001/licensing/install-status?t=${Date.now()}`, {
+      const installResponse = await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/install-status?t=${Date.now()}`, {
         method: 'GET',
         cache: 'no-cache',
         headers: {
@@ -151,8 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let hubAvailable = true;
       
       try {
-        console.log('🌐 Fazendo requisição para Hub: http://localhost:8081/public/login');
-        hubResponse = await fetch('http://localhost:8081/public/login', {
+        console.log('🌐 Fazendo requisição para Hub:', ENDPOINTS.HUB_LOGIN);
+        hubResponse = await fetch(ENDPOINTS.HUB_LOGIN, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -193,7 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Sincronizar dados com client-local
         console.log('🔄 Sincronizando dados com client-local...');
         try {
-          const syncResponse = await fetch('http://localhost:3001/users/sync', {
+          const syncResponse = await fetch(ENDPOINTS.CLIENT_USERS_SYNC, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -214,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Verificar licenças no Hub
         console.log('🎫 Verificando licenças no Hub...');
         try {
-          const licenseUrl = `http://localhost:8081/licenses/validate?tenantId=${result.user.tenant.id}`;
+          const licenseUrl = `${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${result.user.tenant.id}`;
           console.log('🎫 URL de validação de licença:', licenseUrl);
           const licenseResponse = await fetch(licenseUrl);
           console.log('🎫 Resposta da licença - Status:', licenseResponse.status, 'OK:', licenseResponse.ok);
@@ -238,7 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // Ativar licença no client-local para gerar e persistir JWT token
                 try {
                   console.log('🔑 Ativando licença no client-local...');
-                  const activateResponse = await fetch('http://localhost:3001/licensing/activate', {
+                  const activateResponse = await fetch(ENDPOINTS.CLIENT_LICENSING_ACTIVATE, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -262,7 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // Persistir licença no client-local para uso offline futuro
                 try {
                   console.log('💾 Persistindo licença no client-local...');
-                  await fetch('http://localhost:3001/licensing/persist', {
+                  await fetch(ENDPOINTS.CLIENT_LICENSING_PERSIST, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -349,7 +350,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!hubAvailable || !hubResponse?.ok) {
         console.log('💻 Tentando login offline no client-local...');
         try {
-          const offlineResponse = await fetch('http://localhost:3001/auth/offline-login', {
+          const offlineResponse = await fetch(`${API_URLS.CLIENT_LOCAL}/auth/offline-login`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -515,7 +516,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isFirstInstallation = async (): Promise<boolean> => {
     try {
-      const response = await fetch('http://localhost:3001/users/has-users');
+      const response = await fetch(ENDPOINTS.CLIENT_USERS_HAS_USERS);
       if (response.ok) {
         const data = await response.json();
         return !data.hasUsers;
@@ -529,7 +530,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasLocalUsers = async (): Promise<boolean> => {
     try {
-      const response = await fetch('http://localhost:3001/users/has-users');
+      const response = await fetch(ENDPOINTS.CLIENT_USERS_HAS_USERS);
       if (response.ok) {
         const data = await response.json();
         return data.hasUsers;

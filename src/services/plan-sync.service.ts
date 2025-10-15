@@ -1,6 +1,7 @@
 /**
  * Serviço para sincronização de planos entre Hub, client-local e cache local
  */
+import { API_URLS } from '@/lib/env';
 
 interface SyncPlanData {
   tenantId: string;
@@ -19,8 +20,9 @@ interface SyncResult {
 }
 
 export class PlanSyncService {
-  private static readonly HUB_BASE_URL = 'http://localhost:8081';
-  private static readonly CLIENT_LOCAL_BASE_URL = 'http://localhost:3001';
+  // Centralizar URLs via env.ts
+  private static readonly HUB_BASE_URL = API_URLS.HUB;
+  private static readonly CLIENT_LOCAL_BASE_URL = API_URLS.CLIENT_LOCAL;
 
   /**
    * Sincroniza planos em todas as fontes após login ou alteração de plano

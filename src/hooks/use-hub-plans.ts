@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ENDPOINTS } from '../lib/env';
 
 export interface HubPlan {
   id: string;
@@ -49,7 +50,7 @@ export const useHubPlans = () => {
 
   const fetchPlansFromHub = async (): Promise<HubPlan[]> => {
     try {
-      const response = await fetch('http://localhost:8081/public/plans?active=true');
+      const response = await fetch(`${ENDPOINTS.HUB_PLANS}?active=true`);
       if (response.ok) {
         const hubPlans = await response.json();
         setIsHubAvailable(true);

@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { getPlanInfo, updatePlan } from '@/lib/settings-api';
 import { getAllPlans } from '@/lib/entitlements';
 import { Check, Clock, X, Wifi, WifiOff, RefreshCw } from 'lucide-react';
-import { ENDPOINTS } from '@/lib/env';
+import { ENDPOINTS, API_URLS } from '@/lib/env';
 import {
   Table,
   TableBody,
@@ -119,7 +119,7 @@ export default function PlanoPage() {
   const getLicenseToken = async (): Promise<string | null> => {
     try {
       // Primeiro, tentar obter do endpoint /licensing/current
-      const response = await fetch('http://localhost:3001/licensing/current', {
+      const response = await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/current`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
