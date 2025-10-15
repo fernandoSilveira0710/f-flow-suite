@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
+import { PlanSyncService } from '@/services/plan-sync.service';
 
 interface User {
   id: string;
@@ -22,7 +23,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   checkLicenseStatus: () => Promise<void>;
-  refreshLicenseStatus: () => Promise<void>;
+  refreshLicenseStatus: (forceUpdate?: boolean) => Promise<void>;
   isFirstInstallation: () => Promise<boolean>;
   hasLocalUsers: () => Promise<boolean>;
 }
@@ -58,14 +59,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const checkLicenseStatus = useCallback(async () => {
+    console.log('🔍 Verificando status da licença - DIRETO do client-local...');
+    
     try {
-      // Usar fetch com configurações específicas para o proxy
-      const statusResponse = await fetch('/licensing/status', {
+      const tenantId = localStorage.getItem('tenant_id');
+      console.log('🏢 Tenant ID:', tenantId);
+      
+      // SEMPRE limpar estado antes de nova consulta
+      setLicenseStatus(null);
+      
+      // Consulta DIRETA ao client-local - SEM CACHE
+      const statusResponse = await fetch(`http://localhost:3001/licensing/status?t=${Date.now()}`, {
         method: 'GET',
-        credentials: 'include',
+        cache: 'no-cache',
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          ...(tenantId && { 'x-tenant-id': tenantId })
         }
       });
       
@@ -74,13 +87,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       const statusData = await statusResponse.json();
+      console.log('📊 Status data from client-local:', statusData);
       
-      const installResponse = await fetch('/licensing/install-status', {
+      const installResponse = await fetch(`http://localhost:3001/licensing/install-status?t=${Date.now()}`, {
         method: 'GET',
-        credentials: 'include',
+        cache: 'no-cache',
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          ...(tenantId && { 'x-tenant-id': tenantId })
         }
       });
       
@@ -89,15 +107,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       const installData = await installResponse.json();
+      console.log('🔧 Install data from client-local:', installData);
       
-      setLicenseStatus({
+      const newLicenseStatus = {
         isValid: statusData.valid || false,
         isInstalled: installData.isInstalled || false,
-        plan: statusData.planKey,
-        expiresAt: statusData.expiresAt
-      });
+        plan: installData.planKey, // USAR install-status que tem dados mais confiáveis
+        expiresAt: installData.expiresAt || statusData.expiresAt
+      };
+      
+      console.log('✅ Novo license status:', newLicenseStatus);
+      setLicenseStatus(newLicenseStatus);
+      
     } catch (error) {
-      console.error('Erro ao verificar status da licença:', error);
+      console.error('❌ Erro ao verificar status da licença:', error);
       setLicenseStatus({
         isValid: false,
         isInstalled: false
@@ -105,8 +128,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshLicenseStatus = useCallback(async () => {
-    console.log('🔄 Forçando atualização do status da licença...');
+  const refreshLicenseStatus = useCallback(async (forceUpdate: boolean = false) => {
+    console.log('🔄 Forçando atualização do status da licença...', forceUpdate ? '(FORCE UPDATE)' : '');
+    
+    if (forceUpdate) {
+      // Limpar cache local antes de fazer nova consulta
+      console.log('🧹 Limpando cache local de licença...');
+      setLicenseStatus(null);
+    }
+    
     await checkLicenseStatus();
   }, [checkLicenseStatus]);
 
@@ -199,58 +229,93 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
             
             // Se tem licença válida, fazer login normalmente
-            if (licenseData.valid && licenseData.licensed) {
-              console.log('✅ Licença válida - fazendo login completo...');
-              setUser(userData);
-              localStorage.setItem('auth_user', JSON.stringify(userData));
-              localStorage.setItem('tenant_id', result.user.tenant.id);
-              
-              // Ativar licença no client-local para gerar e persistir JWT token
-              try {
-                console.log('🔑 Ativando licença no client-local...');
-                const activateResponse = await fetch('http://localhost:3001/licensing/activate', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    tenantId: result.user.tenant.id,
-                    deviceId: 'web-client', // ou gerar um deviceId único
-                  }),
-                });
+              if (licenseData.valid && licenseData.licensed) {
+                console.log('✅ Licença válida - fazendo login completo...');
+                setUser(userData);
+                localStorage.setItem('auth_user', JSON.stringify(userData));
+                localStorage.setItem('tenant_id', result.user.tenant.id);
                 
-                if (activateResponse.ok) {
-                  const activateResult = await activateResponse.json();
-                  console.log('🔑 Licença ativada com sucesso:', activateResult);
-                } else {
-                  console.warn('⚠️ Erro na ativação da licença:', activateResponse.status);
+                // Ativar licença no client-local para gerar e persistir JWT token
+                try {
+                  console.log('🔑 Ativando licença no client-local...');
+                  const activateResponse = await fetch('http://localhost:3001/licensing/activate', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      tenantId: result.user.tenant.id,
+                      deviceId: 'web-client', // ou gerar um deviceId único
+                    }),
+                  });
+                  
+                  if (activateResponse.ok) {
+                    const activateResult = await activateResponse.json();
+                    console.log('🔑 Licença ativada com sucesso:', activateResult);
+                  } else {
+                    console.warn('⚠️ Erro na ativação da licença:', activateResponse.status);
+                  }
+                } catch (activateError) {
+                  console.warn('⚠️ Erro ao ativar licença:', activateError);
                 }
-              } catch (activateError) {
-                console.warn('⚠️ Erro ao ativar licença:', activateError);
-              }
-              
-              // Persistir licença no client-local para uso offline futuro
-              try {
-                console.log('💾 Persistindo licença no client-local...');
-                await fetch('http://localhost:3001/licensing/persist', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    tenantId: result.user.tenant.id,
-                    userId: result.user.id,
-                    licenseData: licenseData
-                  }),
-                });
-                console.log('💾 Licença persistida com sucesso');
-              } catch (persistError) {
-                console.warn('⚠️ Erro ao persistir licença localmente:', persistError);
-              }
-              
-              await checkLicenseStatus();
-              console.log('🎉 LOGIN CONCLUÍDO COM SUCESSO!');
-              return true;
+                
+                // Persistir licença no client-local para uso offline futuro
+                try {
+                  console.log('💾 Persistindo licença no client-local...');
+                  await fetch('http://localhost:3001/licensing/persist', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      tenantId: result.user.tenant.id,
+                      userId: result.user.id,
+                      licenseData: licenseData
+                    }),
+                  });
+                  console.log('💾 Licença persistida com sucesso');
+                } catch (persistError) {
+                  console.warn('⚠️ Erro ao persistir licença localmente:', persistError);
+                }
+                
+                // 🔄 SINCRONIZAÇÃO DE PLANOS APÓS LOGIN
+                try {
+                  console.log('🔄 Iniciando sincronização de planos após login...');
+                  const syncResult = await PlanSyncService.syncPlansAfterLogin(
+                    result.user.tenant.id,
+                    result.user.id
+                  );
+                  
+                  if (syncResult.success) {
+                    console.log('✅ Sincronização de planos concluída:', syncResult.message);
+                    toast({
+                      title: "Sincronização concluída",
+                      description: `Planos sincronizados com sucesso. Plano atual: ${syncResult.planKey}`,
+                      variant: "default",
+                    });
+                  } else {
+                    console.warn('⚠️ Sincronização parcial:', syncResult.message);
+                    toast({
+                      title: "Sincronização parcial",
+                      description: syncResult.message,
+                      variant: "default",
+                    });
+                  }
+                } catch (syncError) {
+                  console.error('❌ Erro na sincronização de planos:', syncError);
+                  toast({
+                    title: "Erro na sincronização",
+                    description: "Não foi possível sincronizar os planos. O sistema funcionará normalmente.",
+                    variant: "default",
+                  });
+                }
+                
+                // Forçar atualização do status da licença após login bem-sucedido
+                console.log('🔄 Forçando atualização do cache de licença após login...');
+                await checkLicenseStatus();
+                
+                console.log('🎉 LOGIN CONCLUÍDO COM SUCESSO!');
+                return true;
             } else {
               console.log('⚠️ Hub online mas licença vencida/inexistente - mostrando modal de planos');
               // Hub online mas licença vencida/inexistente - mostrar modal de planos
@@ -264,6 +329,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 description: "Selecione um plano para continuar usando o sistema.",
                 variant: "default",
               });
+              
+              // Forçar atualização do status da licença após login (mesmo sem licença válida)
+              console.log('🔄 Forçando atualização do cache de licença após login...');
+              await checkLicenseStatus();
               
               console.log('🎉 LOGIN CONCLUÍDO - mas precisa selecionar plano');
               return true; // Login bem-sucedido, mas precisa selecionar plano
@@ -317,6 +386,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 description: "Conectado usando dados em cache. Funcionalidade limitada.",
                 variant: "default",
               });
+              
+              // Forçar atualização do status da licença após login offline
+              console.log('🔄 Forçando atualização do cache de licença após login offline...');
+              await checkLicenseStatus();
               
               return true;
             } else {
@@ -411,15 +484,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    console.log('🚪 Iniciando logout - limpando cache...');
+    
+    // Limpar estado do React
     setUser(null);
     setLicenseStatus(null);
-    localStorage.removeItem('auth_user');
-    navigate('/erp/login');
+    
+    // Limpar localStorage completamente
+    localStorage.clear();
+    
+    // Limpar sessionStorage
+    sessionStorage.clear();
+    
+    console.log('🧹 Cache limpo - redirecionando para login...');
     
     toast({
       title: "Logout realizado",
       description: "Você foi desconectado com sucesso.",
     });
+    
+    // Navegar para login e forçar refresh da página para garantir estado limpo
+    navigate('/erp/login');
+    
+    // Pequeno delay para garantir que a navegação aconteça antes do reload
+    setTimeout(() => {
+      console.log('🔄 Forçando reload da página para garantir estado limpo...');
+      window.location.reload();
+    }, 100);
   };
 
   const isFirstInstallation = async (): Promise<boolean> => {

@@ -184,19 +184,7 @@ export default function SettingsLayout() {
             })}
           </nav>
 
-          {/* Plan Card */}
-          <div className="mt-6 rounded-lg bg-accent p-4">
-            <p className="text-xs text-muted-foreground mb-1">Plano Atual</p>
-            <p className="text-sm font-semibold capitalize mb-2">
-              {planNames[currentPlan]}
-            </p>
-            <p className="text-xs text-muted-foreground mb-3">
-              {entitlements.seatLimit} {entitlements.seatLimit === 1 ? 'assento' : 'assentos'}
-            </p>
-            <Button variant="outline" size="sm" className="w-full" asChild>
-              <Link to="/planos">Fazer Upgrade</Link>
-            </Button>
-          </div>
+
         </div>
       </aside>
 

@@ -20,6 +20,7 @@ export class PrismaTenantMiddleware implements NestMiddleware {
     const tenantId =
       (req.headers['x-tenant-id'] as string | undefined) ??
       (req as Request & { user?: { tenantId?: string } })?.user?.tenantId ??
+      (req.query.tenantId as string | undefined) ??
       null;
 
     console.log(`[PrismaTenantMiddleware] Path: ${req.path}, Method: ${req.method}, TenantId: ${tenantId}`);

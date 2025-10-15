@@ -28,7 +28,7 @@ npm run check:all
 ### Serviços disponíveis
 Após o setup, você terá:
 - **Frontend ERP**: http://localhost:8080/erp/login
-- **Site Institucional**: http://localhost:8080/site
+- **Site Institucional**: http://localhost:5173
 - **Hub API**: http://localhost:8081 (NestJS + PostgreSQL)
 - **Client-local API**: http://localhost:3002 (NestJS + SQLite)
 - **Prisma Studio HUB**: http://localhost:5555 (Base de dados do HUB)
@@ -65,7 +65,7 @@ Após o setup, você terá:
 | ------- | --- | --------- |
 | **ERP Login** | http://localhost:8080/erp/login | Interface de login do ERP |
 | **ERP Dashboard** | http://localhost:8080/erp/dashboard | Dashboard principal do ERP |
-| **Site Institucional** | http://localhost:8080/site | Site público da empresa |
+| **Site Institucional** | http://localhost:5173 | Site público da empresa |
 | **Hub API** | http://localhost:8081 | API do HUB (autenticação, licenças) |
 | **Client-Local API** | http://localhost:3002 | API local (POS, estoque, grooming) |
 | **Prisma Studio HUB** | http://localhost:5555 | Interface do banco HUB |

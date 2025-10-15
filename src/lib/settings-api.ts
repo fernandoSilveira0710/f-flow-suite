@@ -438,7 +438,7 @@ export const getPlanInfo = async (): Promise<PlanInfo> => {
   await delay(300);
   
   // Tentar buscar dados do Hub primeiro
-  const tenantId = localStorage.getItem('2f.tenantId') || '3cb88e58-b2e7-4fb1-9e0f-eb5a9c4b640b';
+  const tenantId = localStorage.getItem('2f.tenantId') || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
   const hubSubscription = await fetchTenantSubscription(tenantId);
   
   if (hubSubscription && hubSubscription.plan) {
@@ -496,95 +496,25 @@ export const getPlanInfo = async (): Promise<PlanInfo> => {
 };
 
 export const updatePlan = async (planKey: 'starter' | 'pro' | 'max') => {
-  const tenantId = localStorage.getItem('2f.tenantId') || '3cb88e58-b2e7-4fb1-9e0f-eb5a9c4b640b';
+  const tenantId = localStorage.getItem('2f.tenantId') || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
+  const userId = localStorage.getItem('user_id') || 'unknown';
   
   try {
-    // 1. Tentar atualizar no Hub primeiro
-    const hubResponse = await fetch(ENDPOINTS.HUB_TENANTS_SUBSCRIPTION(tenantId), {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-tenant-id': tenantId,
-      },
-      body: JSON.stringify({ 
-        planId: planKey,
-        status: 'active'
-      }),
-    });
-
-    if (hubResponse.ok) {
-      console.log('Plan updated successfully in Hub');
-      
-      // 2. Tentar sincronizar com o client-local
-      try {
-        const clientLocalResponse = await fetch(ENDPOINTS.CLIENT_LICENSING_SYNC_PLAN, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            tenantId,
-            planKey 
-          }),
-        });
-
-        if (clientLocalResponse.ok) {
-          console.log('Plan synchronized successfully with client-local');
-        } else {
-          console.warn('Failed to sync with client-local, but Hub update succeeded');
-        }
-      } catch (clientError) {
-        console.warn('Client-local not available for sync, but Hub update succeeded:', clientError);
-      }
+    // Usar PlanSyncService para sincronização completa
+    const { PlanSyncService } = await import('../services/plan-sync.service');
+    const result = await PlanSyncService.syncPlansAfterPlanChange(tenantId, userId, planKey);
+    
+    if (result.success) {
+      console.log('Plan synchronized successfully across all services');
     } else {
-      console.warn('Failed to update plan in Hub, trying client-local fallback');
-      
-      // 3. Fallback para client-local se Hub falhar
-      const clientLocalResponse = await fetch(ENDPOINTS.CLIENT_LICENSING_SYNC_PLAN, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          tenantId,
-          planKey 
-        }),
-      });
-
-      if (clientLocalResponse.ok) {
-        console.log('Plan updated successfully in client-local (Hub fallback)');
-      } else {
-        console.warn('Both Hub and client-local failed, using localStorage fallback');
-      }
+      console.warn('Plan synchronization completed with some issues:', result.errors);
     }
   } catch (error) {
-    console.warn('Hub not available, trying client-local fallback:', error);
+    console.warn('PlanSyncService not available, using fallback:', error);
     
-    try {
-      // Fallback para client-local se Hub não estiver disponível
-      const clientLocalResponse = await fetch(ENDPOINTS.CLIENT_LICENSING_SYNC_PLAN, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          tenantId,
-          planKey 
-        }),
-      });
-
-      if (clientLocalResponse.ok) {
-        console.log('Plan updated successfully in client-local (Hub offline)');
-      } else {
-        console.warn('Both services unavailable, using localStorage fallback');
-      }
-    } catch (clientError) {
-      console.warn('All services unavailable, using localStorage fallback:', clientError);
-    }
+    // Fallback para localStorage se o serviço não estiver disponível
+    localStorage.setItem('selectedPlan', planKey);
   }
-
-  // Atualizar localStorage como fallback final ou confirmação
-  localStorage.setItem('selectedPlan', planKey);
   
   // Disparar evento customizado para notificar outras partes da aplicação
   window.dispatchEvent(new CustomEvent('planChanged', { detail: { planKey } }));

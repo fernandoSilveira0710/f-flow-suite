@@ -48,7 +48,7 @@ export default function Pagamento() {
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       // Chamar o HUB para criar a licença após pagamento aprovado
-      const response = await fetch('http://localhost:3000/licenses/create', {
+      const response = await fetch('http://localhost:8081/licenses/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

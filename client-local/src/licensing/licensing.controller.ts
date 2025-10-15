@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Logger, HttpException, HttpStatus, Headers } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LicensingService } from './licensing.service';
 
@@ -56,8 +56,11 @@ export class LicensingController {
   }
 
   @Get('install-status')
-  async getInstallStatus(): Promise<InstallStatusResponse> {
+  async getInstallStatus(@Headers('x-tenant-id') headerTenantId?: string): Promise<InstallStatusResponse> {
     try {
+      // Priorizar tenantId do header, fallback para .env
+      const tenantId = headerTenantId || this.configService.get<string>('TENANT_ID', 'default-tenant');
+      this.logger.log(`Getting install status for tenant: ${tenantId} (source: ${headerTenantId ? 'header' : 'env'})`);
       return await this.licensingService.getInstallStatus();
     } catch (error: any) {
       this.logger.error('Failed to get install status', error);
@@ -93,6 +96,58 @@ export class LicensingController {
       throw new HttpException(
         `Failed to get current license: ${error.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Get('plan/current')
+  async getCurrentPlan() {
+    try {
+      const license = await this.licensingService.getCurrentLicense();
+      if (!license) {
+        return { 
+          planKey: 'starter',
+          message: 'No active license found, defaulting to starter plan'
+        };
+      }
+
+      // Mapear o plano 'enterprise' (desenvolvimento) para 'max'
+      let planKey = license.plan;
+      if (planKey === 'enterprise') {
+        planKey = 'max';
+      }
+
+      // Garantir que o planKey seja válido
+      const validPlans = ['starter', 'pro', 'max'];
+      if (!validPlans.includes(planKey)) {
+        planKey = 'starter';
+      }
+
+      return {
+        planKey,
+        status: license.status || 'activated',
+        expiresAt: new Date(license.exp * 1000).toISOString()
+      };
+    } catch (error: any) {
+      this.logger.error('Failed to get current plan', error);
+      return { 
+        planKey: 'starter',
+        message: 'Error getting plan, defaulting to starter'
+      };
+    }
+  }
+
+  @Post('update-cache')
+  async updateCache(@Body() updateData: { tenantId: string; planKey: string; lastChecked: string; updatedAt: string }) {
+    try {
+      this.logger.log(`Updating license cache for tenant ${updateData.tenantId}: ${updateData.planKey}`);
+      const result = await this.licensingService.updateLicenseCache(updateData);
+      return { success: true, message: 'Cache updated successfully', data: result };
+    } catch (error) {
+      this.logger.error(`Failed to update cache for tenant ${updateData.tenantId}:`, error);
+      throw new HttpException(
+        'Failed to update cache',
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -146,7 +201,7 @@ export class LicensingController {
   }) {
     try {
       // Persistir dados de licença localmente para uso offline futuro
-      await this.licensingService.updateLicenseCache(body.tenantId);
+      await this.licensingService.updateLicenseCacheFromHub(body.tenantId);
       
       this.logger.log(`Licença persistida localmente para tenant ${body.tenantId}`);
       
@@ -164,9 +219,11 @@ export class LicensingController {
   }
 
   @Get('status')
-  async getLicenseStatus(): Promise<LicenseStatusResponse> {
+  async getLicenseStatus(@Headers('x-tenant-id') headerTenantId?: string): Promise<LicenseStatusResponse> {
     try {
-      const tenantId = this.configService.get<string>('TENANT_ID', 'default-tenant');
+      // Priorizar tenantId do header, fallback para .env
+      const tenantId = headerTenantId || this.configService.get<string>('TENANT_ID', 'default-tenant');
+      this.logger.log(`Getting license status for tenant: ${tenantId} (source: ${headerTenantId ? 'header' : 'env'})`);
       const result = await this.licensingService.checkLicenseStatus(tenantId);
 
       return {

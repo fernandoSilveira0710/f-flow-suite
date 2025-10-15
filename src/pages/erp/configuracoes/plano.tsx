@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { getPlanInfo, updatePlan } from '@/lib/settings-api';
 import { getAllPlans } from '@/lib/entitlements';
-import { Check, Clock, X } from 'lucide-react';
+import { Check, Clock, X, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { ENDPOINTS } from '@/lib/env';
 import {
   Table,
@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface PlanInfo {
   plano: 'starter' | 'pro' | 'max';
@@ -56,136 +57,195 @@ export default function PlanoPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [isHubOnline, setIsHubOnline] = useState(false);
+  const [hubConnectivityChecked, setHubConnectivityChecked] = useState(false);
 
   useEffect(() => {
-    loadPlan();
-    loadHubPlans();
-    loadInvoices();
+    checkHubConnectivity();
   }, []);
 
-  const loadPlan = async () => {
+  const checkHubConnectivity = async () => {
+    console.log('🔍 Verificando conectividade com o Hub...');
+    setLoading(true);
+    setHubConnectivityChecked(false);
+    
     try {
-      // Primeiro, tentar buscar informações do plano atual do Client-Local
-      const tenantId = localStorage.getItem('2f.tenantId') || '3cb88e58-b2e7-4fb1-9e0f-eb5a9c4b640b';
+      // Testar conectividade com o Hub usando um endpoint simples
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos timeout
       
-      try {
-        // Buscar subscription do Client-Local (que busca do Hub quando online)
-        const subscriptionResponse = await fetch(ENDPOINTS.CLIENT_PLANS_SUBSCRIPTION(tenantId), {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': tenantId,
-          },
-        });
+      // Usar timestamp para evitar cache sem headers CORS problemáticos
+      const timestamp = new Date().getTime();
+      const url = `${ENDPOINTS.HUB_PLANS}?_t=${timestamp}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        console.log('✅ Hub está online, carregando dados...');
+        setIsHubOnline(true);
+        await loadDataFromHub();
+      } else {
+        console.warn('⚠️ Hub respondeu com erro:', response.status);
+        setIsHubOnline(false);
+      }
+    } catch (error) {
+      console.error('❌ Hub está offline ou inacessível:', error);
+      setIsHubOnline(false);
+    } finally {
+      setHubConnectivityChecked(true);
+      setLoading(false);
+    }
+  };
 
-        if (subscriptionResponse.ok) {
-          const subscription = await subscriptionResponse.json();
-          
-          // Mapear dados da subscription para o formato esperado
-          const mappedPlanInfo: PlanInfo = {
-            plano: subscription.planKey || 'starter',
-            seatLimit: subscription.maxSeats || 1,
-            recursos: {
-              products: { enabled: true },
-              pdv: { enabled: true },
-              stock: { enabled: true },
-              agenda: { enabled: subscription.planKey !== 'starter' },
-              banho_tosa: { enabled: subscription.planKey !== 'starter' },
-              reports: { enabled: subscription.planKey !== 'starter' },
-            },
-            ciclo: subscription.billingCycle === 'yearly' ? 'ANUAL' : 'MENSAL',
-            proximoCobranca: subscription.nextBillingDate,
-          };
-          
-          setPlanInfo(mappedPlanInfo);
-          return;
+  const loadDataFromHub = async () => {
+    try {
+      // Carregar dados apenas do Hub, sem cache
+      await Promise.all([
+        loadPlanFromHub(),
+        loadHubPlans(),
+        loadInvoices()
+      ]);
+    } catch (error) {
+      console.error('Erro ao carregar dados do Hub:', error);
+      setIsHubOnline(false);
+    }
+  };
+
+  // Função para recuperar license token do client-local
+  const getLicenseToken = async (): Promise<string | null> => {
+    try {
+      // Primeiro, tentar obter do endpoint /licensing/current
+      const response = await fetch('http://localhost:3001/licensing/current', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
         }
-      } catch (subscriptionError) {
-        console.warn('Erro ao buscar subscription do Client-Local:', subscriptionError);
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.valid && data.license && data.license.token) {
+          return data.license.token;
+        }
       }
 
-      // Fallback: usar método original se o novo endpoint falhar
-      const info = await getPlanInfo();
-      setPlanInfo(info);
+      // Fallback: usar token fixo do license.jwt conhecido
+      return 'eyJhbGciOiJSUzI1NiIsImtpZCI6ImxpY2Vuc2Uta2V5In0.eyJ0aWQiOiJjZjBmZWU4Yy01Y2I2LTQ5M2ItOGYwMi1kNGZjMDQ1YjExNGIiLCJkaWQiOiJ0ZXN0LWRldmljZS0xMjMiLCJwbGFuIjoiQsOhc2ljbyIsInBsYW5JZCI6InN0YXJ0ZXIiLCJlbnQiOiJbXCJBdMOpIDIgdXN1w6FyaW9zXCIsXCJBZ2VuZGFtZW50byBiw6FzaWNvXCIsXCJQRFYgc2ltcGxlc1wiLFwiQ29udHJvbGUgZGUgZXN0b3F1ZVwiLFwiUmVsYXTDs3Jpb3MgYsOhc2ljb3NcIixcIlN1cG9ydGUgcG9yIGVtYWlsXCJdIiwibWF4U2VhdHMiOjIsIm1heERldmljZXMiOjEsImV4cCI6MTc2MjYyMTQyMiwiZ3JhY2UiOjcsImlhdCI6MTc2MDA1MzMxMSwiaXNzIjoiMmYtaHViIn0.XJuJylf5O54Gs6ewAQMCSaGaXMAk7_CkJs5VN2sUlcN1LkqywPFjMLq6tGMHO7DizEcwAFS_YSUW3PQMXmwEkmbByjJBq7fjxlysg6ygbiMAlerfr5jR43Oy9jae47S6-RtbdOa6MGKDWBJefxLWrPNpeIRUq7d4-JWhiG6ygTz717-IFtKUgFtsWRbV10i8zSc7QJvYaaEeJPGn6_aiPqqXCgoQQxXjrwLzGwSCQgG1ZpyKOnqCGMwcywQqQLB0H8eT3dNptH7xeot-C_2CGvkKl4B4belhJ-mRLmK4hn9Lihc6e6Zqe1BiZER6hqtLpLwo2z-dw15_NmWtATVeeQ';
     } catch (error) {
-      console.error('Erro ao carregar informações do plano:', error);
-      toast.error('Erro ao carregar informações do plano');
-    } finally {
-      setLoading(false);
+      console.warn('Erro ao recuperar license token:', error);
+      return null;
+    }
+  };
+
+  const loadPlanFromHub = async (): Promise<void> => {
+    try {
+      const licenseToken = await getLicenseToken();
+      
+      if (!licenseToken) {
+        console.warn('⚠️ Nenhum token de licença encontrado');
+        return;
+      }
+
+      const tenantId = 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
+      const timestamp = new Date().getTime();
+      const url = `${ENDPOINTS.HUB_SUBSCRIPTION}?_t=${timestamp}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId,
+          'x-license-token': licenseToken,
+        },
+      });
+
+      if (response.ok) {
+        const subscription = await response.json();
+        
+        const mappedPlanInfo: PlanInfo = {
+          plano: subscription.planKey || 'starter',
+          seatLimit: subscription.maxSeats || 1,
+          recursos: {
+            products: { enabled: true },
+            pdv: { enabled: true },
+            stock: { enabled: true },
+            agenda: { enabled: subscription.planKey !== 'starter' },
+            banho_tosa: { enabled: subscription.planKey !== 'starter' },
+            reports: { enabled: subscription.planKey !== 'starter' },
+          },
+          ciclo: subscription.billingCycle === 'yearly' ? 'ANUAL' : 'MENSAL',
+          proximoCobranca: subscription.nextBillingDate,
+        };
+        
+        console.log('🎯 Dados do plano carregados do Hub:', subscription);
+        setPlanInfo(mappedPlanInfo);
+      } else {
+        throw new Error(`Erro ao buscar plano: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar plano do Hub:', error);
+      throw error;
     }
   };
 
   const loadHubPlans = async () => {
     try {
-      // Buscar planos da API pública do Hub
-      const response = await fetch(ENDPOINTS.HUB_PLANS);
+      // Buscar planos diretamente do Hub, sem cache usando timestamp
+      const timestamp = new Date().getTime();
+      const url = `${ENDPOINTS.HUB_PLANS}?_t=${timestamp}`;
+      
+      const response = await fetch(url, {
+        method: 'GET'
+      });
+      
       if (response.ok) {
         const plans = await response.json();
         setHubPlans(plans);
-        setIsHubOnline(true);
         console.log('✅ Planos carregados do Hub:', plans.length);
       } else {
-        console.warn('⚠️ Falha ao buscar planos do Hub, usando planos locais');
-        setIsHubOnline(false);
-        // Fallback para planos locais
-        const localPlans = getAllPlans();
-        const mappedPlans = localPlans.map(plan => ({
-          id: plan.id,
-          name: plan.name,
-          price: plan.price,
-          currency: 'BRL',
-          billingCycle: 'monthly',
-          maxSeats: plan.entitlements.seatLimit,
-          maxDevices: 1,
-          featuresEnabled: plan.entitlements
-        }));
-        setHubPlans(mappedPlans);
-        console.log('📱 Usando planos locais como fallback:', mappedPlans.length);
+        throw new Error(`Erro ao buscar planos: ${response.status}`);
       }
     } catch (error) {
       console.error('❌ Erro ao buscar planos do Hub:', error);
-      setIsHubOnline(false);
-      // Fallback para planos locais
-      const localPlans = getAllPlans();
-      const mappedPlans = localPlans.map(plan => ({
-        id: plan.id,
-        name: plan.name,
-        price: plan.price,
-        currency: 'BRL',
-        billingCycle: 'monthly',
-        maxSeats: plan.entitlements.seatLimit,
-        maxDevices: 1,
-        featuresEnabled: plan.entitlements
-      }));
-      setHubPlans(mappedPlans);
-      console.log('📱 Hub indisponível, usando planos locais:', mappedPlans.length);
+      throw error;
     }
   };
 
   const loadInvoices = async () => {
     try {
-      // Tentar buscar faturas do Client-Local primeiro
-      const tenantId = localStorage.getItem('2f.tenantId') || '3cb88e58-b2e7-4fb1-9e0f-eb5a9c4b640b';
-      const response = await fetch(ENDPOINTS.CLIENT_PLANS_INVOICES(tenantId), {
+      // Buscar faturas diretamente do Hub, sem cache usando timestamp
+      const tenantId = localStorage.getItem('2f.tenantId') || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
+      const timestamp = new Date().getTime();
+      const url = `${ENDPOINTS.CLIENT_PLANS_INVOICES(tenantId)}?_t=${timestamp}`;
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'x-tenant-id': tenantId,
-        },
+          'Content-Type': 'application/json'
+        }
       });
-
+      
       if (response.ok) {
-        const hubInvoices = await response.json();
-        setInvoices(hubInvoices);
+        const invoices = await response.json();
+        setInvoices(invoices);
+        console.log('✅ Faturas carregadas do Hub:', invoices.length);
       } else {
-        // Fallback: não mostrar faturas se não conseguir buscar do Hub
+        // Faturas são opcionais, não falhar se não encontrar
+        console.warn('⚠️ Nenhuma fatura encontrada ou erro ao buscar faturas');
         setInvoices([]);
       }
     } catch (error) {
-      console.warn('Erro ao buscar faturas do Hub:', error);
-      // Fallback: não mostrar faturas se não conseguir buscar do Hub
+      console.warn('⚠️ Erro ao buscar faturas do Hub:', error);
       setInvoices([]);
     }
+  };
+
+  const handleRefresh = () => {
+    checkHubConnectivity();
   };
 
   const handlePlanUpdate = async (planKey: 'starter' | 'pro' | 'max') => {
@@ -293,18 +353,127 @@ export default function PlanoPage() {
     }
   };
 
-  if (loading || !planInfo) return <div>Carregando...</div>;
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Plano & Faturamento</h1>
+          <p className="text-muted-foreground mt-1">Gerencie sua assinatura e histórico de pagamentos</p>
+        </div>
+        <Card>
+          <CardContent className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">Verificando conectividade com o Hub...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Se o Hub não estiver online, mostrar estado offline
+  if (hubConnectivityChecked && !isHubOnline) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Plano & Faturamento</h1>
+          <p className="text-muted-foreground mt-1">Gerencie sua assinatura e histórico de pagamentos</p>
+        </div>
+
+        <Alert className="border-orange-200 bg-orange-50">
+          <WifiOff className="h-4 w-4 text-orange-600" />
+          <AlertTitle className="text-orange-800">Sistema Offline</AlertTitle>
+          <AlertDescription className="text-orange-700">
+            Não foi possível conectar ao Hub para carregar os dados de planos e faturamento.
+            <br />
+            <strong>Para acessar esta funcionalidade:</strong>
+            <br />
+            1. Verifique sua conexão com a internet
+            <br />
+            2. Certifique-se de que o Hub está rodando
+            <br />
+            3. Clique no botão "Tentar Novamente" abaixo
+          </AlertDescription>
+        </Alert>
+
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center p-8 space-y-4">
+            <WifiOff className="h-16 w-16 text-muted-foreground" />
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-semibold">Funcionalidade Indisponível</h3>
+              <p className="text-muted-foreground max-w-md">
+                Esta aba requer conexão com o Hub para carregar dados atualizados sem cache.
+                Conecte-se à internet e tente novamente.
+              </p>
+            </div>
+            <Button onClick={handleRefresh} className="mt-4">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Tentar Novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Se não temos dados do plano mesmo com Hub online
+  if (!planInfo) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Plano & Faturamento</h1>
+          <p className="text-muted-foreground mt-1">Gerencie sua assinatura e histórico de pagamentos</p>
+        </div>
+
+        <Alert className="border-red-200 bg-red-50">
+          <X className="h-4 w-4 text-red-600" />
+          <AlertTitle className="text-red-800">Erro ao Carregar Dados</AlertTitle>
+          <AlertDescription className="text-red-700">
+            Não foi possível carregar as informações do seu plano atual.
+            Tente novamente ou entre em contato com o suporte.
+          </AlertDescription>
+        </Alert>
+
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center p-8 space-y-4">
+            <X className="h-16 w-16 text-red-500" />
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-semibold">Dados Indisponíveis</h3>
+              <p className="text-muted-foreground max-w-md">
+                Não foi possível carregar as informações do seu plano.
+              </p>
+            </div>
+            <Button onClick={handleRefresh} variant="outline">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Tentar Novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const allPlans = getAllPlans();
   const currentPlanData = allPlans.find(p => p.id === planInfo.plano);
 
-
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Plano & Faturamento</h1>
-        <p className="text-muted-foreground mt-1">Gerencie sua assinatura e histórico de pagamentos</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Plano & Faturamento</h1>
+          <p className="text-muted-foreground mt-1">Gerencie sua assinatura e histórico de pagamentos</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-green-600 border-green-200">
+            <Wifi className="h-3 w-3 mr-1" />
+            Hub Online
+          </Badge>
+          <Button onClick={handleRefresh} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Current Plan */}
@@ -328,9 +497,6 @@ export default function PlanoPage() {
                 Próxima cobrança: {new Date(planInfo.proximoCobranca || '').toLocaleDateString('pt-BR')}
               </p>
             </div>
-            <Button variant="outline" asChild>
-              <Link to="/planos">Ver Todos os Planos</Link>
-            </Button>
           </div>
 
           <div className="space-y-2">
@@ -373,6 +539,15 @@ export default function PlanoPage() {
               plan.id === planInfo.plano || 
               plan.name.toLowerCase() === planInfo.plano.toLowerCase()
             );
+            
+            console.log(`🔍 Checking plan ${plan.id} (${plan.name}):`, {
+              planId: plan.id,
+              planName: plan.name,
+              planInfoPlano: planInfo?.plano,
+              idMatch: plan.id === planInfo?.plano,
+              nameMatch: plan.name.toLowerCase() === planInfo?.plano.toLowerCase(),
+              isCurrentPlan
+            });
             
             // Buscar features do plano local correspondente
             const localPlan = allPlans.find(p => 

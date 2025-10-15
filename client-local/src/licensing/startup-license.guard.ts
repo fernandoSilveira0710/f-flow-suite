@@ -154,7 +154,7 @@ export class StartupLicenseGuard {
 
     try {
       this.logger.log('Updating license cache on startup...');
-      await this.licensingService.updateLicenseCache(tenantId);
+      await this.licensingService.updateLicenseCacheFromHub(tenantId);
       this.logger.log('License cache updated successfully');
     } catch (error) {
       this.logger.warn('Failed to update license cache on startup:', error instanceof Error ? error.message : 'Unknown error');

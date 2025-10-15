@@ -448,7 +448,7 @@ export class LicensingService implements OnModuleInit {
   /**
    * Atualiza o cache local de licença com informações do Hub
    */
-  async updateLicenseCache(tenantId: string): Promise<void> {
+  async updateLicenseCacheFromHub(tenantId: string): Promise<void> {
     try {
       // Chama o endpoint /licenses/validate do Hub
       const response = await axios.get(`${this.hubBaseUrl}/licenses/validate`, {
@@ -537,7 +537,7 @@ export class LicensingService implements OnModuleInit {
       // Se não há cache ou está desatualizado, tenta atualizar do Hub
       if (!cachedLicense || cachedLicense.isStale) {
         try {
-          await this.updateLicenseCache(tenantId);
+          await this.updateLicenseCacheFromHub(tenantId);
           // Obtém novamente do cache após atualização
           const updatedCache = await this.getLicenseFromCache(tenantId);
           if (updatedCache) {
@@ -639,5 +639,37 @@ export class LicensingService implements OnModuleInit {
       planKey: licenseData.planKey,
       expiresAt: licenseData.expiresAt
     };
+  }
+
+  /**
+   * Atualiza o cache de licença com novos dados
+   */
+  async updateLicenseCache(updateData: { tenantId: string; planKey: string; lastChecked: string; updatedAt: string }) {
+    this.logger.log(`Updating license cache for tenant ${updateData.tenantId}: ${updateData.planKey}`);
+    
+    try {
+      const updatedCache = await this.prisma.licenseCache.upsert({
+        where: { tenantId: updateData.tenantId },
+        update: {
+          planKey: updateData.planKey,
+          lastChecked: new Date(updateData.lastChecked),
+          updatedAt: new Date(updateData.updatedAt)
+        },
+        create: {
+          tenantId: updateData.tenantId,
+          planKey: updateData.planKey,
+          status: 'active', // Campo obrigatório
+          lastChecked: new Date(updateData.lastChecked),
+          updatedAt: new Date(updateData.updatedAt),
+          createdAt: new Date()
+        }
+      });
+
+      this.logger.log(`License cache updated successfully for tenant ${updateData.tenantId}`);
+      return updatedCache;
+    } catch (error) {
+      this.logger.error(`Failed to update license cache for tenant ${updateData.tenantId}:`, error);
+      throw error;
+    }
   }
 }

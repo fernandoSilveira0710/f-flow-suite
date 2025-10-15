@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { PlansService } from './plans.service';
 
 @Controller('plans')
@@ -32,6 +32,21 @@ export class PlansController {
       this.logger.error(`Failed to fetch invoices for tenant ${tenantId}:`, error);
       throw new HttpException(
         'Failed to fetch invoices',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('sync')
+  async syncPlan(@Body() syncData: { tenantId: string; userId: string; planKey: string; syncedAt: string }) {
+    try {
+      this.logger.log(`Syncing plan for tenant ${syncData.tenantId}: ${syncData.planKey}`);
+      const result = await this.plansService.syncPlan(syncData);
+      return { success: true, message: 'Plan synchronized successfully', data: result };
+    } catch (error) {
+      this.logger.error(`Failed to sync plan for tenant ${syncData.tenantId}:`, error);
+      throw new HttpException(
+        'Failed to sync plan',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
