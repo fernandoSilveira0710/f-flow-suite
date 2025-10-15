@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
-import { Check, Package2, ArrowLeft } from 'lucide-react'
+import { Check, Package2, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 
 const SignupPage = () => {
   const navigate = useNavigate()
@@ -14,14 +14,20 @@ const SignupPage = () => {
     email: '',
     company: '',
     phone: '',
+    password: '',
     plan: selectedPlan
   })
+
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const plans = {
     basico: {
       name: 'Básico',
       price: 'R$ 19,99',
       period: '/mês',
+      planKey: 'starter',
       features: [
         'Até 2 usuários',
         'Agendamento básico',
@@ -35,6 +41,7 @@ const SignupPage = () => {
       name: 'Profissional',
       price: 'R$ 59,99',
       period: '/mês',
+      planKey: 'pro',
       features: [
         'Até 5 usuários',
         'Agendamento avançado',
@@ -50,6 +57,7 @@ const SignupPage = () => {
       name: 'Enterprise',
       price: 'R$ 99,99',
       period: '/mês',
+      planKey: 'max',
       features: [
         'Usuários ilimitados',
         'Todos os recursos',
@@ -65,17 +73,76 @@ const SignupPage = () => {
 
   const currentPlan = plans[formData.plan as keyof typeof plans]
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
+    setError('')
     
-    // Simular envio do formulário
-    console.log('Dados do cadastro:', formData)
-    
-    // Redirecionar para uma página de sucesso ou próximo passo
-    alert('Cadastro realizado com sucesso! Em breve você receberá um email com as instruções para download e ativação.')
-    
-    // Opcional: redirecionar para página de download ou instruções
-    navigate('/docs/instalacao')
+    try {
+      // 1. Registrar usuário/tenant no Hub
+      const registerResponse = await fetch(`${import.meta.env.VITE_HUB_API_URL}/public/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          planId: currentPlan.planKey
+        }),
+      })
+
+      if (!registerResponse.ok) {
+        const errorData = await registerResponse.json()
+        throw new Error(errorData.message || 'Erro ao criar conta')
+      }
+
+      const registerData = await registerResponse.json()
+      console.log('Usuário registrado:', registerData)
+
+      // 2. Criar licença de teste gratuito
+      const licenseResponse = await fetch(`${import.meta.env.VITE_HUB_API_URL}/licenses/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          cpf: '000.000.000-00', // CPF fictício para teste gratuito
+          planKey: currentPlan.planKey,
+          paymentId: 'FREE_TRIAL_' + Date.now() // ID fictício para teste gratuito
+        }),
+      })
+
+      if (!licenseResponse.ok) {
+        console.warn('Erro ao criar licença, mas usuário foi criado')
+      } else {
+        const licenseData = await licenseResponse.json()
+        console.log('Licença criada:', licenseData)
+      }
+
+      // Sucesso - mostrar mensagem e redirecionar
+      alert(`🎉 Conta criada com sucesso!
+
+📧 Email: ${formData.email}
+🏢 Empresa: ${formData.company}
+📦 Plano: ${currentPlan.name}
+
+✅ Teste gratuito de 30 dias ativado
+📥 Em breve você receberá um email com as instruções para download
+
+Você será redirecionado para a página de instalação.`)
+      
+      navigate('/docs/instalacao')
+      
+    } catch (error: any) {
+      console.error('Erro no cadastro:', error)
+      setError(error.message || 'Erro interno do servidor. Tente novamente.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -130,6 +197,12 @@ const SignupPage = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <p className="text-red-800 text-sm">{error}</p>
+                    </div>
+                  )}
+
                   <div>
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                       Nome Completo *
@@ -143,6 +216,7 @@ const SignupPage = () => {
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       placeholder="Seu nome completo"
+                      disabled={isLoading}
                     />
                   </div>
 
@@ -159,6 +233,7 @@ const SignupPage = () => {
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       placeholder="seu@email.com"
+                      disabled={isLoading}
                     />
                   </div>
 
@@ -175,6 +250,7 @@ const SignupPage = () => {
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       placeholder="Nome do seu pet shop"
+                      disabled={isLoading}
                     />
                   </div>
 
@@ -191,7 +267,39 @@ const SignupPage = () => {
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       placeholder="(11) 99999-9999"
+                      disabled={isLoading}
                     />
+                  </div>
+
+                  <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                      Senha *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        id="password"
+                        name="password"
+                        required
+                        minLength={6}
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Mínimo 6 caracteres"
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                        disabled={isLoading}
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Use esta senha para acessar o sistema após a instalação
+                    </p>
                   </div>
 
                   <div>
@@ -204,6 +312,7 @@ const SignupPage = () => {
                       value={formData.plan}
                       onChange={(e) => setFormData({ ...formData, plan: e.target.value })}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      disabled={isLoading}
                     >
                       <option value="basico">Básico - R$ 19,99/mês</option>
                       <option value="profissional">Profissional - R$ 59,99/mês</option>
@@ -213,9 +322,10 @@ const SignupPage = () => {
 
                   <button
                     type="submit"
-                    className="w-full bg-primary-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+                    disabled={isLoading}
+                    className="w-full bg-primary-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Iniciar Teste Gratuito
+                    {isLoading ? 'Criando conta...' : 'Iniciar Teste Gratuito'}
                   </button>
 
                   <p className="text-sm text-gray-600 text-center">

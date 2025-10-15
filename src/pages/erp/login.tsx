@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Eye, EyeOff, Loader2, Package2, AlertTriangle, ExternalLink } from 'lucide-react';
+import { API_URLS } from "@/lib/env";
 import { useAuth } from '@/contexts/auth-context';
 import { toast } from '@/hooks/use-toast';
 import { PlansModal } from '@/components/erp/plans-modal';
@@ -192,7 +193,7 @@ export default function Login() {
                     variant="outline"
                     size="sm"
                     className="text-yellow-800 border-yellow-300 hover:bg-yellow-100"
-                    onClick={() => window.open('http://localhost:5173/renovacao', '_blank')}
+                    onClick={() => window.open(`${API_URLS.SITE}/renovacao`, '_blank')}
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
                     Renovar Licença
@@ -211,7 +212,7 @@ export default function Login() {
               <Button 
                 variant="link" 
                 className="text-sm text-primary p-0 h-auto font-normal"
-                onClick={() => window.open('/site', '_blank')}
+                onClick={() => window.open(API_URLS.SITE, '_blank')}
               >
                 Visite nosso site institucional
               </Button>

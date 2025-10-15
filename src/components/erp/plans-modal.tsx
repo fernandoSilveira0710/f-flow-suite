@@ -132,63 +132,50 @@ export function PlansModal({ open, onOpenChange, onPlanSelected }: PlansModalPro
     
     try {
       const tenantId = localStorage.getItem('tenant_id');
+      const userId = localStorage.getItem('user_id') || 'unknown';
+      
       if (!tenantId) {
         throw new Error('Tenant ID não encontrado');
       }
 
-      // Tentar atualizar plano no Hub
-      const response = await fetch(`http://localhost:8081/licenses/${tenantId}/plan`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          planKey: planId
-        }),
-      });
+      // Usar PlanSyncService para sincronização completa
+      const { PlanSyncService } = await import('../../services/plan-sync.service');
+      const result = await PlanSyncService.syncPlansAfterPlanChange(tenantId, userId, planId);
 
-      if (response.ok) {
-        // Persistir no client-local para uso offline futuro
-        try {
-          await fetch('http://localhost:3001/licensing/persist', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              tenantId,
-              userId: localStorage.getItem('user_id') || 'unknown',
-              licenseData: {
-                planKey: planId,
-                activatedAt: new Date().toISOString()
-              }
-            }),
-          });
-        } catch (localError) {
-          console.warn('Erro ao persistir licença localmente:', localError);
-        }
-
+      if (result.success) {
         // Forçar atualização do status da licença
         console.log('🔄 Atualizando status da licença...');
         await refreshLicenseStatus();
 
         toast({
           title: "Plano ativado com sucesso!",
-          description: `Seu plano ${plans.find(p => p.id === planId)?.name} foi ativado.`,
-          variant: "default",
+          description: `Seu plano ${planId} foi ativado e sincronizado em todos os serviços.`,
         });
 
-        // Remover flag do modal e chamar callback
-        localStorage.removeItem('show_plans_modal');
+        setSelectedPlan(planId);
+        onPlanSelected?.(planId);
         onOpenChange(false);
       } else {
-        throw new Error(`Erro ao ativar plano: ${response.status}`);
+        // Sincronização parcial - ainda assim considerar sucesso
+        console.log('🔄 Atualizando status da licença...');
+        await refreshLicenseStatus();
+
+        toast({
+          title: "Plano ativado com avisos",
+          description: `Plano ${planId} ativado, mas alguns serviços podem não estar sincronizados.`,
+          variant: "default"
+        });
+
+        setSelectedPlan(planId);
+        onPlanSelected?.(planId);
+        onOpenChange(false);
       }
     } catch (error) {
-      console.error('Erro ao selecionar plano:', error);
+      console.error('Erro ao ativar plano:', error);
+      
       toast({
         title: "Erro ao ativar plano",
-        description: error instanceof Error ? error.message : "Tente novamente mais tarde.",
+        description: error instanceof Error ? error.message : "Tente novamente em alguns instantes.",
         variant: "destructive",
       });
     } finally {

@@ -123,4 +123,36 @@ export class PlansService {
       message: 'Informações obtidas do cache local - Hub indisponível'
     };
   }
+
+  /**
+   * Sincroniza dados de plano (para uso com sincronização automática)
+   */
+  async syncPlan(syncData: { tenantId: string; userId: string; planKey: string; syncedAt: string }) {
+    this.logger.log(`Syncing plan data for tenant ${syncData.tenantId}: ${syncData.planKey}`);
+    
+    try {
+      // Atualizar o cache da licença com o novo planKey
+      await this.licensingService.updateLicenseCache({
+        tenantId: syncData.tenantId,
+        planKey: syncData.planKey,
+        lastChecked: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      
+      this.logger.log(`License cache updated for tenant ${syncData.tenantId} with planKey: ${syncData.planKey}`);
+      
+      // Registrar a sincronização
+      this.logger.log(`Plan sync completed for tenant ${syncData.tenantId} - Plan: ${syncData.planKey}`);
+      
+      return {
+        tenantId: syncData.tenantId,
+        planKey: syncData.planKey,
+        syncedAt: syncData.syncedAt,
+        status: 'synchronized'
+      };
+    } catch (error) {
+      this.logger.error(`Failed to sync plan for tenant ${syncData.tenantId}:`, error);
+      throw error;
+    }
+  }
 }

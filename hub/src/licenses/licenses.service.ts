@@ -15,37 +15,60 @@ export class LicensesService {
   async createLicenseAfterPayment(createLicenseDto: CreateLicenseDto) {
     const { name, email, cpf, planKey, paymentId } = createLicenseDto;
 
-    // Verificar se já existe um tenant com este email
-    let tenant = await this.prisma.tenant.findFirst({
-      where: { 
-        OR: [
-          { email },
-          { cpf }
-        ]
-      },
+    // Verificar se já existe um usuário com este email
+    let existingUser = await this.prisma.user.findFirst({
+      where: { email },
+      include: { tenant: true }
     });
 
-    // Se não existe, criar novo tenant
-    if (!tenant) {
-      const tenantId = uuidv4();
-      tenant = await this.prisma.tenant.create({
-        data: {
-          id: tenantId,
-          name,
-          email,
-          cpf,
-          planId: planKey,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
+    let tenant;
+
+    if (!existingUser) {
+      // Se não existe, criar novo tenant e usuário
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Criar ou obter organização padrão
+        let org = await tx.org.findFirst({
+          where: { name: 'Default Organization' },
+        });
+
+        if (!org) {
+          org = await tx.org.create({
+            data: {
+              name: 'Default Organization',
+            },
+          });
+        }
+
+        // Criar tenant
+        const newTenant = await tx.tenant.create({
+          data: {
+            orgId: org.id,
+            slug: name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
+            planId: planKey,
+          },
+        });
+
+        // Criar usuário
+        const newUser = await tx.user.create({
+          data: {
+            email,
+            password: '', // Senha será definida posteriormente
+            displayName: name || email.split('@')[0],
+            tenantId: newTenant.id,
+            active: true,
+          },
+        });
+
+        return { tenant: newTenant, user: newUser };
       });
+
+      tenant = result.tenant;
     } else {
       // Atualizar tenant existente com novo plano
       tenant = await this.prisma.tenant.update({
-        where: { id: tenant.id },
+        where: { id: existingUser.tenant.id },
         data: {
           planId: planKey,
-          updatedAt: new Date(),
         },
       });
     }
