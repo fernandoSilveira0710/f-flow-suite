@@ -7,7 +7,7 @@ O **F-Flow Client Local** é um executável multiplataforma que fornece uma API 
 - **Executável Multiplataforma**: Binários para Windows, macOS e Linux
 - **Banco SQLite Embutido**: Database local com migrations automáticas
 - **Paths por SO**: Resolve automaticamente diretórios de dados e logs conforme o sistema operacional
-- **Servidor NestJS**: API REST em `127.0.0.1:3010`
+- **Servidor NestJS**: API REST em `127.0.0.1:3001`
 - **Instalação como Serviço**: Pode ser instalado como serviço do sistema operacional
 - **Logs Estruturados**: Logs em JSON com rotação diária
 - **Configuração Flexível**: Suporte a variáveis de ambiente e configuração automática
@@ -87,7 +87,7 @@ Copie `.env.example` para `.env` e configure:
 ```bash
 # Servidor Local
 LOCAL_SERVER_ENABLED=true
-PORT=3010
+PORT=3001
 
 # Paths Customizados (opcional)
 LOCAL_DATA_DIR=/custom/data/path
@@ -218,7 +218,7 @@ Os logs são estruturados em formato JSON e incluem:
   "time": "2024-01-01T12:00:00.000Z",
   "service": "f-flow-client-local",
   "context": "Bootstrap",
-  "message": "Server started on http://127.0.0.1:3010",
+  "message": "Server started on http://127.0.0.1:3001",
   "requestId": "abc123"
 }
 ```
@@ -229,12 +229,151 @@ Os logs são estruturados em formato JSON e incluem:
 - **Retenção**: 30 dias
 - **Compressão**: Logs antigos são comprimidos com gzip
 
+## 🔐 Sistema de Autenticação Offline
+
+O F-Flow Client Local implementa um sistema robusto de autenticação offline que permite o funcionamento do sistema mesmo quando o Hub principal não está disponível.
+
+### 🎯 Funcionalidades de Autenticação
+
+#### Modo Offline Automático
+- **Detecção Automática**: Quando o Hub não está disponível, o sistema automaticamente tenta autenticação local
+- **Cache de Usuários**: Mantém dados de usuários sincronizados localmente para autenticação offline
+- **Validação de Licença**: Verifica licenças locais e períodos de graça
+- **Fallback Inteligente**: Transição suave entre modos online e offline
+
+#### Endpoint de Autenticação Offline
+
+```bash
+POST /auth/offline-login
+Content-Type: application/json
+
+{
+  "email": "usuario@exemplo.com",
+  "password": "senha123"
+}
+```
+
+**Respostas:**
+
+✅ **Sucesso (201 Created):**
+```json
+{
+  "success": true,
+  "message": "Login offline realizado com sucesso",
+  "user": {
+    "id": "uuid-do-usuario",
+    "email": "usuario@exemplo.com",
+    "displayName": "Nome do Usuário",
+    "tenantId": "uuid-do-tenant",
+    "role": "admin"
+  }
+}
+```
+
+❌ **Credenciais Inválidas (401 Unauthorized):**
+```json
+{
+  "success": false,
+  "message": "Credenciais inválidas ou usuário não encontrado"
+}
+```
+
+❌ **Licença Expirada (403 Forbidden):**
+```json
+{
+  "success": false,
+  "message": "Licença expirada. Entre em contato com o suporte."
+}
+```
+
+### 🔄 Fluxo de Autenticação Offline
+
+1. **Verificação de Cache**: Sistema verifica se existe cache válido de usuários
+2. **Validação de Credenciais**: Compara credenciais com dados locais (sem validação de senha para segurança)
+3. **Verificação de Licença**: Valida licença local e período de graça
+4. **Geração de Token**: Cria token local para sessão offline
+5. **Resposta**: Retorna dados do usuário e status de autenticação
+
+### 🛡️ Segurança Offline
+
+#### Validação de Licença Local
+- **Cache de Licença**: Licenças são armazenadas localmente em formato JWT
+- **Período de Graça**: Sistema permite funcionamento por período limitado após expiração
+- **Verificação de Integridade**: Validação criptográfica das licenças locais
+
+#### Proteção de Dados
+- **Sem Armazenamento de Senhas**: Senhas não são validadas no modo offline por segurança
+- **Tokens Temporários**: Tokens offline têm validade limitada
+- **Isolamento por Tenant**: Dados isolados por tenant mesmo offline
+
+### ⚙️ Configuração
+
+**Variáveis de Ambiente:**
+```bash
+# Autenticação Offline
+OFFLINE_AUTH_ENABLED=true                    # Habilita autenticação offline
+OFFLINE_TOKEN_EXPIRY=24h                     # Validade do token offline
+OFFLINE_GRACE_PERIOD=7d                      # Período de graça após expiração da licença
+
+# Licenciamento Local
+LICENSE_FILE=./license.jwt                   # Arquivo de licença local
+LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----..."  # Chave pública para validação
+```
+
+### 🧪 Testando Autenticação Offline
+
+#### Cenário 1: Hub Indisponível
+```bash
+# 1. Parar o Hub
+# 2. Tentar login no frontend
+# 3. Sistema deve automaticamente tentar autenticação local
+# 4. Verificar logs do client-local para confirmação
+```
+
+#### Cenário 2: Teste Direto da API
+```bash
+curl -X POST http://127.0.0.1:3001/auth/offline-login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "fernando@2fsolutions.com.br",
+    "password": "qualquer-senha"
+  }'
+```
+
+#### Cenário 3: Verificação de Licença
+```bash
+# Verificar status da licença local
+curl http://127.0.0.1:3001/health/license
+```
+
+### 📊 Monitoramento
+
+#### Logs de Autenticação
+```json
+{
+  "level": "info",
+  "time": "2024-01-01T12:00:00.000Z",
+  "service": "f-flow-client-local",
+  "context": "AuthService",
+  "message": "Offline login attempt",
+  "email": "usuario@exemplo.com",
+  "success": true,
+  "requestId": "abc123"
+}
+```
+
+#### Métricas Disponíveis
+- **Tentativas de Login Offline**: Contador de tentativas
+- **Taxa de Sucesso**: Percentual de logins offline bem-sucedidos
+- **Status de Licença**: Estado atual da licença local
+- **Período de Graça**: Tempo restante em caso de licença expirada
+
 ## 🔌 API Endpoints
 
 ### Health Check
 
 ```bash
-GET http://127.0.0.1:3010/health
+GET http://127.0.0.1:3001/health
 ```
 
 Resposta:
@@ -249,7 +388,7 @@ Resposta:
 ### Health Dependencies
 
 ```bash
-GET http://127.0.0.1:3010/health/deps
+GET http://127.0.0.1:3001/health/deps
 ```
 
 Resposta:
@@ -269,7 +408,7 @@ Resposta:
 ### Dashboard
 
 ```bash
-GET http://127.0.0.1:3010/dashboard/summary
+GET http://127.0.0.1:3001/dashboard/summary
 ```
 
 Resposta:
@@ -302,15 +441,15 @@ Resposta:
 
 ```bash
 # Obter todas as feature flags
-GET http://127.0.0.1:3010/feature-flags
+GET http://127.0.0.1:3001/feature-flags
 
 # Verificar feature específica
-GET http://127.0.0.1:3010/feature-flags/pos
-GET http://127.0.0.1:3010/feature-flags/grooming
-GET http://127.0.0.1:3010/feature-flags/appointments
-GET http://127.0.0.1:3010/feature-flags/inventory
-GET http://127.0.0.1:3010/feature-flags/customers
-GET http://127.0.0.1:3010/feature-flags/reports
+GET http://127.0.0.1:3001/feature-flags/pos
+GET http://127.0.0.1:3001/feature-flags/grooming
+GET http://127.0.0.1:3001/feature-flags/appointments
+GET http://127.0.0.1:3001/feature-flags/inventory
+GET http://127.0.0.1:3001/feature-flags/customers
+GET http://127.0.0.1:3001/feature-flags/reports
 ```
 
 Resposta (todas as flags):
@@ -353,10 +492,10 @@ journalctl -u f-flow-client-local --no-pager
 #### 2. Porta já em uso
 
 ```bash
-# Verificar processo usando a porta 3010
-netstat -tulpn | grep 3010  # Linux
-netstat -an | findstr 3010  # Windows
-lsof -i :3010              # macOS
+# Verificar processo usando a porta 3001
+netstat -tulpn | grep 3001  # Linux
+netstat -an | findstr 3001  # Windows
+lsof -i :3001              # macOS
 ```
 
 #### 3. Permissões de diretório
@@ -558,13 +697,13 @@ npm run start:dev
 ### 3. Testar Endpoints (PowerShell)
 ```powershell
 # Verificar status da instalação
-Invoke-RestMethod -Uri "http://localhost:3010/licensing/install/status" -Method GET
+Invoke-RestMethod -Uri "http://localhost:3001/licensing/install/status" -Method GET
 
 # Ativar licença (simulação)
-Invoke-RestMethod -Uri "http://localhost:3010/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "test-tenant", "deviceId": "test-device"}'
+Invoke-RestMethod -Uri "http://localhost:3001/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "test-tenant", "deviceId": "test-device"}'
 
 # Verificar licença atual
-Invoke-RestMethod -Uri "http://localhost:3010/licensing/license" -Method GET
+Invoke-RestMethod -Uri "http://localhost:3001/licensing/license" -Method GET
 ```
 
 ### 4. Modo Produção (com enforcement)

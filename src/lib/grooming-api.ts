@@ -132,7 +132,7 @@ export interface GroomPrefs {
 }
 
 // ============ API CONFIGURATION ============
-const API_BASE_URL = 'http://127.0.0.1:3010';
+const API_BASE_URL = 'http://127.0.0.1:3001';
 
 // ============ API HELPER ============
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

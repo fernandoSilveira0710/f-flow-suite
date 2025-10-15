@@ -1,0 +1,249 @@
+name: Auto Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+  check_suite:
+    types: [completed]
+  status: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  auto-merge:
+    name: Auto Merge
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' ||
+      github.event_name == 'pull_request_review' ||
+      github.event_name == 'check_suite' ||
+      github.event_name == 'status'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get PR information
+        id: pr-info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let prNumber;
+            let prData;
+
+            if (context.eventName === 'pull_request') {
+              prNumber = context.payload.pull_request.number;
+              prData = context.payload.pull_request;
+            } else if (context.eventName === 'pull_request_review') {
+              prNumber = context.payload.pull_request.number;
+              prData = context.payload.pull_request;
+            } else if (context.eventName === 'check_suite') {
+              const prs = context.payload.check_suite.pull_requests;
+              if (prs.length === 0) return;
+              prNumber = prs[0].number;
+              const { data } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+              prData = data;
+            } else if (context.eventName === 'status') {
+              // Get PRs for this commit
+              const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.payload.sha
+              });
+              if (prs.length === 0) return;
+              prNumber = prs[0].number;
+              prData = prs[0];
+            }
+
+            if (!prData) return;
+
+            core.setOutput('pr_number', prNumber);
+            core.setOutput('pr_author', prData.user.login);
+            core.setOutput('pr_title', prData.title);
+            core.setOutput('pr_draft', prData.draft);
+            core.setOutput('pr_mergeable', prData.mergeable);
+            core.setOutput('pr_state', prData.state);
+
+      - name: Check if PR should be auto-merged
+        id: should-merge
+        if: steps.pr-info.outputs.pr_number
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ steps.pr-info.outputs.pr_number }};
+            const prAuthor = '${{ steps.pr-info.outputs.pr_author }}';
+            const prTitle = '${{ steps.pr-info.outputs.pr_title }}';
+            const isDraft = ${{ steps.pr-info.outputs.pr_draft }};
+            const isMergeable = ${{ steps.pr-info.outputs.pr_mergeable }};
+            const prState = '${{ steps.pr-info.outputs.pr_state }}';
+
+            console.log(`PR #${prNumber}: ${prTitle} by ${prAuthor}`);
+            console.log(`Draft: ${isDraft}, Mergeable: ${isMergeable}, State: ${prState}`);
+
+            // Don't merge draft PRs or closed PRs
+            if (isDraft || prState !== 'open') {
+              console.log('Skipping: PR is draft or not open');
+              return;
+            }
+
+            // Check if PR has auto-merge label
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            const hasAutoMergeLabel = pr.labels.some(label => 
+              label.name === 'auto-merge' || 
+              label.name === 'dependencies'
+            );
+
+            // Check if it's a dependabot PR
+            const isDependabot = prAuthor === 'dependabot[bot]' || 
+                                prAuthor === 'renovate[bot]' ||
+                                prTitle.toLowerCase().includes('bump') ||
+                                prTitle.toLowerCase().includes('update') && prTitle.toLowerCase().includes('dependencies');
+
+            // Check if it's a minor version update
+            const isMinorUpdate = prTitle.match(/bump .* from .* to .*/) && 
+                                !prTitle.includes('major') &&
+                                !prTitle.match(/\d+\.0\.0/);
+
+            const shouldAutoMerge = hasAutoMergeLabel || (isDependabot && isMinorUpdate);
+
+            console.log(`Should auto-merge: ${shouldAutoMerge}`);
+            console.log(`Has auto-merge label: ${hasAutoMergeLabel}`);
+            console.log(`Is dependabot: ${isDependabot}`);
+            console.log(`Is minor update: ${isMinorUpdate}`);
+
+            core.setOutput('should_merge', shouldAutoMerge);
+
+      - name: Check PR status
+        id: pr-status
+        if: steps.should-merge.outputs.should_merge == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ steps.pr-info.outputs.pr_number }};
+
+            // Get PR reviews
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            // Check for required approvals
+            const approvals = reviews.filter(review => review.state === 'APPROVED');
+            const rejections = reviews.filter(review => review.state === 'CHANGES_REQUESTED');
+
+            console.log(`Approvals: ${approvals.length}, Rejections: ${rejections.length}`);
+
+            // Get status checks
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            const { data: checks } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: pr.head.sha
+            });
+
+            const { data: statuses } = await github.rest.repos.listCommitStatusesForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: pr.head.sha
+            });
+
+            // Check if all checks are passing
+            const failedChecks = checks.check_runs.filter(check => 
+              check.status === 'completed' && check.conclusion !== 'success' && check.conclusion !== 'neutral'
+            );
+
+            const failedStatuses = statuses.filter(status => 
+              status.state !== 'success' && status.state !== 'pending'
+            );
+
+            const allChecksPassing = failedChecks.length === 0 && failedStatuses.length === 0;
+            const hasRejections = rejections.length > 0;
+
+            console.log(`All checks passing: ${allChecksPassing}`);
+            console.log(`Has rejections: ${hasRejections}`);
+            console.log(`Failed checks: ${failedChecks.length}`);
+            console.log(`Failed statuses: ${failedStatuses.length}`);
+
+            core.setOutput('can_merge', allChecksPassing && !hasRejections);
+            core.setOutput('approvals', approvals.length);
+
+      - name: Auto-merge PR
+        if: |
+          steps.should-merge.outputs.should_merge == 'true' && 
+          steps.pr-status.outputs.can_merge == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ steps.pr-info.outputs.pr_number }};
+
+            try {
+              // Enable auto-merge
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                commit_title: `Auto-merge: ${{ steps.pr-info.outputs.pr_title }}`,
+                commit_message: 'Automatically merged by GitHub Actions',
+                merge_method: 'squash'
+              });
+
+              console.log(`Successfully auto-merged PR #${prNumber}`);
+
+              // Add comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: '🤖 This PR was automatically merged because it meets the auto-merge criteria:\n\n' +
+                      '✅ All status checks passed\n' +
+                      '✅ No requested changes\n' +
+                      '✅ Approved for auto-merge\n\n' +
+                      'Thank you for your contribution!'
+              });
+
+            } catch (error) {
+              console.error('Failed to auto-merge:', error);
+              
+              // Comment about the failure
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: '⚠️ Auto-merge failed. This PR may need manual attention.\n\n' +
+                      `Error: ${error.message}`
+              });
+            }
+
+      - name: Create summary
+        if: always() && steps.pr-info.outputs.pr_number
+        run: |
+          echo "## Auto-Merge Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR Number**: #${{ steps.pr-info.outputs.pr_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR Title**: ${{ steps.pr-info.outputs.pr_title }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Author**: ${{ steps.pr-info.outputs.pr_author }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Should Merge**: ${{ steps.should-merge.outputs.should_merge }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Can Merge**: ${{ steps.pr-status.outputs.can_merge }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Approvals**: ${{ steps.pr-status.outputs.approvals }}" >> $GITHUB_STEP_SUMMARY

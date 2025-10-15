@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ENDPOINTS } from '@/lib/env';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +43,7 @@ export function UpgradeDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction asChild>
-            <Link to="/planos">Ver Planos</Link>
+            <a href={ENDPOINTS.SITE_RENOVACAO} target="_blank" rel="noopener noreferrer">Ver Planos</a>
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

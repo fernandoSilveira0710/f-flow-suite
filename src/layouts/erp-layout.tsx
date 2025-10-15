@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useEntitlements } from '@/hooks/use-entitlements';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { UpgradeDialog } from '@/components/erp/upgrade-dialog';
 import {
@@ -19,9 +20,11 @@ import {
   Sun,
   Search,
   Package2,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { ENDPOINTS } from '@/lib/env';
 
 export default function ErpLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -30,6 +33,7 @@ export default function ErpLayout() {
   const [requiredPlan, setRequiredPlan] = useState('');
   const location = useLocation();
   const { entitlements, currentPlan } = useEntitlements();
+  const { logout } = useAuth();
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
@@ -82,7 +86,7 @@ export default function ErpLayout() {
       path: '/erp/agenda',
       enabled: entitlements.agenda,
       feature: 'Agenda',
-      plan: 'Starter',
+      plan: 'Pro',
     },
     {
       label: 'Banho & Tosa',
@@ -98,7 +102,7 @@ export default function ErpLayout() {
       path: '/erp/relatorios',
       enabled: entitlements.reports,
       feature: 'Relatórios',
-      plan: 'Pro',
+      plan: 'Max',
     },
   ];
 
@@ -194,9 +198,17 @@ export default function ErpLayout() {
           <div className="p-4 border-t">
             <div className="rounded-lg bg-sidebar-accent p-3">
               <p className="text-xs text-sidebar-accent-foreground/70 mb-1">Plano Atual</p>
-              <p className="text-sm font-semibold capitalize">{currentPlan}</p>
+              {(() => {
+                const hubPlanLabels: Record<string, string> = {
+                  starter: 'Básico',
+                  pro: 'Profissional',
+                  max: 'Enterprise',
+                };
+                const label = hubPlanLabels[String(currentPlan)] || String(currentPlan);
+                return <p className="text-sm font-semibold capitalize">{label}</p>;
+              })()}
               <Button variant="link" size="sm" className="p-0 h-auto mt-1" asChild>
-                <Link to="/planos">Fazer Upgrade</Link>
+                <a href={ENDPOINTS.SITE_RENOVACAO} target="_blank" rel="noopener noreferrer">Fazer Upgrade</a>
               </Button>
             </div>
           </div>
@@ -215,13 +227,19 @@ export default function ErpLayout() {
             />
           </div>
 
-          <Button variant="ghost" size="icon" onClick={toggleTheme}>
-            {theme === 'light' ? (
-              <Moon className="h-5 w-5" />
-            ) : (
-              <Sun className="h-5 w-5" />
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={toggleTheme}>
+              {theme === 'light' ? (
+                <Moon className="h-5 w-5" />
+              ) : (
+                <Sun className="h-5 w-5" />
+              )}
+            </Button>
+            
+            <Button variant="ghost" size="icon" onClick={logout} title="Sair">
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </header>
 
         {/* Page Content */}

@@ -15,6 +15,14 @@ export class CreateUserDto {
   @IsBoolean()
   @IsOptional()
   active?: boolean = true;
+
+  @IsString()
+  @IsOptional()
+  tenantId?: string;
+
+  @IsString()
+  @IsOptional()
+  hubUserId?: string;
 }
 
 export class UpdateUserDto {
@@ -34,4 +42,12 @@ export class UpdateUserDto {
   @IsBoolean()
   @IsOptional()
   active?: boolean;
+
+  @IsString()
+  @IsOptional()
+  tenantId?: string;
+
+  @IsString()
+  @IsOptional()
+  hubUserId?: string;
 }

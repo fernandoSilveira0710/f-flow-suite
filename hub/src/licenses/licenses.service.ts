@@ -1,10 +1,122 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { JwtService } from '@nestjs/jwt';
+import { CreateLicenseDto, PlanType } from './dto/create-license.dto';
 import * as jose from 'jose';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class LicensesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService
+  ) {}
+
+  async createLicenseAfterPayment(createLicenseDto: CreateLicenseDto) {
+    const { name, email, cpf, planKey, paymentId } = createLicenseDto;
+
+    // Verificar se já existe um usuário com este email
+    let existingUser = await this.prisma.user.findFirst({
+      where: { email },
+      include: { tenant: true }
+    });
+
+    let tenant;
+
+    if (!existingUser) {
+      // Se não existe, criar novo tenant e usuário
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Criar ou obter organização padrão
+        let org = await tx.org.findFirst({
+          where: { name: 'Default Organization' },
+        });
+
+        if (!org) {
+          org = await tx.org.create({
+            data: {
+              name: 'Default Organization',
+            },
+          });
+        }
+
+        // Criar tenant
+        const newTenant = await tx.tenant.create({
+          data: {
+            orgId: org.id,
+            slug: name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
+            planId: planKey,
+          },
+        });
+
+        // Criar usuário
+        const newUser = await tx.user.create({
+          data: {
+            email,
+            password: '', // Senha será definida posteriormente
+            displayName: name || email.split('@')[0],
+            tenantId: newTenant.id,
+            active: true,
+          },
+        });
+
+        return { tenant: newTenant, user: newUser };
+      });
+
+      tenant = result.tenant;
+    } else {
+      // Atualizar tenant existente com novo plano
+      tenant = await this.prisma.tenant.update({
+        where: { id: existingUser.tenant.id },
+        data: {
+          planId: planKey,
+        },
+      });
+    }
+
+    // Definir configurações do plano
+    const planConfig = {
+      starter: { maxSeats: 1, maxDevices: 1 },
+      pro: { maxSeats: 5, maxDevices: 3 },
+      max: { maxSeats: 15, maxDevices: 10 },
+    };
+
+    const config = planConfig[planKey];
+    const expiryDate = new Date();
+    expiryDate.setFullYear(expiryDate.getFullYear() + 1); // 1 ano de validade
+
+    // Criar ou atualizar licença
+    const license = await this.prisma.license.upsert({
+      where: { tenantId: tenant.id },
+      update: {
+        planKey,
+        status: 'active',
+        maxSeats: config.maxSeats,
+        expiry: expiryDate,
+        graceDays: 7,
+        updatedAt: new Date(),
+      },
+      create: {
+        tenantId: tenant.id,
+        planKey,
+        status: 'active',
+        maxSeats: config.maxSeats,
+        expiry: expiryDate,
+        graceDays: 7,
+      },
+    });
+
+    // Gerar chave de licença única
+    const licenseKey = `FL-${email.split('@')[0].toUpperCase()}-${Date.now().toString().slice(-6)}`;
+
+    return {
+      tenantId: tenant.id,
+      licenseKey,
+      license,
+      tenant,
+      downloadUrl: 'https://releases.2fsolutions.com/f-flow-suite/latest',
+      expiresAt: expiryDate,
+    };
+  }
 
   async issue(tenantId: string, deviceId: string) {
     const license = await this.prisma.license.findFirst({
@@ -55,12 +167,39 @@ export class LicensesService {
       throw new Error('MISSING_LICENSE_PRIVATE_KEY_PEM');
     }
 
-    const privateKey = await jose.importPKCS8(privateKeyPem, 'RS256');
+    // Ler a chave privada do arquivo diretamente
+    const fs = require('fs');
+    const path = require('path');
+    const keyPath = path.join(process.cwd(), 'license_private.pem');
+    const privateKeyFromFile = fs.readFileSync(keyPath, 'utf8');
+
+    const privateKey = await jose.importPKCS8(privateKeyFromFile, 'RS256');
 
     const token = await new jose.SignJWT(payload)
       .setProtectedHeader({ alg: 'RS256', kid: 'license-key' })
       .setExpirationTime(payload.exp)
       .sign(privateKey);
+
+    // Persistir o token no banco de dados
+    await this.prisma.licenseToken.upsert({
+      where: {
+        tenantId_deviceId: {
+          tenantId,
+          deviceId
+        }
+      },
+      update: {
+        token,
+        expiresAt: new Date(payload.exp * 1000),
+        revokedAt: null
+      },
+      create: {
+        tenantId,
+        deviceId,
+        token,
+        expiresAt: new Date(payload.exp * 1000)
+      }
+    });
 
     return token;
   }
@@ -107,5 +246,100 @@ export class LicensesService {
     });
 
     return license;
+  }
+
+  async validateLicense(licenseKey?: string, tenantId?: string, deviceId?: string) {
+    try {
+      // Se temos licenseKey, validamos o JWT
+      if (licenseKey) {
+        const publicKeyPem = process.env.LICENSE_PUBLIC_KEY_PEM;
+        if (!publicKeyPem) {
+          throw new Error('MISSING_LICENSE_PUBLIC_KEY_PEM');
+        }
+
+        const publicKey = await jose.importSPKI(publicKeyPem, 'RS256');
+        const { payload } = await jose.jwtVerify(licenseKey, publicKey);
+
+        // Verificar se a licença ainda está válida no banco
+        const license = await this.prisma.license.findUnique({
+          where: { tenantId: payload.tenantId as string },
+          include: { tenant: true }
+        });
+
+        if (!license || license.status !== 'active') {
+          return {
+            valid: false,
+            reason: 'LICENSE_INACTIVE_OR_NOT_FOUND',
+            license: null
+          };
+        }
+
+        // Verificar expiração
+        if (license.expiry && new Date() > license.expiry) {
+          return {
+            valid: false,
+            reason: 'LICENSE_EXPIRED',
+            license: license
+          };
+        }
+
+        return {
+          valid: true,
+          license: license,
+          payload: payload
+        };
+      }
+
+      // Se temos tenantId, validamos diretamente no banco
+      if (tenantId) {
+        const license = await this.prisma.license.findUnique({
+          where: { tenantId },
+          include: { tenant: true }
+        });
+
+        if (!license) {
+          return {
+            valid: false,
+            reason: 'LICENSE_NOT_FOUND',
+            license: null
+          };
+        }
+
+        if (license.status !== 'active') {
+          return {
+            valid: false,
+            reason: 'LICENSE_INACTIVE',
+            license: license
+          };
+        }
+
+        // Verificar expiração
+        if (license.expiry && new Date() > license.expiry) {
+          return {
+            valid: false,
+            reason: 'LICENSE_EXPIRED',
+            license: license
+          };
+        }
+
+        return {
+          valid: true,
+          license: license
+        };
+      }
+
+      return {
+        valid: false,
+        reason: 'INSUFFICIENT_PARAMETERS',
+        license: null
+      };
+
+    } catch (error: any) {
+      return {
+        valid: false,
+        reason: error.message || 'VALIDATION_ERROR',
+        license: null
+      };
+    }
   }
 }

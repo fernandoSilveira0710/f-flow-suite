@@ -1,0 +1,975 @@
+{
+  "info": {
+    "name": "F-Flow Suite E2E",
+    "description": "Coleção completa de testes End-to-End para o F-Flow Suite\n\nFluxo de testes:\n1. Seed - Configuração inicial\n2. Health Check - Verificação de saúde\n3. Ativar Licença - Fluxo de ativação\n4. CRUD - Operações básicas\n5. Sync Roundtrip - Sincronização completa",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "f-flow-suite-e2e",
+    "version": {
+      "major": 1,
+      "minor": 0,
+      "patch": 0
+    }
+  },
+  "variable": [
+    {
+      "key": "hub_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "client_url",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "tenant_id",
+      "value": "test-tenant-001",
+      "type": "string"
+    },
+    {
+      "key": "device_id",
+      "value": "test-device-001",
+      "type": "string"
+    },
+    {
+      "key": "license_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "appointment_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Seed - Configuração Inicial",
+      "item": [
+        {
+          "name": "Reset Database (HUB)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"confirm\": true\n}"
+            },
+            "url": {
+              "raw": "{{hub_url}}/api/dev/reset",
+              "host": ["{{hub_url}}"],
+              "path": ["api", "dev", "reset"]
+            },
+            "description": "Reseta o banco de dados do HUB para estado inicial"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Database reset successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Test Tenant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{tenant_id}}\",\n  \"name\": \"Salão de Beleza Teste\",\n  \"email\": \"teste@salaoteste.com\",\n  \"phone\": \"+5511999999999\",\n  \"address\": {\n    \"street\": \"Rua das Flores, 123\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"01234-567\",\n    \"country\": \"Brasil\"\n  },\n  \"settings\": {\n    \"timezone\": \"America/Sao_Paulo\",\n    \"currency\": \"BRL\",\n    \"language\": \"pt-BR\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{hub_url}}/api/tenants",
+              "host": ["{{hub_url}}"],
+              "path": ["api", "tenants"]
+            },
+            "description": "Cria tenant de teste"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Tenant created successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.id).to.eql(pm.variables.get('tenant_id'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Test License",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"plan\": \"professional\",\n  \"entitlements\": {\n    \"maxUsers\": 10,\n    \"maxCustomers\": 1000,\n    \"maxAppointments\": 5000,\n    \"features\": [\n      \"scheduling\",\n      \"pos\",\n      \"inventory\",\n      \"crm\",\n      \"reports\",\n      \"backup\"\n    ]\n  },\n  \"expiresAt\": \"2025-12-31T23:59:59.000Z\",\n  \"graceDays\": 30\n}"
+            },
+            "url": {
+              "raw": "{{hub_url}}/api/licenses",
+              "host": ["{{hub_url}}"],
+              "path": ["api", "licenses"]
+            },
+            "description": "Cria licença de teste"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('License created successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.tenantId).to.eql(pm.variables.get('tenant_id'));",
+                  "    pm.collectionVariables.set('license_token', response.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Seed Sample Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"seedType\": \"sample\",\n  \"data\": {\n    \"services\": [\n      {\n        \"name\": \"Corte de Cabelo\",\n        \"duration\": 60,\n        \"price\": 50.00,\n        \"category\": \"cabelo\"\n      },\n      {\n        \"name\": \"Manicure\",\n        \"duration\": 45,\n        \"price\": 25.00,\n        \"category\": \"unhas\"\n      }\n    ],\n    \"professionals\": [\n      {\n        \"name\": \"Maria Silva\",\n        \"email\": \"maria@salaoteste.com\",\n        \"specialties\": [\"cabelo\", \"unhas\"]\n      }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{hub_url}}/api/seed",
+              "host": ["{{hub_url}}"],
+              "path": ["api", "seed"]
+            },
+            "description": "Popula dados de exemplo"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Sample data seeded successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Configuração inicial do ambiente de teste"
+    },
+    {
+      "name": "2. Health Check - Verificação de Saúde",
+      "item": [
+        {
+          "name": "HUB Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{hub_url}}/api/health",
+              "host": ["{{hub_url}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Verifica saúde do serviço HUB"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HUB is healthy', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.status).to.eql('ok');",
+                  "    pm.expect(response.database).to.eql('connected');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Client Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_url}}/api/health",
+              "host": ["{{client_url}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Verifica saúde do serviço Client"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Client is healthy', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.status).to.eql('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Database Connection Test",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{hub_url}}/api/health/database",
+              "host": ["{{hub_url}}"],
+              "path": ["api", "health", "database"]
+            },
+            "description": "Testa conexão com banco de dados"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Database connection is healthy', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.connected).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Verificação de saúde dos serviços"
+    },
+    {
+      "name": "3. Ativar Licença - Fluxo de Ativação",
+      "item": [
+        {
+          "name": "Validate License (HUB)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{hub_url}}/api/licenses/validate?tenantId={{tenant_id}}&deviceId={{device_id}}",
+              "host": ["{{hub_url}}"],
+              "path": ["api", "licenses", "validate"],
+              "query": [
+                {
+                  "key": "tenantId",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "deviceId",
+                  "value": "{{device_id}}"
+                }
+              ]
+            },
+            "description": "Valida licença no HUB"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('License validation successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.valid).to.be.true;",
+                  "    pm.expect(response.status).to.eql('activated');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activate License (Client)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"deviceId\": \"{{device_id}}\",\n  \"token\": \"{{license_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{client_url}}/api/licensing/activate",
+              "host": ["{{client_url}}"],
+              "path": ["api", "licensing", "activate"]
+            },
+            "description": "Ativa licença no cliente local"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('License activation successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.true;",
+                  "    pm.expect(response.status).to.eql('activated');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validate License (Client Offline)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_url}}/api/licensing/validate?tenantId={{tenant_id}}&deviceId={{device_id}}",
+              "host": ["{{client_url}}"],
+              "path": ["api", "licensing", "validate"],
+              "query": [
+                {
+                  "key": "tenantId",
+                  "value": "{{tenant_id}}"
+                },
+                {
+                  "key": "deviceId",
+                  "value": "{{device_id}}"
+                }
+              ]
+            },
+            "description": "Valida licença offline no cliente"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Offline license validation successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.valid).to.be.true;",
+                  "    pm.expect(['activated', 'offline_grace']).to.include(response.status);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get License Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_url}}/api/licensing/status",
+              "host": ["{{client_url}}"],
+              "path": ["api", "licensing", "status"]
+            },
+            "description": "Obtém status atual da licença"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('License status retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.isActivated).to.be.true;",
+                  "    pm.expect(response.tenantId).to.eql(pm.variables.get('tenant_id'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Fluxo completo de ativação de licença"
+    },
+    {
+      "name": "4. CRUD - Operações Básicas",
+      "item": [
+        {
+          "name": "Create Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ana Costa\",\n  \"email\": \"ana.costa@email.com\",\n  \"phone\": \"+5511987654321\",\n  \"birthDate\": \"1990-05-15\",\n  \"address\": {\n    \"street\": \"Rua das Palmeiras, 456\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"04567-890\"\n  },\n  \"preferences\": {\n    \"notifications\": true,\n    \"marketing\": false\n  }\n}"
+            },
+            "url": {
+              "raw": "{{client_url}}/api/customers",
+              "host": ["{{client_url}}"],
+              "path": ["api", "customers"]
+            },
+            "description": "Cria novo cliente"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Customer created successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.name).to.eql('Ana Costa');",
+                  "    pm.collectionVariables.set('customer_id', response.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Customer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_url}}/api/customers/{{customer_id}}",
+              "host": ["{{client_url}}"],
+              "path": ["api", "customers", "{{customer_id}}"]
+            },
+            "description": "Obtém dados do cliente"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Customer retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.id).to.eql(pm.variables.get('customer_id'));",
+                  "    pm.expect(response.name).to.eql('Ana Costa');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ana Costa Silva\",\n  \"email\": \"ana.costa.silva@email.com\",\n  \"phone\": \"+5511987654321\",\n  \"birthDate\": \"1990-05-15\",\n  \"address\": {\n    \"street\": \"Rua das Palmeiras, 456 - Apto 101\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"04567-890\"\n  },\n  \"preferences\": {\n    \"notifications\": true,\n    \"marketing\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{client_url}}/api/customers/{{customer_id}}",
+              "host": ["{{client_url}}"],
+              "path": ["api", "customers", "{{customer_id}}"]
+            },
+            "description": "Atualiza dados do cliente"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Customer updated successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.name).to.eql('Ana Costa Silva');",
+                  "    pm.expect(response.preferences.marketing).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Appointment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"serviceId\": \"service-001\",\n  \"professionalId\": \"professional-001\",\n  \"scheduledAt\": \"2024-12-20T14:00:00.000Z\",\n  \"duration\": 60,\n  \"notes\": \"Cliente prefere corte mais curto\",\n  \"status\": \"scheduled\"\n}"
+            },
+            "url": {
+              "raw": "{{client_url}}/api/appointments",
+              "host": ["{{client_url}}"],
+              "path": ["api", "appointments"]
+            },
+            "description": "Cria novo agendamento"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Appointment created successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.customerId).to.eql(pm.variables.get('customer_id'));",
+                  "    pm.collectionVariables.set('appointment_id', response.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Appointments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_url}}/api/appointments?date=2024-12-20",
+              "host": ["{{client_url}}"],
+              "path": ["api", "appointments"],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2024-12-20"
+                }
+              ]
+            },
+            "description": "Lista agendamentos por data"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Appointments listed successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.data).to.be.an('array');",
+                  "    pm.expect(response.data.length).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Appointment Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\",\n  \"completedAt\": \"2024-12-20T15:00:00.000Z\",\n  \"notes\": \"Serviço realizado com sucesso. Cliente satisfeita.\"\n}"
+            },
+            "url": {
+              "raw": "{{client_url}}/api/appointments/{{appointment_id}}/status",
+              "host": ["{{client_url}}"],
+              "path": ["api", "appointments", "{{appointment_id}}", "status"]
+            },
+            "description": "Atualiza status do agendamento"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Appointment status updated successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.status).to.eql('completed');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Operações CRUD básicas do sistema"
+    },
+    {
+      "name": "5. Sync Roundtrip - Sincronização Completa",
+      "item": [
+        {
+          "name": "Get Sync Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_url}}/api/sync/status",
+              "host": ["{{client_url}}"],
+              "path": ["api", "sync", "status"]
+            },
+            "description": "Obtém status da sincronização"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Sync status retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('lastSync');",
+                  "    pm.expect(response).to.have.property('pendingChanges');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Push Changes to HUB",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"deviceId\": \"{{device_id}}\",\n  \"changes\": [\n    {\n      \"entity\": \"customer\",\n      \"entityId\": \"{{customer_id}}\",\n      \"operation\": \"update\",\n      \"data\": {\n        \"name\": \"Ana Costa Silva\",\n        \"email\": \"ana.costa.silva@email.com\"\n      },\n      \"timestamp\": \"2024-12-20T15:30:00.000Z\"\n    },\n    {\n      \"entity\": \"appointment\",\n      \"entityId\": \"{{appointment_id}}\",\n      \"operation\": \"update\",\n      \"data\": {\n        \"status\": \"completed\"\n      },\n      \"timestamp\": \"2024-12-20T15:00:00.000Z\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{hub_url}}/api/sync/push",
+              "host": ["{{hub_url}}"],
+              "path": ["api", "sync", "push"]
+            },
+            "description": "Envia mudanças locais para o HUB"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Changes pushed successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.true;",
+                  "    pm.expect(response.processed).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pull Changes from HUB",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"deviceId\": \"{{device_id}}\",\n  \"lastSync\": \"2024-12-20T10:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{hub_url}}/api/sync/pull",
+              "host": ["{{hub_url}}"],
+              "path": ["api", "sync", "pull"]
+            },
+            "description": "Recebe mudanças do HUB"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Changes pulled successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.have.property('changes');",
+                  "    pm.expect(response.changes).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apply Remote Changes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"changes\": [\n    {\n      \"entity\": \"service\",\n      \"entityId\": \"service-002\",\n      \"operation\": \"create\",\n      \"data\": {\n        \"name\": \"Pedicure\",\n        \"duration\": 60,\n        \"price\": 30.00,\n        \"category\": \"unhas\"\n      },\n      \"timestamp\": \"2024-12-20T16:00:00.000Z\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{client_url}}/api/sync/apply",
+              "host": ["{{client_url}}"],
+              "path": ["api", "sync", "apply"]
+            },
+            "description": "Aplica mudanças remotas localmente"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Remote changes applied successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.true;",
+                  "    pm.expect(response.applied).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full Sync Roundtrip",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantId\": \"{{tenant_id}}\",\n  \"deviceId\": \"{{device_id}}\",\n  \"force\": false\n}"
+            },
+            "url": {
+              "raw": "{{client_url}}/api/sync/full",
+              "host": ["{{client_url}}"],
+              "path": ["api", "sync", "full"]
+            },
+            "description": "Executa sincronização completa bidirecional"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Full sync completed successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.true;",
+                  "    pm.expect(response).to.have.property('pushed');",
+                  "    pm.expect(response).to.have.property('pulled');",
+                  "    pm.expect(response).to.have.property('conflicts');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Data Consistency",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{client_url}}/api/sync/verify",
+              "host": ["{{client_url}}"],
+              "path": ["api", "sync", "verify"]
+            },
+            "description": "Verifica consistência dos dados após sincronização"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Data consistency verified', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.consistent).to.be.true;",
+                  "    pm.expect(response.errors).to.be.an('array').that.is.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Fluxo completo de sincronização bidirecional"
+    },
+    {
+      "name": "6. Cleanup - Limpeza Final",
+      "item": [
+        {
+          "name": "Delete Test Appointment",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{client_url}}/api/appointments/{{appointment_id}}",
+              "host": ["{{client_url}}"],
+              "path": ["api", "appointments", "{{appointment_id}}"]
+            },
+            "description": "Remove agendamento de teste"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Test appointment deleted successfully', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Test Customer",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{client_url}}/api/customers/{{customer_id}}",
+              "host": ["{{client_url}}"],
+              "path": ["api", "customers", "{{customer_id}}"]
+            },
+            "description": "Remove cliente de teste"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Test customer deleted successfully', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Limpeza dos dados de teste"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Configurações globais",
+          "pm.globals.set('timestamp', new Date().toISOString());"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Testes globais",
+          "pm.test('Response time is acceptable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "pm.test('Response has valid JSON', function () {",
+          "    pm.response.to.be.json;",
+          "});"
+        ]
+      }
+    }
+  ]
+}

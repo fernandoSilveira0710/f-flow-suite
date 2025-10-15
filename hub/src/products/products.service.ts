@@ -220,7 +220,12 @@ export class ProductsService {
       updatedAt: product.updatedAt,
     };
 
-    await this.eventsService.createEvent(eventType, payload);
+    await this.eventsService.createEvent(product.tenantId, {
+      eventType,
+      entityType: 'product',
+      entityId: product.id,
+      data: payload,
+    });
   }
 
   private mapToResponseDto(product: any): ProductResponseDto {

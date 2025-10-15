@@ -20,10 +20,15 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { ResourceTypeModule } from './resource-type/resource-type.module';
 import { UsersModule } from './users/users.module';
+import { AutoUpdateModule } from './auto-update/auto-update.module';
+import { PlansModule } from './plans/plans.module';
+import { AuthModule } from './auth/auth.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     LicensingModule,
     PosModule,
     ProductsModule,
@@ -44,6 +49,9 @@ import { UsersModule } from './users/users.module';
     FeatureFlagsModule,
     ResourceTypeModule,
     UsersModule,
+    AutoUpdateModule,
+    PlansModule,
+    AuthModule,
   ],
 })
 export class AppModule {}

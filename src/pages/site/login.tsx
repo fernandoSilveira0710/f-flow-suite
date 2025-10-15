@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,8 +9,28 @@ import { toast } from '@/hooks/use-toast';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Exibir mensagem de sucesso do cadastro
+  useEffect(() => {
+    if (location.state?.message) {
+      toast({
+        title: 'Sucesso!',
+        description: location.state.message,
+        variant: 'default',
+      });
+      
+      // Preencher email se fornecido
+      if (location.state.email) {
+        setEmail(location.state.email);
+      }
+      
+      // Limpar o state para evitar mostrar a mensagem novamente
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +98,7 @@ export default function Login() {
         <CardFooter className="flex flex-col gap-4">
           <div className="text-sm text-center text-muted-foreground">
             Não tem uma conta?{' '}
-            <Link to="/cadastro" className="text-primary hover:underline">
+            <Link to="/site/cadastro" className="text-primary hover:underline">
               Cadastre-se
             </Link>
           </div>

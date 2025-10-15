@@ -146,11 +146,71 @@ export async function bootstrap(): Promise<void> {
     });
     
     // Configure structured logger for NestJS
-  app.useLogger(new StructuredLogger(logDir));
+    app.useLogger(new StructuredLogger(logDir));
     logger.log('Structured logger configured successfully');
     
+    // Configure CORS
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || 'http://localhost:8080',
+      process.env.SITE_URL || 'http://localhost:5173',
+      // Incluir variações com 127.0.0.1 para compatibilidade
+      (process.env.FRONTEND_URL || 'http://localhost:8080').replace('localhost', '127.0.0.1'),
+      (process.env.SITE_URL || 'http://localhost:5173').replace('localhost', '127.0.0.1'),
+    ];
+
+    app.enableCors({
+      origin: allowedOrigins,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'Accept',
+        'Origin',
+        'X-Requested-With',
+        'Cache-Control',
+        'Pragma',
+        'Expires',
+        'x-tenant-id'
+      ],
+      credentials: true,
+      optionsSuccessStatus: 200,
+      preflightContinue: false,
+    });
+    logger.log('CORS configured successfully');
+    
+    // Verificação de licença na inicialização
+    try {
+      logger.log('Checking license status on startup...');
+      const { StartupLicenseGuard } = await import('./licensing/startup-license.guard');
+      const startupGuard = app.get(StartupLicenseGuard);
+      
+      // Atualiza cache de licença se possível
+      await startupGuard.updateCacheOnStartup();
+      
+      // Verifica status da licença
+      const licenseCheck = await startupGuard.checkStartupLicense();
+      
+      if (!licenseCheck.canStart) {
+        logger.error(`License check failed: ${licenseCheck.message}`);
+        logger.error('Application cannot start due to license restrictions');
+        process.exit(1);
+      }
+      
+      if (licenseCheck.showWarning) {
+        logger.warn(`License Warning: ${licenseCheck.message}`);
+      } else if (licenseCheck.requiresSetup) {
+        logger.warn(`License Setup Required: ${licenseCheck.message}`);
+      } else {
+        logger.log(`License Status: ${licenseCheck.message}`);
+      }
+      
+    } catch (error) {
+      logger.warn('License check failed during startup:', error instanceof Error ? error.message : String(error));
+      logger.warn('Continuing startup with limited functionality');
+    }
+    
     // Start server
-    const port = process.env.PORT ? Number(process.env.PORT) : 3010;
+    const port = process.env.PORT ? Number(process.env.PORT) : 3001;
     const host = '127.0.0.1';
     
     await app.listen(port, host);
@@ -179,7 +239,7 @@ export async function bootstrap(): Promise<void> {
 export function getBootstrapConfig(): BootstrapConfig {
   const { dataDir, logDir } = resolvePaths();
   const databaseUrl = setupDatabase(dataDir);
-  const port = process.env.PORT ? Number(process.env.PORT) : 3010;
+  const port = process.env.PORT ? Number(process.env.PORT) : 3001;
   const host = '127.0.0.1';
   
   return {
