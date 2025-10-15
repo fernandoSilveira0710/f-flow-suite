@@ -1,0 +1,266 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create_release.outputs.id }}
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          
+          # Generate changelog
+          if [ -n "$PREVIOUS_TAG" ]; then
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" HEAD)
+          fi
+          
+          # Save changelog to file
+          echo "## Changes" > changelog.md
+          echo "" >> changelog.md
+          echo "$CHANGELOG" >> changelog.md
+          
+          # Set output for GitHub Actions
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          cat changelog.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: F-Flow Suite ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
+
+  build-and-upload:
+    name: Build and Upload Assets
+    runs-on: ${{ matrix.os }}
+    needs: create-release
+    
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            ext: .exe
+            installer_ext: .msi
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+            ext: ''
+            installer_ext: .dmg
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            ext: ''
+            installer_ext: .AppImage
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: client-local/package-lock.json
+
+      - name: Install dependencies
+        working-directory: client-local
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: client-local
+        run: npx prisma generate
+
+      - name: Build application
+        working-directory: client-local
+        run: npm run build
+
+      - name: Create binary with pkg
+        working-directory: client-local
+        run: npm run build:pkg
+
+      - name: Rename binary
+        shell: bash
+        working-directory: client-local
+        run: |
+          if [ "${{ matrix.platform }}" = "win32" ]; then
+            mv f-flow-client-win.exe f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
+          elif [ "${{ matrix.platform }}" = "darwin" ]; then
+            mv f-flow-client-macos f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}
+          else
+            mv f-flow-client-linux f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}
+          fi
+
+      # Windows Installer
+      - name: Create Windows Installer
+        if: matrix.platform == 'win32'
+        run: |
+          # Install WiX Toolset
+          choco install wixtoolset -y
+          
+          # Create installer using WiX (simplified example)
+          echo "Creating Windows installer..."
+          # This would typically use a proper WiX configuration
+          # For now, we'll just copy the binary as a placeholder
+          cp client-local/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }} f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
+
+      # macOS Installer
+      - name: Create macOS Installer
+        if: matrix.platform == 'darwin'
+        run: |
+          # Create DMG using create-dmg or similar tool
+          echo "Creating macOS installer..."
+          # This would typically use create-dmg or similar
+          # For now, we'll just copy the binary as a placeholder
+          cp client-local/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }} f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
+
+      # Linux AppImage
+      - name: Create Linux AppImage
+        if: matrix.platform == 'linux'
+        run: |
+          # Create AppImage using appimagetool
+          echo "Creating Linux AppImage..."
+          # This would typically use appimagetool
+          # For now, we'll just copy the binary as a placeholder
+          cp client-local/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }} f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
+
+      - name: Upload Binary Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: client-local/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
+          asset_name: f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
+          asset_content_type: application/octet-stream
+
+      - name: Upload Installer Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
+          asset_name: f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
+          asset_content_type: application/octet-stream
+
+  build-hub-docker:
+    name: Build and Push Hub Docker Image
+    runs-on: ubuntu-latest
+    needs: create-release
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/hub
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./hub
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-site:
+    name: Deploy Site to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: create-release
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install dependencies
+        working-directory: site
+        run: npm ci
+
+      - name: Build site
+        working-directory: site
+        run: npm run build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site/dist
+          cname: f-flow.2fsolutions.com.br
+
+  notify-release:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [create-release, build-and-upload, build-hub-docker, deploy-site]
+    if: always()
+    
+    steps:
+      - name: Notify Slack
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: "🚀 F-Flow Suite ${{ github.ref_name }} has been released successfully!"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: "❌ F-Flow Suite ${{ github.ref_name }} release failed!"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { EventValidatorService } from '../common/validation/event-validator.service';
 import { CreateGroomingTicketDto } from './dto/create-grooming-ticket.dto';
 import { UpdateGroomingTicketDto } from './dto/update-grooming-ticket.dto';
+import { CreateGroomingItemDto } from './dto/create-grooming-item.dto';
 
 @Injectable()
 export class TicketsService {
@@ -12,36 +13,47 @@ export class TicketsService {
   ) {}
 
   async create(createTicketDto: CreateGroomingTicketDto) {
-    const totalPrice = createTicketDto.items.reduce(
-      (sum, item) => sum + item.price * item.qty,
-      0
-    );
-
     const ticket = await this.prisma.$transaction(async (prisma) => {
+      // Generate ticket code
+      const code = await this.generateTicketCode();
+
       // Create the ticket
       const newTicket = await prisma.groomingTicket.create({
         data: {
+          code,
           petId: createTicketDto.petId,
           tutorId: createTicketDto.tutorId,
-          status: createTicketDto.status || 'pending',
+          professionalId: createTicketDto.professionalId,
+          status: createTicketDto.status || 'aberto',
+          notes: createTicketDto.notes,
         },
       });
 
-      // Create the items
-      const items = await Promise.all(
-        createTicketDto.items.map((item) =>
-          prisma.groomingItem.create({
-            data: {
-              ticketId: newTicket.id,
-              serviceId: item.serviceId,
-              productId: item.productId,
-              name: item.name,
-              price: item.price,
-              qty: item.qty,
-            },
-          })
-        )
-      );
+      // Create the items if provided
+      let items: any[] = [];
+      if (createTicketDto.items && createTicketDto.items.length > 0) {
+        items = await Promise.all(
+          createTicketDto.items.map((item) =>
+            prisma.groomingItem.create({
+              data: {
+                ticketId: newTicket.id,
+                serviceId: item.serviceId,
+                productId: item.productId,
+                name: item.name,
+                price: item.price,
+                qty: item.qty,
+              },
+            })
+          )
+        );
+
+        // Calculate and update total
+        const total = items.reduce((sum, item) => sum + Number(item.price) * item.qty, 0);
+        await prisma.groomingTicket.update({
+          where: { id: newTicket.id },
+          data: { total },
+        });
+      }
 
       return { ...newTicket, items };
     });
@@ -63,6 +75,7 @@ export class TicketsService {
         },
         pet: true,
         tutor: true,
+        professional: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -80,6 +93,7 @@ export class TicketsService {
         },
         pet: true,
         tutor: true,
+        professional: true,
       },
     });
 
@@ -99,6 +113,9 @@ export class TicketsService {
         where: { id },
         data: {
           status: updateTicketDto.status,
+          professionalId: updateTicketDto.professionalId,
+          notes: updateTicketDto.notes,
+          total: updateTicketDto.total,
         },
       });
 
@@ -125,14 +142,16 @@ export class TicketsService {
           )
         );
 
-        // Calculate total price but don't store it in the ticket
-        const totalPrice = updateTicketDto.items.reduce(
-          (sum, item) => sum + item.price * item.qty,
-          0
-        );
+        // Calculate and update total if not explicitly provided
+        if (!updateTicketDto.total) {
+          const total = items.reduce((sum, item) => sum + Number(item.price) * item.qty, 0);
+          await prisma.groomingTicket.update({
+            where: { id },
+            data: { total },
+          });
+        }
 
-        // Return the updated ticket with calculated total
-        return { ...updatedTicket, items, totalPrice };
+        return { ...updatedTicket, items };
       }
 
       return updatedTicket;
@@ -144,16 +163,53 @@ export class TicketsService {
     return ticket;
   }
 
+  async addItem(ticketId: string, createItemDto: CreateGroomingItemDto) {
+    const existingTicket = await this.findOne(ticketId);
+
+    const result = await this.prisma.$transaction(async (prisma) => {
+      // Create the new item
+      const newItem = await prisma.groomingItem.create({
+        data: {
+          ticketId,
+          serviceId: createItemDto.serviceId,
+          productId: createItemDto.productId,
+          name: createItemDto.name,
+          price: createItemDto.price,
+          qty: createItemDto.qty,
+        },
+      });
+
+      // Recalculate total
+      const allItems = await prisma.groomingItem.findMany({
+        where: { ticketId },
+      });
+      const total = allItems.reduce((sum, item) => sum + Number(item.price) * item.qty, 0);
+
+      // Update ticket total
+      const updatedTicket = await prisma.groomingTicket.update({
+        where: { id: ticketId },
+        data: { total },
+      });
+
+      return { ticket: updatedTicket, item: newItem };
+    });
+
+    // Generate event for synchronization
+    await this.generateTicketEvent('grooming.ticket.updated.v1', result.ticket);
+
+    return result;
+  }
+
   async remove(id: string) {
     const existingTicket = await this.findOne(id);
 
     const ticket = await this.prisma.groomingTicket.update({
       where: { id },
-      data: { status: 'cancelled' },
+      data: { status: 'cancelado' },
     });
 
     // Generate event for synchronization
-    await this.generateTicketEvent('grooming.ticket.cancelled.v1', ticket);
+    await this.generateTicketEvent('grooming.ticket.updated.v1', ticket);
 
     return ticket;
   }
@@ -177,11 +233,12 @@ export class TicketsService {
   private async generateTicketEvent(eventType: string, ticket: any) {
     const payload = {
       id: ticket.id,
+      code: ticket.code,
       petId: ticket.petId,
       tutorId: ticket.tutorId,
-      code: ticket.code,
+      professionalId: ticket.professionalId,
       status: ticket.status,
-      totalPrice: ticket.totalPrice,
+      total: ticket.total,
       notes: ticket.notes,
       items: ticket.items || [],
       createdAt: ticket.createdAt,

@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useEntitlements } from '@/hooks/use-entitlements';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { UpgradeDialog } from '@/components/erp/upgrade-dialog';
 import {
@@ -19,6 +20,7 @@ import {
   Sun,
   Search,
   Package2,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -30,6 +32,7 @@ export default function ErpLayout() {
   const [requiredPlan, setRequiredPlan] = useState('');
   const location = useLocation();
   const { entitlements, currentPlan } = useEntitlements();
+  const { logout } = useAuth();
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
@@ -215,13 +218,19 @@ export default function ErpLayout() {
             />
           </div>
 
-          <Button variant="ghost" size="icon" onClick={toggleTheme}>
-            {theme === 'light' ? (
-              <Moon className="h-5 w-5" />
-            ) : (
-              <Sun className="h-5 w-5" />
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={toggleTheme}>
+              {theme === 'light' ? (
+                <Moon className="h-5 w-5" />
+              ) : (
+                <Sun className="h-5 w-5" />
+              )}
+            </Button>
+            
+            <Button variant="ghost" size="icon" onClick={logout} title="Sair">
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </header>
 
         {/* Page Content */}

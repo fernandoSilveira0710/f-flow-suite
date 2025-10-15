@@ -5,11 +5,11 @@ import { LayoutGrid, PlusCircle, PawPrint, Users, Briefcase, Box, UserCog } from
 const tabs = [
   { value: 'kanban', label: 'Kanban', icon: LayoutGrid, href: '/erp/grooming' },
   { value: 'checkin', label: 'Check-in', icon: PlusCircle, href: '/erp/grooming/new' },
-  { value: 'pets', label: 'Pets', icon: PawPrint, href: '/erp/grooming/pets' },
   { value: 'tutors', label: 'Tutores', icon: Users, href: '/erp/grooming/tutors' },
   { value: 'services', label: 'Serviços', icon: Briefcase, href: '/erp/grooming/services' },
   { value: 'resources', label: 'Recursos', icon: Box, href: '/erp/grooming/resources' },
   { value: 'profissionais', label: 'Profissionais', icon: UserCog, href: '/erp/grooming/profissionais' },
+  { value: 'pets', label: 'Pets', icon: PawPrint, href: '/erp/grooming/pets' },
 ];
 
 export function GroomingTabs() {

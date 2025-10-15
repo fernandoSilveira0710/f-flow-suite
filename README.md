@@ -27,11 +27,50 @@ npm run check:all
 
 ### Serviços disponíveis
 Após o setup, você terá:
-- **Frontend**: http://localhost:8081 (ou porta disponível)
-- **Hub API**: http://localhost:3000
-- **Client-local API**: http://localhost:3010
+- **Frontend ERP**: http://localhost:8080/erp/login
+- **Site Institucional**: http://localhost:5173
+- **Hub API**: http://localhost:8081 (NestJS + PostgreSQL)
+- **Client-local API**: http://localhost:3002 (NestJS + SQLite)
+- **Prisma Studio HUB**: http://localhost:5555 (Base de dados do HUB)
+- **Prisma Studio Client-Local**: http://localhost:5556 (Base de dados local)
 - **Adminer**: http://localhost:8080 (PostgreSQL UI)
 - **PostgreSQL**: localhost:5432
+
+### 👥 Usuários de Teste
+
+#### Usuários cadastrados no HUB (localhost:5555):
+1. **Admin Principal**
+   - Email: `luisfernando@email.com`
+   - Senha: `123456`
+   - Role: `admin`
+
+2. **Usuário de Teste**
+   - Email: `teste@exemplo.com`
+   - Senha: `123456`
+   - Role: `admin`
+
+3. **Login de Teste**
+   - Email: `logintest@2fsolutions.com.br`
+   - Senha: `123456`
+   - Role: `admin`
+
+4. **Terceiro Usuário**
+   - Email: `terceiro@exemplo.com`
+   - Senha: `123456`
+   - Role: `admin`
+
+### 🔗 URLs dos Serviços
+
+| Serviço | URL | Descrição |
+| ------- | --- | --------- |
+| **ERP Login** | http://localhost:8080/erp/login | Interface de login do ERP |
+| **ERP Dashboard** | http://localhost:8080/erp/dashboard | Dashboard principal do ERP |
+| **Site Institucional** | http://localhost:5173 | Site público da empresa |
+| **Hub API** | http://localhost:8081 | API do HUB (autenticação, licenças) |
+| **Client-Local API** | http://localhost:3002 | API local (POS, estoque, grooming) |
+| **Prisma Studio HUB** | http://localhost:5555 | Interface do banco HUB |
+| **Prisma Studio Local** | http://localhost:5556 | Interface do banco local |
+| **Adminer** | http://localhost:8080 | Interface PostgreSQL |
 
 ### Scripts principais
 | Script | Descrição |
@@ -46,10 +85,10 @@ Após o setup, você terá:
 ### Teste de saúde
 ```bash
 # Verificar se o Hub está funcionando
-curl http://localhost:3000/health
+curl http://localhost:8081/health
 
 # Verificar se o Client-local está funcionando  
-curl http://localhost:3010/pos/sales -X POST -H "Content-Type: application/json" -d "{}"
+curl http://localhost:3002/pos/sales -X POST -H "Content-Type: application/json" -d "{}"
 ```
 
 ### Configuração de ambiente
@@ -157,15 +196,19 @@ curl -X POST http://localhost:8080/licenses/activate \
 
 Para validar RLS, execute uma query com `x-tenant-id` incorreto: o select deve retornar zero linhas.
 
-#### Autenticação OIDC e Licenciamento
+#### Sistema de Autenticação
 
-O Hub implementa autenticação dupla:
-1. **OIDC (OpenID Connect)**: Validação de identidade via token JWT do IdP
-2. **Licenciamento**: Validação de licença e entitlements via token próprio
+O F-Flow Suite implementa um sistema de autenticação robusto que suporta dois modos de operação:
 
-##### Configuração OIDC
+##### 🌐 Modo Online (Hub + Client-Local)
 
-Variáveis de ambiente necessárias no `hub/.env`:
+**Fluxo de Autenticação Completo:**
+1. **Tentativa no Hub**: O frontend tenta autenticar no Hub (localhost:8081)
+2. **Validação OIDC + Licenciamento**: Hub valida credenciais e licença
+3. **Sincronização Local**: Dados são sincronizados com o client-local
+4. **Acesso Completo**: Usuário tem acesso a todas as funcionalidades
+
+**Configuração Hub (`hub/.env`):**
 ```bash
 # OIDC Configuration
 OIDC_REQUIRED=true                                    # Habilita validação OIDC
@@ -178,38 +221,79 @@ LICENSING_ENFORCED=true                               # Habilita validação de 
 LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
 ```
 
-##### Rotas Protegidas
+##### 💻 Modo Offline (Client-Local Apenas)
 
-As seguintes rotas requerem ambos os tokens:
-- `/tenants/*` - Gestão de tenants
-- `/tenants/{id}/sync/*` - Sincronização de dados
+**Fluxo de Autenticação Offline:**
+1. **Hub Indisponível**: Frontend detecta que o Hub não está acessível
+2. **Fallback Automático**: Sistema tenta autenticação no client-local (localhost:3001)
+3. **Validação Local**: Client-local valida credenciais usando dados em cache
+4. **Verificação de Licença**: Valida licença local e período de graça
+5. **Acesso Limitado**: Usuário acessa funcionalidades offline disponíveis
 
-**Headers necessários:**
+**Endpoint de Autenticação Offline:**
+```bash
+POST /auth/offline-login
+Content-Type: application/json
+
+{
+  "email": "usuario@exemplo.com",
+  "password": "senha123"
+}
+```
+
+**Respostas Possíveis:**
+- `201 Created`: Login offline bem-sucedido
+- `401 Unauthorized`: Credenciais inválidas ou usuário não encontrado
+- `403 Forbidden`: Licença expirada sem período de graça
+- `404 Not Found`: Endpoint não disponível (client-local não configurado)
+
+##### 🔄 Mensagens de Erro Amigáveis
+
+O sistema fornece feedback claro para diferentes cenários:
+
+**Hub Indisponível:**
+- "Servidor principal indisponível. Tentando login offline com dados em cache..."
+
+**Falha no Client-Local:**
+- "Serviço local não está executando. Verifique se o F-Flow Client está instalado e ativo."
+- "Credenciais inválidas para login offline."
+- "Usuário não encontrado nos dados locais."
+- "Licença expirada. Entre em contato com o suporte."
+
+##### 🛡️ Rotas Protegidas
+
+**Headers necessários (Modo Online):**
 ```bash
 Authorization: Bearer <oidc-token>      # Token do IdP (Auth0, Keycloak, etc.)
 X-License-Token: <license-token>        # Token de licença obtido via /licenses/activate
 ```
 
-**Nota sobre Headers:**
-- O cabeçalho `X-License-Token` é preferido para tokens de licença
-- Por compatibilidade, o `Authorization: Bearer` ainda funciona quando apenas licença é necessária
-- Quando ambos OIDC e licença são necessários, use `Authorization` para OIDC e `X-License-Token` para licença
-
-##### Cenários de Teste (Postman)
-
-A coleção Postman inclui cenários para validar:
-1. **Sem tokens** → 401 Unauthorized
-2. **Apenas OIDC** → 403 Forbidden (falta licença)
-3. **OIDC + Licença** → 200 Success
-
-##### Rollback para Desenvolvimento
-
-Para desabilitar autenticação durante desenvolvimento:
+**Headers necessários (Modo Offline):**
 ```bash
-# Desabilita OIDC (apenas licença será validada)
+Authorization: Bearer <offline-token>   # Token gerado pelo client-local
+```
+
+##### 🧪 Cenários de Teste
+
+**Teste Modo Online:**
+1. Hub e Client-Local executando
+2. Login com credenciais válidas
+3. Verificar sincronização de dados
+
+**Teste Modo Offline:**
+1. Parar o Hub (`npm run dev:down` no diretório hub)
+2. Manter Client-Local executando
+3. Tentar login - deve funcionar com dados em cache
+4. Verificar funcionalidades offline disponíveis
+
+##### ⚙️ Configuração para Desenvolvimento
+
+**Desabilitar autenticação (desenvolvimento):**
+```bash
+# Hub - Desabilita OIDC (apenas licença será validada)
 OIDC_REQUIRED=false
 
-# Desabilita ambos (acesso livre)
+# Hub - Desabilita ambos (acesso livre)
 OIDC_REQUIRED=false
 LICENSING_ENFORCED=false
 ```
@@ -231,9 +315,9 @@ npm run start:dev
 #### Variáveis (`client-local/.env.example`)
 ```
 NODE_ENV=development
-PORT=3010
+PORT=3001
 DATABASE_URL="file:./local.db"
-HUB_BASE_URL=https://hub.2fsolutions.com.br/api
+HUB_BASE_URL=http://localhost:8081
 LICENSE_FILE=./license.jwt
 LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
 DEVICE_ID=<guid-da-maquina>
@@ -272,7 +356,7 @@ POST /sync/push/pending
 Envia todos os eventos não processados para o Hub e os marca como processados:
 ```bash
 # Exemplo de uso
-curl -X POST http://localhost:3010/sync/push/pending
+curl -X POST http://localhost:3001/sync/push/pending
 # Resposta: número de eventos sincronizados
 ```
 
@@ -305,7 +389,7 @@ Busca comandos pendentes do Hub para execução local.
 
 1. **Criar uma venda** (gera evento `sale.created.v1`):
 ```bash
-curl -X POST http://localhost:3010/pos/sales \
+curl -X POST http://localhost:3001/pos/sales \
   -H "Content-Type: application/json" \
   -d '{
     "operator": "Operador Teste",
@@ -322,17 +406,17 @@ curl -X POST http://localhost:3010/pos/sales \
 
 2. **Verificar eventos pendentes**:
 ```bash
-curl http://localhost:3010/sync/events
+curl http://localhost:3001/sync/events
 ```
 
 3. **Sincronizar com o Hub**:
 ```bash
-curl -X POST http://localhost:3010/sync/push/pending
+curl -X POST http://localhost:3001/sync/push/pending
 ```
 
 4. **Confirmar processamento**:
 ```bash
-curl http://localhost:3010/sync/events
+curl http://localhost:3001/sync/events
 # Verificar se "processed": true
 ```
 
@@ -349,7 +433,7 @@ O sistema agora inclui funcionalidades completas para gerenciamento de clientes:
   - Paginação com `page` e `limit`
   - Busca por nome com parâmetro `search`
   - Filtro por status ativo com parâmetro `active`
-  - Sincronização via eventos (`customer.created.v1`, `customer.updated.v1`, `customer.deleted.v1`)
+  - Sincronização via eventos (`customer.upserted.v1`, `customer.deleted.v1`)
   - Suporte multi-tenant com RLS (Row Level Security)
 
 #### Frontend (React)
@@ -375,7 +459,7 @@ Sistema completo para gerenciamento de pets e relacionamento com tutores:
   - Busca por nome com parâmetro `search`
   - Filtro por tutor com parâmetro `tutorId`
   - Filtro por status ativo com parâmetro `active`
-  - Sincronização via eventos (`pet.created.v1`, `pet.updated.v1`, `pet.deleted.v1`)
+  - Sincronização via eventos (`pet.upserted.v1`, `pet.deleted.v1`)
   - Suporte multi-tenant com RLS
 
 #### Frontend (React)

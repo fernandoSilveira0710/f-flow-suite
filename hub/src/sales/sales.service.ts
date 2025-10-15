@@ -1,6 +1,6 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-import { SaleResponseDto } from './dto';
+import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
+import { SaleResponseDto, CreateSaleDto, UpdateSaleDto } from './dto';
 
 export interface SaleCreatedEventPayload {
   id: string;
@@ -26,13 +26,43 @@ export interface SaleCreatedEventPayload {
 export class SalesService {
   private readonly logger = new Logger(SalesService.name);
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async upsertFromEvent(tenantId: string, eventPayload: SaleCreatedEventPayload): Promise<void> {
     this.logger.log(`Upserting sale ${eventPayload.id} for tenant: ${tenantId}`);
 
-    // Set tenant context for RLS
-    await this.prisma.$executeRaw`SET app.tenant_id = ${tenantId}`;
+    // Verify tenant exists
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantId }
+    });
+    
+    if (!tenant) {
+      this.logger.error(`Tenant not found: ${tenantId}`);
+      throw new Error(`Tenant not found: ${tenantId}`);
+    }
+    
+    this.logger.log(`Found tenant: ${tenant.id} (slug: ${tenant.slug})`);
+
+    // Validate required fields
+    if (!eventPayload.createdAt || !eventPayload.code || !eventPayload.operator || 
+        eventPayload.total === undefined || !eventPayload.paymentMethod) {
+      this.logger.error('Missing required fields in sale event payload', eventPayload);
+      throw new Error('Missing required fields in sale event payload');
+    }
+
+    // Validate dates
+    const createdAt = new Date(eventPayload.createdAt);
+    const updatedAt = eventPayload.updatedAt ? new Date(eventPayload.updatedAt) : createdAt;
+    
+    if (isNaN(createdAt.getTime())) {
+      this.logger.error('Invalid createdAt date in sale event payload', eventPayload);
+      throw new Error('Invalid createdAt date in sale event payload');
+    }
+    
+    if (eventPayload.updatedAt && isNaN(updatedAt.getTime())) {
+      this.logger.error('Invalid updatedAt date in sale event payload', eventPayload);
+      throw new Error('Invalid updatedAt date in sale event payload');
+    }
 
     await this.prisma.$transaction(async (tx: any) => {
       // Upsert the sale
@@ -42,15 +72,15 @@ export class SalesService {
         },
         create: {
           id: eventPayload.id,
-          tenantId,
+          tenantId: tenant.id,
           code: eventPayload.code,
-          date: new Date(eventPayload.createdAt),
+          date: createdAt,
           operator: eventPayload.operator,
           total: eventPayload.total,
           paymentMethod: eventPayload.paymentMethod,
           status: eventPayload.status || 'completed',
-          createdAt: new Date(eventPayload.createdAt),
-          updatedAt: eventPayload.updatedAt ? new Date(eventPayload.updatedAt) : new Date(eventPayload.createdAt),
+          createdAt: createdAt,
+          updatedAt: updatedAt,
         },
         update: {
           code: eventPayload.code,
@@ -58,7 +88,7 @@ export class SalesService {
           total: eventPayload.total,
           paymentMethod: eventPayload.paymentMethod,
           status: eventPayload.status || 'completed',
-          updatedAt: eventPayload.updatedAt ? new Date(eventPayload.updatedAt) : new Date(),
+          updatedAt: new Date(),
         },
       });
 
@@ -66,7 +96,7 @@ export class SalesService {
       await tx.saleItem.deleteMany({
         where: {
           saleId: sale.id,
-          tenantId,
+          tenantId: tenant.id,
         },
       });
 
@@ -75,7 +105,7 @@ export class SalesService {
         await tx.saleItem.create({
           data: {
             id: item.id,
-            tenantId,
+            tenantId: tenant.id,
             saleId: sale.id,
             productId: item.productId,
             qty: item.qty,
@@ -87,6 +117,209 @@ export class SalesService {
     });
 
     this.logger.log(`Successfully upserted sale ${eventPayload.id} with ${eventPayload.items.length} items`);
+  }
+
+  async create(tenantId: string, createSaleDto: CreateSaleDto): Promise<SaleResponseDto> {
+    this.logger.log(`Creating new sale for tenant: ${tenantId}`);
+
+    // Verify tenant exists
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantId }
+    });
+    
+    if (!tenant) {
+      this.logger.error(`Tenant not found: ${tenantId}`);
+      throw new NotFoundException(`Tenant not found: ${tenantId}`);
+    }
+
+    // Check if sale code already exists for this tenant
+    if (createSaleDto.code) {
+      const existingSale = await this.prisma.sale.findFirst({
+        where: {
+          code: createSaleDto.code,
+          tenantId: tenant.id,
+        },
+      });
+
+      if (existingSale) {
+        throw new ConflictException(`Sale with code ${createSaleDto.code} already exists for tenant ${tenantId}`);
+      }
+    }
+
+    const { v4: uuidv4 } = await import('uuid');
+    const saleId = uuidv4();
+    const now = new Date();
+
+    const result = await this.prisma.$transaction(async (tx: any) => {
+      // Create the sale
+      const sale = await tx.sale.create({
+        data: {
+          id: saleId,
+          tenantId: tenant.id,
+          code: createSaleDto.code || `SALE-${Date.now()}`,
+          date: now,
+          operator: createSaleDto.operator,
+          total: createSaleDto.total,
+          paymentMethod: createSaleDto.paymentMethod,
+          status: createSaleDto.status || 'completed',
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      // Create sale items
+      for (const item of createSaleDto.items) {
+        const { v4: uuidv4 } = await import('uuid');
+        await tx.saleItem.create({
+          data: {
+            id: uuidv4(),
+            tenantId: tenant.id,
+            saleId: sale.id,
+            productId: item.productId,
+            qty: item.qty,
+            unitPrice: item.unitPrice,
+            subtotal: item.subtotal,
+          },
+        });
+      }
+
+      return sale;
+    });
+
+    this.logger.log(`Successfully created sale ${saleId}`);
+    return this.findOneByTenant(tenantId, saleId);
+  }
+
+  async update(tenantId: string, saleId: string, updateSaleDto: UpdateSaleDto): Promise<SaleResponseDto> {
+    this.logger.log(`Updating sale ${saleId} for tenant: ${tenantId}`);
+
+    // Verify tenant exists
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantId }
+    });
+    
+    if (!tenant) {
+      this.logger.error(`Tenant not found: ${tenantId}`);
+      throw new NotFoundException(`Tenant not found: ${tenantId}`);
+    }
+
+    // Check if sale exists
+    const existingSale = await this.prisma.sale.findFirst({
+      where: {
+        id: saleId,
+        tenantId: tenant.id,
+      },
+    });
+
+    if (!existingSale) {
+      throw new NotFoundException(`Sale with ID ${saleId} not found for tenant ${tenantId}`);
+    }
+
+    // Check if new code conflicts with existing sales (if code is being updated)
+    if (updateSaleDto.code && updateSaleDto.code !== existingSale.code) {
+      const codeConflict = await this.prisma.sale.findFirst({
+        where: {
+          code: updateSaleDto.code,
+          tenantId: tenant.id,
+          id: { not: saleId },
+        },
+      });
+
+      if (codeConflict) {
+        throw new ConflictException(`Sale with code ${updateSaleDto.code} already exists for tenant ${tenantId}`);
+      }
+    }
+
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx: any) => {
+      // Update the sale
+      await tx.sale.update({
+        where: { id: saleId },
+        data: {
+          ...(updateSaleDto.code && { code: updateSaleDto.code }),
+          ...(updateSaleDto.operator && { operator: updateSaleDto.operator }),
+          ...(updateSaleDto.total !== undefined && { total: updateSaleDto.total }),
+          ...(updateSaleDto.paymentMethod && { paymentMethod: updateSaleDto.paymentMethod }),
+          ...(updateSaleDto.status && { status: updateSaleDto.status }),
+          updatedAt: now,
+        },
+      });
+
+      // Update items if provided
+      if (updateSaleDto.items) {
+        // Delete existing items
+        await tx.saleItem.deleteMany({
+          where: {
+            saleId: saleId,
+            tenantId: tenant.id,
+          },
+        });
+
+        // Create new items
+        for (const itemDto of updateSaleDto.items) {
+          const { v4: uuidv4 } = await import('uuid');
+          await tx.saleItem.create({
+            data: {
+              id: uuidv4(),
+              tenantId: tenant.id,
+              saleId: saleId,
+              productId: itemDto.productId,
+              qty: itemDto.qty,
+              unitPrice: itemDto.unitPrice,
+              subtotal: itemDto.subtotal,
+              createdAt: now,
+            },
+          });
+        }
+      }
+    });
+
+    this.logger.log(`Successfully updated sale ${saleId}`);
+    return this.findOneByTenant(tenantId, saleId);
+  }
+
+  async remove(tenantId: string, saleId: string): Promise<void> {
+    this.logger.log(`Deleting sale ${saleId} for tenant: ${tenantId}`);
+
+    // Verify tenant exists
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantId }
+    });
+    
+    if (!tenant) {
+      this.logger.error(`Tenant not found: ${tenantId}`);
+      throw new NotFoundException(`Tenant not found: ${tenantId}`);
+    }
+
+    // Check if sale exists
+    const existingSale = await this.prisma.sale.findFirst({
+      where: {
+        id: saleId,
+        tenantId: tenant.id,
+      },
+    });
+
+    if (!existingSale) {
+      throw new NotFoundException(`Sale with ID ${saleId} not found for tenant ${tenantId}`);
+    }
+
+    await this.prisma.$transaction(async (tx: any) => {
+      // Delete sale items first (due to foreign key constraints)
+      await tx.saleItem.deleteMany({
+        where: {
+          saleId: saleId,
+          tenantId: tenant.id,
+        },
+      });
+
+      // Delete the sale
+      await tx.sale.delete({
+        where: { id: saleId },
+      });
+    });
+
+    this.logger.log(`Successfully deleted sale ${saleId}`);
   }
 
   async findAllByTenant(tenantId: string): Promise<SaleResponseDto[]> {

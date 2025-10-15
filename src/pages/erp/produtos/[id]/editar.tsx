@@ -24,6 +24,7 @@ export default function ProdutoEditar() {
   const navigate = useNavigate();
   const product = id ? mockAPI.getProduct(id) : undefined;
   const categories = mockAPI.getCategories();
+  const unitsOfMeasure = mockAPI.getUnitsOfMeasure();
 
   const [formData, setFormData] = useState({
     name: product?.name || '',
@@ -31,9 +32,11 @@ export default function ProdutoEditar() {
     sku: product?.sku || '',
     barcode: product?.barcode || '',
     categoryId: product?.categoryId || '',
+    unitOfMeasureId: product?.unitOfMeasureId || '',
     price: product?.price.toString() || '',
     cost: product?.cost.toString() || '',
     stock: product?.stock.toString() || '',
+    minStock: product?.minStock?.toString() || '',
     active: product?.active ?? true,
     imageUrl: product?.imageUrl,
   });
@@ -61,9 +64,11 @@ export default function ProdutoEditar() {
       sku: formData.sku,
       barcode: formData.barcode,
       categoryId: formData.categoryId,
+      unitOfMeasureId: formData.unitOfMeasureId,
       price: parseFloat(formData.price),
       cost: parseFloat(formData.cost),
       stock: parseInt(formData.stock),
+      minStock: formData.minStock ? parseInt(formData.minStock) : undefined,
       active: formData.active,
       imageUrl: formData.imageUrl,
     });
@@ -144,6 +149,28 @@ export default function ProdutoEditar() {
                 </div>
               </div>
 
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="unitOfMeasureId">Unidade de Medida *</Label>
+                  <Select
+                    value={formData.unitOfMeasureId}
+                    onValueChange={(value) => setFormData({ ...formData, unitOfMeasureId: value })}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unitsOfMeasure.map((unit) => (
+                        <SelectItem key={unit.id} value={unit.id}>
+                          {unit.name} ({unit.abbreviation})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div>
                 <Label htmlFor="description">Descrição</Label>
                 <Textarea
@@ -182,7 +209,7 @@ export default function ProdutoEditar() {
               <CardTitle>Precificação e Estoque</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="price">Preço de Venda *</Label>
                   <Input
@@ -205,15 +232,27 @@ export default function ProdutoEditar() {
                     onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
                   />
                 </div>
+              </div>
 
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="stock">Estoque</Label>
+                  <Label htmlFor="stock">Estoque Atual</Label>
                   <Input
                     id="stock"
                     type="number"
                     value={formData.stock}
                     onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                     required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="minStock">Estoque Mínimo</Label>
+                  <Input
+                    id="minStock"
+                    type="number"
+                    value={formData.minStock}
+                    onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
                   />
                 </div>
               </div>

@@ -3,6 +3,8 @@
  * Connects to client-local server for POS operations
  */
 
+import { API_URLS } from './env';
+
 // Types and Interfaces
 export interface Product {
   id: string;
@@ -74,7 +76,7 @@ export interface Session {
 }
 
 // API Configuration
-const API_BASE_URL = 'http://127.0.0.1:3010';
+const API_BASE_URL = API_URLS.CLIENT_LOCAL;
 
 // Storage keys for cart and session (still needed for frontend state)
 const STORAGE_KEYS = {
@@ -114,40 +116,54 @@ const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> =
   return response.json();
 };
 
+// Import mockAPI to get products from the Products tab
+import { mockAPI } from './mock-data';
+
 // Products API
 export const searchProducts = async (query: string): Promise<Product[]> => {
   try {
-    const products = await apiCall<any[]>('/products');
+    // Get products from mockAPI (same data used in Products tab)
+    const products = mockAPI.getProducts();
+    const categories = mockAPI.getCategories();
     
     if (!query.trim()) {
-      return products.map(p => ({
-        id: p.id,
-        nome: p.name,
-        sku: p.sku,
-        preco: p.salePrice || p.price,
-        estoque: p.stockQty || 0,
-        categoria: p.category,
-        barcode: p.barcode,
-      }));
+      return products
+        .filter(p => p.active) // Only show active products
+        .map(p => {
+          const category = categories.find(c => c.id === p.categoryId);
+          return {
+            id: p.id,
+            nome: p.name,
+            sku: p.sku,
+            preco: p.price,
+            estoque: p.stock,
+            categoria: category?.name,
+            barcode: p.barcode,
+          };
+        });
     }
     
     const lowerQuery = query.toLowerCase();
     return products
       .filter(p => 
-        p.name?.toLowerCase().includes(lowerQuery) ||
-        p.sku?.toLowerCase().includes(lowerQuery) ||
-        p.barcode?.toLowerCase().includes(lowerQuery) ||
-        p.category?.toLowerCase().includes(lowerQuery)
+        p.active && (
+          p.name?.toLowerCase().includes(lowerQuery) ||
+          p.sku?.toLowerCase().includes(lowerQuery) ||
+          p.barcode?.toLowerCase().includes(lowerQuery)
+        )
       )
-      .map(p => ({
-        id: p.id,
-        nome: p.name,
-        sku: p.sku,
-        preco: p.salePrice || p.price,
-        estoque: p.stockQty || 0,
-        categoria: p.category,
-        barcode: p.barcode,
-      }));
+      .map(p => {
+        const category = categories.find(c => c.id === p.categoryId);
+        return {
+          id: p.id,
+          nome: p.name,
+          sku: p.sku,
+          preco: p.price,
+          estoque: p.stock,
+          categoria: category?.name,
+          barcode: p.barcode,
+        };
+      });
   } catch (error) {
     console.error('Error searching products:', error);
     return [];
@@ -156,18 +172,24 @@ export const searchProducts = async (query: string): Promise<Product[]> => {
 
 export const findProductByBarcode = async (barcode: string): Promise<Product | null> => {
   try {
-    const products = await apiCall<any[]>('/products');
-    const product = products.find(p => p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase());
+    // Get products from mockAPI (same data used in Products tab)
+    const products = mockAPI.getProducts();
+    const categories = mockAPI.getCategories();
+    
+    const product = products.find(p => 
+      p.active && (p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase())
+    );
     
     if (!product) return null;
     
+    const category = categories.find(c => c.id === product.categoryId);
     return {
       id: product.id,
       nome: product.name,
       sku: product.sku,
-      preco: product.salePrice || product.price,
-      estoque: product.stockQty || 0,
-      categoria: product.category,
+      preco: product.price,
+      estoque: product.stock,
+      categoria: category?.name,
       barcode: product.barcode,
     };
   } catch (error) {
@@ -196,14 +218,21 @@ export const getProducts = async (): Promise<Product[]> => {
 
 export const getProductById = async (id: string): Promise<Product | null> => {
   try {
-    const product = await apiCall<any>(`/products/${id}`);
+    // Get products from mockAPI (same data used in Products tab)
+    const products = mockAPI.getProducts();
+    const categories = mockAPI.getCategories();
+    
+    const product = products.find(p => p.active && p.id === id);
+    if (!product) return null;
+    
+    const category = categories.find(c => c.id === product.categoryId);
     return {
       id: product.id,
       nome: product.name,
       sku: product.sku,
-      preco: product.salePrice || product.price,
-      estoque: product.stockQty || 0,
-      categoria: product.category,
+      preco: product.price,
+      estoque: product.stock,
+      categoria: category?.name,
       barcode: product.barcode,
     };
   } catch (error) {
@@ -285,33 +314,55 @@ export const clearCart = async (): Promise<void> => {
 };
 
 // Sales API
-export const createSale = async (saleData: {
-  operator: string;
-  paymentMethod: string;
-  customerId?: string;
-  items: { productId: string; qty: number; unitPrice: number }[];
-}): Promise<Sale> => {
+export const createSale = async (
+  cart: CartItem[],
+  paymentMethod: string,
+  installments?: number,
+  discount?: number
+): Promise<Sale> => {
   try {
-    const sale = await apiCall<any>('/pos/sales', {
-      method: 'POST',
-      body: JSON.stringify(saleData),
-    });
+    // Get existing sales from localStorage
+    const existingSales = getFromStorage<Sale[]>('2f.pos.sales', []);
+    
+    // Calculate subtotal from cart
+    const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+    
+    // Apply discount if provided
+    const total = subtotal - (discount || 0);
+    
+    // Get current session for operator
+    const currentSession = getCurrentSession();
+    const operator = currentSession?.operador?.nome || 'Sistema';
+    
+    // Create new sale
+    const newSale: Sale = {
+      id: `sale_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      code: `VND${String(existingSales.length + 1).padStart(6, '0')}`,
+      operator,
+      paymentMethod,
+      status: 'completed',
+      total,
+      customerId: undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      items: cart.map((item, index) => ({
+        id: `item_${Date.now()}_${index}`,
+        productId: item.produto.id,
+        qty: item.qtd,
+        unitPrice: item.produto.preco,
+        subtotal: item.subtotal,
+        createdAt: new Date().toISOString(),
+      })),
+    };
+
+    // Save to localStorage
+    const updatedSales = [...existingSales, newSale];
+    setInStorage('2f.pos.sales', updatedSales);
 
     // Clear cart after successful sale
     await clearCart();
 
-    return {
-      id: sale.id,
-      code: sale.code,
-      operator: sale.operator,
-      paymentMethod: sale.paymentMethod,
-      status: sale.status,
-      total: sale.total,
-      customerId: sale.customerId,
-      createdAt: sale.createdAt,
-      updatedAt: sale.updatedAt,
-      items: sale.items,
-    };
+    return newSale;
   } catch (error) {
     console.error('Error creating sale:', error);
     throw error;
@@ -320,19 +371,8 @@ export const createSale = async (saleData: {
 
 export const getSales = async (): Promise<Sale[]> => {
   try {
-    const sales = await apiCall<any[]>('/pos/sales');
-    return sales.map(sale => ({
-      id: sale.id,
-      code: sale.code,
-      operator: sale.operator,
-      paymentMethod: sale.paymentMethod,
-      status: sale.status,
-      total: sale.total,
-      customerId: sale.customerId,
-      createdAt: sale.createdAt,
-      updatedAt: sale.updatedAt,
-      items: sale.items,
-    }));
+    const sales = getFromStorage<Sale[]>('2f.pos.sales', []);
+    return Array.isArray(sales) ? sales : [];
   } catch (error) {
     console.error('Error getting sales:', error);
     return [];
@@ -341,19 +381,9 @@ export const getSales = async (): Promise<Sale[]> => {
 
 export const getSaleById = async (id: string): Promise<Sale | null> => {
   try {
-    const sale = await apiCall<any>(`/pos/sales/${id}`);
-    return {
-      id: sale.id,
-      code: sale.code,
-      operator: sale.operator,
-      paymentMethod: sale.paymentMethod,
-      status: sale.status,
-      total: sale.total,
-      customerId: sale.customerId,
-      createdAt: sale.createdAt,
-      updatedAt: sale.updatedAt,
-      items: sale.items,
-    };
+    const sales = getFromStorage<Sale[]>('2f.pos.sales', []);
+    const sale = sales.find(s => s.id === id);
+    return sale || null;
   } catch (error) {
     console.error('Error getting sale by id:', error);
     return null;

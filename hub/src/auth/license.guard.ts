@@ -63,15 +63,15 @@ export class LicenseGuard implements CanActivate {
       }) as LicenseJwtPayload;
 
       // Basic validation of required fields
-      if (!payload.tenant_id || !payload.plan_id) {
-        this.logger.warn('License token missing required fields (tenant_id, plan_id)');
+      if (!payload.tid || !payload.plan) {
+        this.logger.warn('License token missing required fields (tid, plan)');
         throw new ForbiddenException('Invalid license token format');
       }
 
       // Attach license payload to request for use in controllers
       (request as any).license = payload;
 
-      this.logger.debug(`License validated for tenant: ${payload.tenant_id}, plan: ${payload.plan_id}`);
+      this.logger.debug(`License validated for tenant: ${payload.tid}, plan: ${payload.plan}${payload.planId ? ` (${payload.planId})` : ''}`);
       return true;
 
     } catch (error) {

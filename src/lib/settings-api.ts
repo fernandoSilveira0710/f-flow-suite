@@ -4,6 +4,7 @@
  */
 
 import { getCurrentPlan, setPlan as setEntitlementsPlan, getEntitlements } from './entitlements';
+import { ENDPOINTS } from './env';
 
 // Types
 export interface Organization {
@@ -48,6 +49,17 @@ export interface Role {
   id: string;
   nome: string;
   permissions: string[];
+}
+
+export interface Seat {
+  id: string;
+  nome: string;
+  email: string;
+  roleId: string;
+  ativo: boolean;
+  tipo: 'USUARIO' | 'ASSENTO'; // Diferencia usuários reais de assentos
+  criadoEm: string;
+  ultimoAcesso?: string;
 }
 
 export interface PlanInfo {
@@ -115,6 +127,7 @@ const STORAGE_KEYS = {
   branding: '2f.settings.branding',
   users: '2f.settings.users',
   roles: '2f.settings.roles',
+  seats: '2f.settings.seats',
   apiKeys: '2f.settings.apiKeys',
   webhooks: '2f.settings.webhooks',
   posPrefs: '2f.settings.posPrefs',
@@ -202,6 +215,27 @@ const DEFAULT_ROLES: Role[] = [
   },
 ];
 
+const DEFAULT_SEATS: Seat[] = [
+  { 
+    id: '1', 
+    nome: 'Assento Demo 1', 
+    email: 'assento1@demo.com', 
+    roleId: 'admin', 
+    ativo: true, 
+    tipo: 'ASSENTO',
+    criadoEm: new Date().toISOString()
+  },
+  { 
+    id: '2', 
+    nome: 'Assento Demo 2', 
+    email: 'assento2@demo.com', 
+    roleId: 'admin', 
+    ativo: false, 
+    tipo: 'ASSENTO',
+    criadoEm: new Date().toISOString()
+  },
+];
+
 export const ALL_PERMISSIONS = [
   { id: 'products:read', nome: 'Ver Produtos', grupo: 'Produtos' },
   { id: 'products:write', nome: 'Editar Produtos', grupo: 'Produtos' },
@@ -251,7 +285,7 @@ export const updateBranding = async (data: Branding): Promise<Branding> => {
   return data;
 };
 
-// Users
+// Users - Using only localStorage (prepared for future backend integration)
 export const getUsers = async (): Promise<User[]> => {
   await delay(300);
   return getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
@@ -271,7 +305,11 @@ export const updateUser = async (id: string, data: Partial<User>): Promise<User>
   const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
   const updated = users.map(u => u.id === id ? { ...u, ...data } : u);
   setInStorage(STORAGE_KEYS.users, updated);
-  return updated.find(u => u.id === id)!;
+  const updatedUser = updated.find(u => u.id === id);
+  if (!updatedUser) {
+    throw new Error('Usuário não encontrado');
+  }
+  return updatedUser;
 };
 
 export const deleteUser = async (id: string): Promise<void> => {
@@ -281,7 +319,7 @@ export const deleteUser = async (id: string): Promise<void> => {
   setInStorage(STORAGE_KEYS.users, updated);
 };
 
-// Roles
+// Roles - Using only localStorage (prepared for future backend integration)
 export const getRoles = async (): Promise<Role[]> => {
   await delay(300);
   return getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
@@ -301,7 +339,11 @@ export const updateRole = async (id: string, data: Partial<Role>): Promise<Role>
   const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
   const updated = roles.map(r => r.id === id ? { ...r, ...data } : r);
   setInStorage(STORAGE_KEYS.roles, updated);
-  return updated.find(r => r.id === id)!;
+  const updatedRole = updated.find(r => r.id === id);
+  if (!updatedRole) {
+    throw new Error('Role não encontrada');
+  }
+  return updatedRole;
 };
 
 export const deleteRole = async (id: string): Promise<void> => {
@@ -311,9 +353,128 @@ export const deleteRole = async (id: string): Promise<void> => {
   setInStorage(STORAGE_KEYS.roles, updated);
 };
 
+// Seats - Using only localStorage (prepared for future backend integration)
+export const getSeats = async (): Promise<Seat[]> => {
+  await delay(300);
+  return getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
+};
+
+export const createSeat = async (seat: Omit<Seat, 'id' | 'criadoEm'>): Promise<Seat> => {
+  await delay(500);
+  const seats = getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
+  const newSeat: Seat = { 
+    ...seat, 
+    id: Date.now().toString(),
+    criadoEm: new Date().toISOString(),
+    tipo: 'ASSENTO'
+  };
+  const updated = [...seats, newSeat];
+  setInStorage(STORAGE_KEYS.seats, updated);
+  return newSeat;
+};
+
+export const updateSeat = async (id: string, data: Partial<Seat>): Promise<Seat> => {
+  await delay(500);
+  const seats = getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
+  const updated = seats.map(s => s.id === id ? { ...s, ...data } : s);
+  setInStorage(STORAGE_KEYS.seats, updated);
+  const updatedSeat = updated.find(s => s.id === id);
+  if (!updatedSeat) {
+    throw new Error('Assento não encontrado');
+  }
+  return updatedSeat;
+};
+
+export const deleteSeat = async (id: string): Promise<void> => {
+  await delay(500);
+  const seats = getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
+  const updated = seats.filter(s => s.id !== id);
+  setInStorage(STORAGE_KEYS.seats, updated);
+};
+
+export const getSeatById = async (id: string): Promise<Seat | null> => {
+  await delay(200);
+  const seats = getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
+  return seats.find(s => s.id === id) || null;
+};
+
+export const getActiveSeats = async (): Promise<Seat[]> => {
+  await delay(300);
+  const seats = await getSeats();
+  return seats.filter(s => s.ativo);
+};
+
+export const getSeatsByRole = async (roleId: string): Promise<Seat[]> => {
+  await delay(300);
+  const seats = await getSeats();
+  return seats.filter(s => s.roleId === roleId);
+};
+
+// Função para buscar assinatura ativa do tenant no Client-Local
+const fetchTenantSubscription = async (tenantId: string) => {
+  try {
+    const response = await fetch(ENDPOINTS.CLIENT_PLANS_SUBSCRIPTION(tenantId), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-tenant-id': tenantId,
+      },
+    });
+
+    if (response.ok) {
+      const subscription = await response.json();
+      return subscription;
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Erro ao buscar assinatura do Hub:', error);
+    return null;
+  }
+};
+
 // Plan
 export const getPlanInfo = async (): Promise<PlanInfo> => {
   await delay(300);
+  
+  // Tentar buscar dados do Hub primeiro
+  const tenantId = localStorage.getItem('2f.tenantId') || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
+  const hubSubscription = await fetchTenantSubscription(tenantId);
+  
+  if (hubSubscription && hubSubscription.plan) {
+    // Mapear dados do Hub para o formato esperado
+    const planKey = hubSubscription.plan.name?.toLowerCase() || 'starter';
+    const mappedPlan = ['starter', 'pro', 'max'].includes(planKey) ? planKey : 'starter';
+    
+    // Calcular próxima cobrança baseada na assinatura
+    const nextBilling = hubSubscription.expiresAt 
+      ? new Date(hubSubscription.expiresAt).toISOString()
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    
+    // Mapear recursos do plano do Hub
+    const planFeatures = hubSubscription.plan.featuresEnabled 
+      ? (typeof hubSubscription.plan.featuresEnabled === 'string' 
+         ? JSON.parse(hubSubscription.plan.featuresEnabled) 
+         : hubSubscription.plan.featuresEnabled)
+      : {};
+    
+    return {
+      plano: mappedPlan as 'starter' | 'pro' | 'max',
+      seatLimit: hubSubscription.plan.maxSeats || 1,
+      recursos: {
+        products: { enabled: planFeatures.products !== false },
+        pdv: { enabled: planFeatures.pdv !== false },
+        stock: { enabled: planFeatures.stock !== false },
+        agenda: { enabled: planFeatures.agenda !== false },
+        banho_tosa: { enabled: planFeatures.banho_tosa !== false },
+        reports: { enabled: planFeatures.reports !== false },
+      },
+      ciclo: 'MENSAL' as 'MENSAL' | 'ANUAL', // Por enquanto assumindo mensal
+      proximoCobranca: nextBilling,
+    };
+  }
+  
+  // Fallback para dados locais se o Hub não estiver disponível
   const plan = getCurrentPlan();
   const entitlements = getEntitlements();
   const cycle = getFromStorage(STORAGE_KEYS.planCycle, 'MENSAL' as 'MENSAL' | 'ANUAL');
@@ -334,13 +495,29 @@ export const getPlanInfo = async (): Promise<PlanInfo> => {
   };
 };
 
-export const updatePlan = async (plan: 'starter' | 'pro' | 'max', cycle?: 'MENSAL' | 'ANUAL'): Promise<PlanInfo> => {
-  await delay(500);
-  setEntitlementsPlan(plan);
-  if (cycle) {
-    setInStorage(STORAGE_KEYS.planCycle, cycle);
+export const updatePlan = async (planKey: 'starter' | 'pro' | 'max') => {
+  const tenantId = localStorage.getItem('2f.tenantId') || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
+  const userId = localStorage.getItem('user_id') || 'unknown';
+  
+  try {
+    // Usar PlanSyncService para sincronização completa
+    const { PlanSyncService } = await import('../services/plan-sync.service');
+    const result = await PlanSyncService.syncPlansAfterPlanChange(tenantId, userId, planKey);
+    
+    if (result.success) {
+      console.log('Plan synchronized successfully across all services');
+    } else {
+      console.warn('Plan synchronization completed with some issues:', result.errors);
+    }
+  } catch (error) {
+    console.warn('PlanSyncService not available, using fallback:', error);
+    
+    // Fallback para localStorage se o serviço não estiver disponível
+    localStorage.setItem('selectedPlan', planKey);
   }
-  return getPlanInfo();
+  
+  // Disparar evento customizado para notificar outras partes da aplicação
+  window.dispatchEvent(new CustomEvent('planChanged', { detail: { planKey } }));
 };
 
 // License (mock UI only)

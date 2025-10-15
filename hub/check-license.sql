@@ -1,0 +1,1 @@
+SELECT * FROM "License" WHERE "tenantId" = 'tenant-1';

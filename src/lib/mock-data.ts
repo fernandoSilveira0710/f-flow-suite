@@ -3,6 +3,14 @@
  * Simula respostas da API
  */
 
+export interface UnitOfMeasure {
+  id: string;
+  name: string;
+  abbreviation: string;
+  type: 'weight' | 'volume' | 'unit' | 'length';
+  active: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -16,6 +24,8 @@ export interface Product {
   active: boolean;
   imageUrl?: string;
   gallery?: string[];
+  unitOfMeasureId?: string;
+  minStock?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -45,6 +55,8 @@ const mockProducts: Product[] = [
     cost: 120.00,
     stock: 45,
     active: true,
+    unitOfMeasureId: '1',
+    minStock: 10,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -59,6 +71,8 @@ const mockProducts: Product[] = [
     cost: 18.00,
     stock: 120,
     active: true,
+    unitOfMeasureId: '4',
+    minStock: 20,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -73,6 +87,8 @@ const mockProducts: Product[] = [
     cost: 25.00,
     stock: 32,
     active: true,
+    unitOfMeasureId: '5',
+    minStock: 5,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -84,45 +100,109 @@ const mockCategories: Category[] = [
   { id: '3', name: 'Acessórios', description: 'Coleiras, guias e brinquedos' },
 ];
 
+const mockUnitsOfMeasure: UnitOfMeasure[] = [
+  { id: '1', name: 'Quilograma', abbreviation: 'kg', type: 'weight', active: true },
+  { id: '2', name: 'Grama', abbreviation: 'g', type: 'weight', active: true },
+  { id: '3', name: 'Litro', abbreviation: 'L', type: 'volume', active: true },
+  { id: '4', name: 'Mililitro', abbreviation: 'ml', type: 'volume', active: true },
+  { id: '5', name: 'Unidade', abbreviation: 'un', type: 'unit', active: true },
+  { id: '6', name: 'Metro', abbreviation: 'm', type: 'length', active: true },
+  { id: '7', name: 'Centímetro', abbreviation: 'cm', type: 'length', active: true },
+];
+
+// Carregar produtos do localStorage se existir
+const loadProductsFromStorage = (): Product[] => {
+  const stored = localStorage.getItem('mock_products');
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch (error) {
+      console.error('Erro ao carregar produtos do localStorage:', error);
+    }
+  }
+  return mockProducts;
+};
+
+// Inicializar produtos com dados do localStorage
+let currentProducts = loadProductsFromStorage();
+
 export const mockAPI = {
   // Products
-  getProducts: (): Product[] => mockProducts,
+  getProducts: (): Product[] => currentProducts,
   
   getProduct: (id: string): Product | undefined => 
-    mockProducts.find(p => p.id === id),
+    currentProducts.find(p => p.id === id),
   
   createProduct: (data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Product => {
     const newProduct: Product = {
       ...data,
-      id: String(mockProducts.length + 1),
+      id: String(currentProducts.length + 1),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    mockProducts.push(newProduct);
+    currentProducts.push(newProduct);
+    localStorage.setItem('mock_products', JSON.stringify(currentProducts));
     return newProduct;
   },
   
   updateProduct: (id: string, data: Partial<Product>): Product | undefined => {
-    const index = mockProducts.findIndex(p => p.id === id);
+    const index = currentProducts.findIndex(p => p.id === id);
     if (index === -1) return undefined;
     
-    mockProducts[index] = {
-      ...mockProducts[index],
+    currentProducts[index] = {
+      ...currentProducts[index],
       ...data,
       updatedAt: new Date().toISOString(),
     };
-    return mockProducts[index];
+    localStorage.setItem('mock_products', JSON.stringify(currentProducts));
+    return currentProducts[index];
   },
   
   deleteProduct: (id: string): boolean => {
-    const index = mockProducts.findIndex(p => p.id === id);
+    const index = currentProducts.findIndex(p => p.id === id);
     if (index === -1) return false;
-    mockProducts.splice(index, 1);
+    currentProducts.splice(index, 1);
+    localStorage.setItem('mock_products', JSON.stringify(currentProducts));
     return true;
   },
 
   // Categories
   getCategories: (): Category[] => mockCategories,
+
+  // Unidades de Medida
+  getUnitsOfMeasure: (): UnitOfMeasure[] => mockUnitsOfMeasure.filter(u => u.active),
+  
+  getAllUnitsOfMeasure: (): UnitOfMeasure[] => mockUnitsOfMeasure,
+  
+  getUnitOfMeasure: (id: string): UnitOfMeasure | undefined => 
+    mockUnitsOfMeasure.find(u => u.id === id),
+  
+  createUnitOfMeasure: (data: Omit<UnitOfMeasure, 'id'>): UnitOfMeasure => {
+    const unit: UnitOfMeasure = {
+      id: Date.now().toString(),
+      ...data,
+    };
+    mockUnitsOfMeasure.push(unit);
+    return unit;
+  },
+  
+  updateUnitOfMeasure: (id: string, data: Partial<UnitOfMeasure>): UnitOfMeasure | undefined => {
+    const index = mockUnitsOfMeasure.findIndex(u => u.id === id);
+    if (index !== -1) {
+      mockUnitsOfMeasure[index] = { ...mockUnitsOfMeasure[index], ...data };
+      return mockUnitsOfMeasure[index];
+    }
+    return undefined;
+  },
+  
+  deleteUnitOfMeasure: (id: string): boolean => {
+    const index = mockUnitsOfMeasure.findIndex(u => u.id === id);
+    if (index !== -1) {
+      mockUnitsOfMeasure.splice(index, 1);
+      return true;
+    }
+    return false;
+  },
 
   // Dashboard KPIs
   getDashboardKPIs: (): DashboardKPI[] => [
@@ -146,7 +226,7 @@ export const mockAPI = {
     },
     {
       label: 'Produtos Ativos',
-      value: String(mockProducts.filter(p => p.active).length),
+      value: String(currentProducts.filter(p => p.active).length),
       change: '+2',
       trend: 'up',
     },

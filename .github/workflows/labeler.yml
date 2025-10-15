@@ -1,0 +1,203 @@
+name: Labeler
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  label-pr:
+    name: Label Pull Request
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Label based on files changed
+        uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
+
+      - name: Label based on PR content
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+            const title = context.payload.pull_request.title.toLowerCase();
+            const body = (context.payload.pull_request.body || '').toLowerCase();
+            const labels = [];
+
+            // Type-based labels
+            if (title.includes('feat') || title.includes('feature')) {
+              labels.push('enhancement');
+            }
+            if (title.includes('fix') || title.includes('bug')) {
+              labels.push('bug');
+            }
+            if (title.includes('docs') || title.includes('documentation')) {
+              labels.push('documentation');
+            }
+            if (title.includes('test') || title.includes('testing')) {
+              labels.push('testing');
+            }
+            if (title.includes('refactor') || title.includes('refactoring')) {
+              labels.push('refactoring');
+            }
+            if (title.includes('perf') || title.includes('performance')) {
+              labels.push('performance');
+            }
+            if (title.includes('security')) {
+              labels.push('security');
+            }
+            if (title.includes('breaking') || body.includes('breaking change')) {
+              labels.push('breaking-change');
+            }
+
+            // Priority labels
+            if (body.includes('urgent') || body.includes('critical')) {
+              labels.push('priority-high');
+            }
+            if (body.includes('low priority') || body.includes('nice to have')) {
+              labels.push('priority-low');
+            }
+
+            // Size labels based on files changed
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner,
+              repo,
+              pull_number: prNumber
+            });
+
+            const changedLines = files.reduce((total, file) => total + file.changes, 0);
+            if (changedLines < 10) {
+              labels.push('size-xs');
+            } else if (changedLines < 50) {
+              labels.push('size-s');
+            } else if (changedLines < 200) {
+              labels.push('size-m');
+            } else if (changedLines < 500) {
+              labels.push('size-l');
+            } else {
+              labels.push('size-xl');
+            }
+
+            // Apply labels
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: prNumber,
+                labels
+              });
+            }
+
+  label-issue:
+    name: Label Issue
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues'
+    
+    steps:
+      - name: Label based on issue content
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issueNumber = context.payload.issue.number;
+            const title = context.payload.issue.title.toLowerCase();
+            const body = (context.payload.issue.body || '').toLowerCase();
+            const labels = [];
+
+            // Type-based labels
+            if (title.includes('bug') || body.includes('bug') || body.includes('error')) {
+              labels.push('bug');
+            }
+            if (title.includes('feature') || body.includes('feature request')) {
+              labels.push('enhancement');
+            }
+            if (title.includes('question') || body.includes('question')) {
+              labels.push('question');
+            }
+            if (title.includes('docs') || title.includes('documentation')) {
+              labels.push('documentation');
+            }
+            if (body.includes('security') || body.includes('vulnerability')) {
+              labels.push('security');
+            }
+
+            // Component-based labels
+            if (body.includes('hub') || body.includes('api')) {
+              labels.push('component-hub');
+            }
+            if (body.includes('client-local') || body.includes('desktop')) {
+              labels.push('component-client-local');
+            }
+            if (body.includes('site') || body.includes('website')) {
+              labels.push('component-site');
+            }
+            if (body.includes('database') || body.includes('prisma')) {
+              labels.push('component-database');
+            }
+            if (body.includes('ci/cd') || body.includes('github actions')) {
+              labels.push('component-cicd');
+            }
+
+            // Priority labels
+            if (body.includes('critical') || body.includes('urgent') || body.includes('high')) {
+              labels.push('priority-high');
+            }
+            if (body.includes('low') || body.includes('nice to have')) {
+              labels.push('priority-low');
+            }
+
+            // Difficulty labels
+            if (body.includes('good first issue') || body.includes('beginner')) {
+              labels.push('good first issue');
+            }
+            if (body.includes('help wanted') || body.includes('looking for help')) {
+              labels.push('help wanted');
+            }
+
+            // Apply labels
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                labels
+              });
+            }
+
+            // Add welcome comment for first-time contributors
+            const { data: issueEvents } = await github.rest.issues.listEventsForRepo({
+              owner,
+              repo,
+              per_page: 100
+            });
+
+            const authorIssues = issueEvents.filter(event => 
+              event.actor.login === context.payload.issue.user.login && 
+              event.event === 'opened'
+            );
+
+            if (authorIssues.length === 1) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: `👋 Welcome to F-Flow Suite! Thank you for opening your first issue. 
+
+We appreciate your contribution to the project. A maintainer will review your issue and provide feedback soon.
+
+If you're interested in contributing code, check out our [Contributing Guide](.github/CONTRIBUTING.md) and look for issues labeled \`good first issue\`.`
+              });
+            }

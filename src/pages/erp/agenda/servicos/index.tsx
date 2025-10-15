@@ -39,20 +39,20 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useUrlFilters } from '@/hooks/use-url-filters';
+
 import { getServices, deleteService, duplicateService, type Service } from '@/lib/schedule-api';
 
 export default function ServicosIndex() {
   const navigate = useNavigate();
-  const [services, setServices] = useState<Service[]>(getServices());
+  const [services, setServices] = useState<Service[]>(() => {
+    const servicesData = getServices();
+    return Array.isArray(servicesData) ? servicesData : [];
+  });
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   const { toast } = useToast();
-
-  const { filters, setFilters, activeFiltersCount, clearFilters } = useUrlFilters({
-    q: '',
-    categoria: '',
-    status: 'all' as 'all' | 'active' | 'inactive',
-  });
 
   // Get all unique categories
   const allCategories = useMemo(() => {
@@ -64,33 +64,27 @@ export default function ServicosIndex() {
   }, [services]);
 
   const filteredServices = useMemo(() => {
-    let result = services;
+    let result = Array.isArray(services) ? services : [];
 
-    // Text search
-    if (filters.q) {
-      const lower = filters.q.toLowerCase();
-      result = result.filter(
-        s =>
-          s.nome.toLowerCase().includes(lower) ||
-          s.categoria?.toLowerCase().includes(lower) ||
-          s.descricao?.toLowerCase().includes(lower)
+    if (search) {
+      const lower = search.toLowerCase();
+      result = result.filter(service => 
+        service.nome.toLowerCase().includes(lower) ||
+        service.descricao?.toLowerCase().includes(lower)
       );
     }
 
-    // Category filter
-    if (filters.categoria) {
-      result = result.filter(s => s.categoria === filters.categoria);
+    if (categoryFilter !== 'all') {
+      result = result.filter(service => service.categoria === categoryFilter);
     }
 
-    // Status filter
-    if (filters.status === 'active') {
-      result = result.filter(s => s.ativo);
-    } else if (filters.status === 'inactive') {
-      result = result.filter(s => !s.ativo);
+    if (statusFilter !== 'all') {
+      const isActive = statusFilter === 'active';
+      result = result.filter(service => service.ativo === isActive);
     }
 
     return result;
-  }, [services, filters]);
+  }, [services, search, categoryFilter, statusFilter]);
 
   const handleDelete = (service: Service) => {
     if (deleteService(service.id)) {
@@ -154,15 +148,15 @@ export default function ServicosIndex() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar serviços..."
-            value={filters.q}
-            onChange={e => setFilters({ q: e.target.value })}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
             className="pl-10"
           />
         </div>
 
         <Select
-          value={filters.categoria || 'all'}
-          onValueChange={(value) => setFilters({ categoria: value === 'all' ? '' : value })}
+          value={categoryFilter}
+          onValueChange={setCategoryFilter}
         >
           <SelectTrigger className="w-full md:w-[200px]">
             <SelectValue placeholder="Categoria" />
@@ -178,8 +172,8 @@ export default function ServicosIndex() {
         </Select>
 
         <Select
-          value={filters.status}
-          onValueChange={(value: any) => setFilters({ status: value })}
+          value={statusFilter}
+          onValueChange={setStatusFilter}
         >
           <SelectTrigger className="w-full md:w-[200px]">
             <SelectValue placeholder="Status" />
@@ -191,9 +185,13 @@ export default function ServicosIndex() {
           </SelectContent>
         </Select>
 
-        {activeFiltersCount > 0 && (
-          <Button variant="outline" onClick={clearFilters}>
-            Limpar ({activeFiltersCount})
+        {(search || categoryFilter !== 'all' || statusFilter !== 'all') && (
+          <Button variant="outline" onClick={() => {
+            setSearch('');
+            setCategoryFilter('all');
+            setStatusFilter('all');
+          }}>
+            Limpar
           </Button>
         )}
       </div>

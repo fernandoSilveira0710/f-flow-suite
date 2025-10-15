@@ -197,7 +197,7 @@ OIDC_CLIENT_SECRET=...
 `client-local/.env.example`
 ```
 NODE_ENV=production
-PORT=3010
+PORT=3001
 DATABASE_URL="file:./local.db"
 HUB_BASE_URL=https://hub.2fsolutions.com.br/api
 LICENSE_FILE=./license.jwt

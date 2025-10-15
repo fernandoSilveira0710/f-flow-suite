@@ -31,42 +31,13 @@ import {
 import { PageHeader } from '@/components/erp/page-header';
 import { EmptyState } from '@/components/erp/empty-state';
 import { GroomingTabs } from '@/components/erp/grooming-tabs';
-
-// Mock data - substituir por API quando disponível
-interface Professional {
-  id: string;
-  nome: string;
-  telefone?: string;
-  email?: string;
-  roles: string[];
-  ativo: boolean;
-}
-
-const mockProfessionals: Professional[] = [
-  {
-    id: '1',
-    nome: 'Ana Silva',
-    telefone: '(11) 98765-4321',
-    email: 'ana@petshop.com',
-    roles: ['groomer', 'banhista'],
-    ativo: true,
-  },
-  {
-    id: '2',
-    nome: 'Carlos Santos',
-    telefone: '(11) 98765-4322',
-    email: 'carlos@petshop.com',
-    roles: ['groomer', 'tosador'],
-    ativo: true,
-  },
-];
+import { getProfessionals, deleteProfessional } from '@/lib/grooming-api';
+import { toast } from 'sonner';
 
 export default function GroomingProfissionaisIndex() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [professionals] = useState<Professional[]>(
-    mockProfessionals.filter((p) => p.roles.includes('groomer'))
-  );
+  const [professionals, setProfessionals] = useState(() => getProfessionals());
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const filteredProfessionals = professionals.filter((prof) => {
@@ -79,10 +50,12 @@ export default function GroomingProfissionaisIndex() {
     );
   });
 
-  const handleDelete = (id: string) => {
-    // Mock delete - implementar com API
+  const handleDelete = () => {
+    if (!deleteId) return;
+    deleteProfessional(deleteId);
+    setProfessionals(getProfessionals());
     setDeleteId(null);
-    console.log('Delete professional:', id);
+    toast.success('Profissional excluído');
   };
 
   return (
@@ -146,15 +119,9 @@ export default function GroomingProfissionaisIndex() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {prof.roles.map((role) => (
-                        <Badge key={role} variant="secondary" className="text-xs">
-                          {role === 'groomer'
-                            ? 'Groomer'
-                            : role === 'banhista'
-                            ? 'Banhista'
-                            : role === 'tosador'
-                            ? 'Tosador'
-                            : role}
+                      {prof.especialidades?.map((esp) => (
+                        <Badge key={esp} variant="secondary" className="text-xs">
+                          {esp}
                         </Badge>
                       ))}
                     </div>
@@ -209,7 +176,7 @@ export default function GroomingProfissionaisIndex() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteId && handleDelete(deleteId)}
+              onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Excluir

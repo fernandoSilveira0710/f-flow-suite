@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -17,47 +17,51 @@ model Org {
 model Tenant {
   id              String           @id @default(uuid())
   orgId           String
-  org             Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
   slug            String           @unique
   planId          String?
   createdAt       DateTime         @default(now())
-  users           User[]
-  licenses        License[]
+  appointments    Appointment[]
+  checkIns        CheckIn[]
+  configurations  Configuration[]
+  customers       Customer[]
   devices         Device[]
-  outbox          OutboxEvent[]
+  groomingTickets GroomingTicket[]
   inbox           InboxCommand[]
+  inventory       Inventory[]
+  licenses        License?
+  orders          Order[]
+  outbox          OutboxEvent[]
   paymentMethods  PaymentMethod[]
-  
-  // Business entities
-  products             Product[]
-  sales                Sale[]
-  inventoryAdjustments InventoryAdjustment[]
-  customers            Customer[]
-  services             Service[]
-  professionals        Professional[]
-  appointments         Appointment[]
-  groomingTickets      GroomingTicket[]
-  resources            Resource[]
-  checkIns             CheckIn[]
-  configurations       Configuration[]
+  products        Product[]
+  professionals   Professional[]
+  resources       Resource[]
+  roles           Role[]
+  sales           Sale[]
+  services        Service[]
+  subscriptions   Subscription?
+  org             Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  users           User[]
 }
 
 model User {
   id          String   @id @default(uuid())
   tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   email       String
+  password    String   @default("")
   displayName String
   role        String   @default("operator")
+  active      Boolean  @default(true)
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, email])
+  @@index([tenantId, active])
 }
 
 model License {
   id        String   @id @default(uuid())
   tenantId  String   @unique
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   planKey   String
   status    String
   maxSeats  Int      @default(1)
@@ -65,16 +69,34 @@ model License {
   graceDays Int      @default(7)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tokens    LicenseToken[]
+}
+
+model LicenseToken {
+  id        String   @id @default(uuid())
+  tenantId  String
+  deviceId  String
+  token     String
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  license   License  @relation(fields: [tenantId], references: [tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, deviceId])
+  @@index([tenantId])
+  @@index([deviceId])
+  @@index([expiresAt])
 }
 
 model Device {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name        String
-  fingerprint String   @unique
-  activatedAt DateTime @default(now())
+  fingerprint String    @unique
+  activatedAt DateTime  @default(now())
   revokedAt   DateTime?
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model Entitlement {
@@ -87,229 +109,200 @@ model Entitlement {
 }
 
 model PaymentMethod {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  code      String
-  label     String
-  active    Boolean  @default(true)
-  position  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                      String   @id @default(uuid())
+  tenantId                String
+  name                    String
+  type                    String
+  active                  Boolean  @default(true)
+  jurosPorParcelaPct      Float?
+  descontoFixoPct         Float?
+  taxaFixa                Float?
+  integrationSettings     String?
+  valorMin                Float?
+  valorMax                Float?
+  visivelSomenteParaRoles String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([code, tenantId], name: "code_tenantId")
-  @@index([tenantId, position])
+  @@unique([tenantId, name])
+  @@index([tenantId, active])
 }
 
 model OutboxEvent {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   tenantId   String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   aggregate  String
   type       String
   payload    String
-  occurredAt DateTime @default(now())
+  occurredAt DateTime  @default(now())
   sentAt     DateTime?
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, sentAt])
 }
 
 model InboxCommand {
-  id        String   @id
+  id        String    @id
   tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   type      String
   payload   String
   appliedAt DateTime?
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, appliedAt])
 }
 
-// ===== CORE BUSINESS ENTITIES =====
-
 model Product {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sku         String
-  name        String
-  description String?
-  salePrice   Decimal
-  costPrice   Decimal?
-  stockQty    Int      @default(0)
-  category    String?
-  barcode     String?
-  unit        String?  // Added field for product unit
-  minStock    Int?     // Added field for minimum stock level
-  maxStock    Int?     // Added field for maximum stock level
-  trackStock  Boolean  @default(true) // Added field to enable/disable stock tracking
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  saleItems            SaleItem[]
-  inventoryAdjustments InventoryAdjustment[]
-  groomingItems        GroomingItem[]
+  id            String         @id @default(uuid())
+  tenantId      String
+  name          String
+  description   String?
+  sku           String?
+  barcode       String?
+  category      String?
+  salePrice     Float
+  costPrice     Float?
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  groomingItems GroomingItem[]
+  inventory     Inventory[]
+  orderItems    OrderItem[]
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  saleItems     SaleItem[]
 
   @@unique([tenantId, sku])
   @@unique([tenantId, barcode])
   @@index([tenantId, active])
+  @@index([tenantId, category])
 }
 
 model Sale {
-  id            String   @id @default(uuid())
-  tenantId      String
-  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  code          String
-  date          DateTime @default(now())
-  operator      String
-  total         Decimal
-  paymentMethod String
-  status        String   @default("completed") // draft, completed, cancelled
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  // Relations
-  items SaleItem[]
+  id         String     @id @default(uuid())
+  tenantId   String
+  customerId String?
+  saleNumber String
+  status     String
+  total      Float
+  discount   Float?     @default(0)
+  notes      String?
+  saleDate   DateTime   @default(now())
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  customer   Customer?  @relation(fields: [customerId], references: [id])
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items      SaleItem[]
 
-  @@unique([tenantId, code])
-  @@index([tenantId, date])
-  @@index([tenantId, operator])
+  @@unique([tenantId, saleNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, saleDate])
+  @@index([customerId])
 }
 
 model SaleItem {
   id        String  @id @default(uuid())
-  tenantId  String
   saleId    String
-  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   productId String
+  quantity  Int
+  unitPrice Float
+  subtotal  Float
   product   Product @relation(fields: [productId], references: [id])
-  qty       Int
-  unitPrice Decimal
-  subtotal  Decimal
-  
-  @@index([tenantId, saleId])
-  @@index([tenantId, productId])
-}
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
-model InventoryAdjustment {
-  id           String   @id @default(uuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  productId    String
-  product      Product  @relation(fields: [productId], references: [id])
-  productName  String   // Added for sync events
-  productSku   String   // Added for sync events
-  delta        Int      // positive for increase, negative for decrease
-  reason       String
-  previousStock Int     // Added for sync events
-  newStock     Int      // Added for sync events
-  adjustedAt   DateTime // Added for sync events
-  notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  @@index([tenantId, productId])
-  @@index([tenantId, createdAt])
-  @@index([tenantId, adjustedAt])
+  @@index([saleId])
+  @@index([productId])
 }
-
-// ===== CUSTOMER & PET ENTITIES =====
 
 model Customer {
-  id           String   @id @default(uuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name         String
-  documento    String?  // CPF/CNPJ
-  email        String?
-  phone        String?
-  dataNascISO  DateTime? // Data de nascimento
-  tags         String?  // JSON string for tags
-  notes        String?  // Notas/observações
-  address      String?
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  // Relations
-  pets             Pet[]
-  appointments     Appointment[]
-  groomingTickets  GroomingTicket[]
+  id              String           @id @default(uuid())
+  tenantId        String
+  name            String
+  email           String?
+  phone           String?
+  document        String?
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  country         String?          @default("BR")
+  tags            String?
+  notes           String?
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  appointments    Appointment[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  groomingTickets GroomingTicket[]
+  orders          Order[]
+  pets            Pet[]
+  sales           Sale[]
 
   @@unique([tenantId, email])
+  @@unique([tenantId, document])
+  @@index([tenantId, active])
   @@index([tenantId, name])
-  @@index([tenantId, phone])
 }
 
 model Pet {
-  id           String    @id @default(uuid())
-  tenantId     String
-  tutorId      String
-  tutor        Customer  @relation(fields: [tutorId], references: [id])
-  name         String
-  species      String    // dog, cat, etc.
-  breed        String?   // raça
-  weight       Decimal?  // peso
-  birthDate    DateTime? // dataNascimento
-  observations String?   // observações
-  gender       String?   // male, female
-  color        String?
-  active       Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  
-  // Relations
-  appointments     Appointment[]
-  groomingTickets  GroomingTicket[]
-  checkIns         CheckIn[]
+  id              String           @id @default(uuid())
+  tenantId        String
+  tutorId         String
+  name            String
+  species         String
+  breed           String?
+  weight          Decimal?
+  birthDate       DateTime?
+  observations    String?
+  gender          String?
+  color           String?
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  appointments    Appointment[]
+  checkIns        CheckIn[]
+  groomingTickets GroomingTicket[]
+  tutor           Customer         @relation(fields: [tutorId], references: [id])
 
   @@index([tenantId, tutorId])
   @@index([tenantId, name])
   @@index([tenantId, species])
 }
 
-// ===== SERVICE & APPOINTMENT ENTITIES =====
-
 model Service {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name        String
-  description String?
-  price       Decimal
-  duration    Int      // duration in minutes
-  category    String?  // grooming, veterinary, etc.
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  appointments    Appointment[]
-  groomingItems   GroomingItem[]
+  id            String         @id @default(uuid())
+  tenantId      String
+  name          String
+  description   String?
+  category      String?
+  price         Float
+  duration      Int?
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  appointments  Appointment[]
+  groomingItems GroomingItem[]
+  orderItems    OrderItem[]
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, name])
-  @@index([tenantId, category])
   @@index([tenantId, active])
+  @@index([tenantId, category])
 }
 
 model Professional {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name      String
-  role      String   // groomer, veterinarian, assistant, etc.
-  phone     String?
-  email     String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Relations
+  id           String        @id @default(uuid())
+  tenantId     String
+  name         String
+  role         String
+  phone        String?
+  email        String?
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   appointments Appointment[]
   checkIns     CheckIn[]
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, email])
   @@index([tenantId, role])
@@ -319,49 +312,48 @@ model Professional {
 model Appointment {
   id             String       @id @default(uuid())
   tenantId       String
-  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   petId          String
-  pet            Pet          @relation(fields: [petId], references: [id])
   customerId     String
-  customer       Customer     @relation(fields: [customerId], references: [id])
   serviceId      String
-  service        Service      @relation(fields: [serviceId], references: [id])
   professionalId String
-  professional   Professional @relation(fields: [professionalId], references: [id])
+  resourceId     String?
   date           DateTime
   startTime      DateTime
   endTime        DateTime
-  status         String       @default("scheduled") // scheduled, confirmed, in_progress, completed, cancelled, no_show
+  status         String       @default("scheduled")
   notes          String?
   price          Decimal?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  resource       Resource?    @relation(fields: [resourceId], references: [id])
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  service        Service      @relation(fields: [serviceId], references: [id])
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  pet            Pet          @relation(fields: [petId], references: [id])
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, date])
   @@index([tenantId, professionalId, date])
   @@index([tenantId, petId])
   @@index([tenantId, status])
+  @@index([tenantId, resourceId])
 }
 
-// ===== GROOMING ENTITIES =====
-
 model GroomingTicket {
-  id         String   @id @default(uuid())
+  id         String         @id @default(uuid())
   tenantId   String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   petId      String
-  pet        Pet      @relation(fields: [petId], references: [id])
   tutorId    String
-  tutor      Customer @relation(fields: [tutorId], references: [id])
-  code       String   // ticket number for identification
-  status     String   @default("pending") // pending, in_progress, completed, cancelled
-  totalPrice Decimal  @default(0)
+  code       String
+  status     String         @default("pending")
+  totalPrice Decimal        @default(0)
   notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  
-  // Relations
-  items GroomingItem[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  items      GroomingItem[]
+  tutor      Customer       @relation(fields: [tutorId], references: [id])
+  pet        Pet            @relation(fields: [petId], references: [id])
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -373,31 +365,32 @@ model GroomingItem {
   id        String         @id @default(uuid())
   tenantId  String
   ticketId  String
-  ticket    GroomingTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   serviceId String?
-  service   Service?       @relation(fields: [serviceId], references: [id])
   productId String?
-  product   Product?       @relation(fields: [productId], references: [id])
-  name      String         // service or product name
-  price     Decimal
+  name      String
+  price     Float
   qty       Int            @default(1)
-  subtotal  Decimal
-  
+  subtotal  Float
+  product   Product?       @relation(fields: [productId], references: [id])
+  service   Service?       @relation(fields: [serviceId], references: [id])
+  ticket    GroomingTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
   @@index([tenantId, ticketId])
   @@index([tenantId, serviceId])
   @@index([tenantId, productId])
 }
 
 model Resource {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name      String
-  type      String   // equipment, room, tool, etc.
-  description String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String        @id @default(uuid())
+  tenantId     String
+  name         String
+  type         String
+  description  String?
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  appointments Appointment[]
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, name])
   @@index([tenantId, type])
@@ -407,30 +400,139 @@ model Resource {
 model CheckIn {
   id             String       @id @default(uuid())
   tenantId       String
-  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   petId          String
-  pet            Pet          @relation(fields: [petId], references: [id])
   professionalId String
-  professional   Professional @relation(fields: [professionalId], references: [id])
   checkInAt      DateTime     @default(now())
   checkOutAt     DateTime?
   notes          String?
-  
+  professional   Professional @relation(fields: [professionalId], references: [id])
+  pet            Pet          @relation(fields: [petId], references: [id])
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@index([tenantId, petId])
   @@index([tenantId, professionalId])
   @@index([tenantId, checkInAt])
 }
 
-// ===== CONFIGURATION ENTITIES =====
+model Role {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  permissions String
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@index([tenantId, active])
+}
+
+model Inventory {
+  id        String   @id @default(uuid())
+  tenantId  String
+  productId String
+  location  String?
+  quantity  Int      @default(0)
+  reserved  Int      @default(0)
+  weight    Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id])
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, productId, location])
+  @@index([tenantId, productId])
+  @@index([tenantId, location])
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  tenantId     String
+  customerId   String?
+  orderNumber  String
+  status       String
+  totalPrice   Float       @default(0)
+  notes        String?
+  orderDate    DateTime    @default(now())
+  deliveryDate DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  customer     Customer?   @relation(fields: [customerId], references: [id])
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items        OrderItem[]
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, orderDate])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  productId String?
+  serviceId String?
+  quantity  Int
+  price     Float
+  notes     String?
+  subtotal  Float
+  service   Service? @relation(fields: [serviceId], references: [id])
+  product   Product? @relation(fields: [productId], references: [id])
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([serviceId])
+}
 
 model Configuration {
-  id       String @id @default(uuid())
+  id       String  @id @default(uuid())
   tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   key      String
   value    String
-  category String? // system, business, ui, etc.
-  
+  category String?
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@unique([tenantId, key])
   @@index([tenantId, category])
+}
+
+model Plan {
+  id              String         @id @default(uuid())
+  name            String         @unique
+  description     String?
+  price           Float
+  currency        String         @default("BRL")
+  maxSeats        Int            @default(1)
+  maxDevices      Int            @default(1)
+  featuresEnabled String
+  active          Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  subscriptions   Subscription[]
+
+  @@index([active])
+}
+
+model Subscription {
+  id           String    @id @default(uuid())
+  tenantId     String    @unique
+  planId       String
+  status       String    @default("ACTIVE")
+  startAt      DateTime  @default(now())
+  expiresAt    DateTime?
+  canceledAt   DateTime?
+  paymentData  String?
+  billingCycle String    @default("MONTHLY")
+  autoRenew    Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  plan         Plan      @relation(fields: [planId], references: [id])
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([planId])
+  @@index([expiresAt])
 }

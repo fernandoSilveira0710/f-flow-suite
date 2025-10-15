@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/contexts/auth-context";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 
 // Site pages
 import Home from "./pages/site/home";
@@ -10,9 +12,12 @@ import Planos from "./pages/site/planos";
 import Contato from "./pages/site/contato";
 import Login from "./pages/site/login";
 import Cadastro from "./pages/site/cadastro";
+import Pagamento from "./pages/site/pagamento";
+import PagamentoSucesso from "./pages/site/pagamento/sucesso";
 
 // ERP Layout & Pages
 import ErpLayout from "./layouts/erp-layout";
+import ErpLogin from "./pages/erp/login";
 import Dashboard from "./pages/erp/dashboard";
 import ProdutosIndex from "./pages/erp/produtos/index";
 import ProdutosNovo from "./pages/erp/produtos/novo";
@@ -58,6 +63,10 @@ import EditarRecurso from './pages/erp/grooming/resources/[id]/editar';
 import TutorsIndex from './pages/erp/grooming/tutors/index';
 import NovoTutor from './pages/erp/grooming/tutors/novo';
 import GroomingProfissionaisIndex from './pages/erp/grooming/profissionais/index';
+import NovoGroomingProfissional from './pages/erp/grooming/profissionais/novo';
+import EditarGroomingProfissional from './pages/erp/grooming/profissionais/[id]/editar';
+import GroomingCategoriesIndex from './pages/erp/grooming/categories/index';
+import GroomingTicketDetails from './pages/erp/grooming/details';
 
 // Stock pages
 import StockPosition from "./pages/erp/estoque/index";
@@ -78,6 +87,7 @@ import PosSettings from "./pages/settings/pos";
 import ScheduleSettings from "./pages/settings/schedule";
 import GroomingSettings from "./pages/settings/grooming";
 import InventorySettings from "./pages/settings/inventory";
+import UnitsSettings from "./pages/settings/units";
 import PaymentsIndex from "./pages/settings/payments/index";
 import NotificationsSettings from "./pages/settings/notifications";
 import ImportExportSettings from "./pages/settings/import-export";
@@ -93,19 +103,30 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            {/* Site Routes */}
-            <Route path="/" element={<Home />} />
-            <Route path="/planos" element={<Planos />} />
-            <Route path="/contato" element={<Contato />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/cadastro" element={<Cadastro />} />
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <Routes>
+              {/* Site Routes (Public) */}
+              <Route path="/" element={<Navigate to="/erp/login" replace />} />
+              <Route path="/site" element={<Home />} />
+              <Route path="/site/planos" element={<Planos />} />
+              <Route path="/site/contato" element={<Contato />} />
+              <Route path="/site/login" element={<Login />} />
+              <Route path="/site/cadastro" element={<Cadastro />} />
+              <Route path="/site/pagamento" element={<Pagamento />} />
+              <Route path="/site/pagamento/sucesso" element={<PagamentoSucesso />} />
 
-          {/* ERP Routes */}
-          <Route path="/erp" element={<ErpLayout />}>
+              {/* ERP Login (Public) */}
+              <Route path="/erp/login" element={<ErpLogin />} />
+
+              {/* Protected ERP Routes */}
+              <Route path="/erp" element={
+                <ProtectedRoute requireAuth={true} requireLicense={true}>
+                  <ErpLayout />
+                </ProtectedRoute>
+              }>
             <Route index element={<Navigate to="/erp/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             
@@ -162,6 +183,7 @@ function App() {
           
           {/* Grooming Routes */}
           <Route path="grooming" element={<GroomingIndex />} />
+          <Route path="grooming/:id" element={<GroomingTicketDetails />} />
           <Route path="grooming/new" element={<GroomingCheckIn />} />
           <Route path="grooming/services" element={<GroomingServicesIndex />} />
           <Route path="grooming/services/novo" element={<NovoGroomingService />} />
@@ -175,6 +197,9 @@ function App() {
           <Route path="grooming/tutors" element={<TutorsIndex />} />
           <Route path="grooming/tutors/novo" element={<NovoTutor />} />
           <Route path="grooming/profissionais" element={<GroomingProfissionaisIndex />} />
+          <Route path="grooming/profissionais/novo" element={<NovoGroomingProfissional />} />
+          <Route path="grooming/profissionais/:id/editar" element={<EditarGroomingProfissional />} />
+          <Route path="grooming/categories" element={<GroomingCategoriesIndex />} />
           
           {/* Banho & Tosa (alias for Grooming) */}
           <Route path="banho-tosa" element={<GroomingIndex />} />
@@ -192,6 +217,7 @@ function App() {
             <Route path="schedule" element={<ScheduleSettings />} />
             <Route path="grooming" element={<GroomingSettings />} />
             <Route path="inventory" element={<InventorySettings />} />
+            <Route path="units" element={<UnitsSettings />} />
             <Route path="payments" element={<PaymentsIndex />} />
             <Route path="payments/new" element={<NovoPagamento />} />
             <Route path="payments/:id/edit" element={<NovoPagamento />} />
@@ -199,15 +225,16 @@ function App() {
             <Route path="import-export" element={<ImportExportSettings />} />
           </Route>
 
-          {/* PT-BR Aliases (redirect to EN canonical) */}
-          <Route path="configuracoes" element={<ConfiguracoesRedirect />} />
-          <Route path="configuracoes/*" element={<ConfiguracoesAlias />} />
-        </Route>
+              {/* PT-BR Aliases (redirect to EN canonical) */}
+              <Route path="configuracoes" element={<ConfiguracoesRedirect />} />
+              <Route path="configuracoes/*" element={<ConfiguracoesAlias />} />
+            </Route>
 
-            {/* 404 */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </TooltipProvider>
+              {/* 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TooltipProvider>
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );

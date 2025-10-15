@@ -10,45 +10,36 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
-  getStaffById,
-  updateStaff,
-  getServices,
-  type Staff,
-  type StaffType,
-} from '@/lib/schedule-api';
+  getProfessionalById,
+  updateProfessional,
+  type ProfessionalResponseDto,
+  type UpdateProfessionalDto,
+} from '@/lib/professionals-api';
+import { getServices } from '@/lib/schedule-api';
 import { ArrowLeft, User, Box } from 'lucide-react';
-
-const colorOptions = [
-  { value: '#3B82F6', label: 'Azul' },
-  { value: '#22C55E', label: 'Verde' },
-  { value: '#F59E0B', label: 'Âmbar' },
-  { value: '#EF4444', label: 'Vermelho' },
-  { value: '#8B5CF6', label: 'Roxo' },
-  { value: '#EC4899', label: 'Rosa' },
-  { value: '#6B7280', label: 'Cinza' },
-  { value: '#14B8A6', label: 'Teal' },
-];
 
 export default function EditarProfissional() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [staff, setStaff] = useState<Staff | null>(null);
+  const [professional, setProfessional] = useState<ProfessionalResponseDto | null>(null);
   const services = getServices();
 
-  const [tipo, setTipo] = useState<StaffType>('PROFISSIONAL');
-  const [nome, setNome] = useState('');
-  const [funcoes, setFuncoes] = useState<string[]>([]);
-  const [cor, setCor] = useState('#6B7280');
-  const [capacidade, setCapacidade] = useState('1');
-  const [ativo, setAtivo] = useState(true);
+  const [role, setRole] = useState<'Professional' | 'Resource'>('Professional');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [specialty, setSpecialty] = useState('');
+  const [description, setDescription] = useState('');
+  const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [active, setActive] = useState(true);
 
   useEffect(() => {
     if (!id) return;
 
-    const loadedStaff = getStaffById(id);
-    if (!loadedStaff) {
+    const loadedProfessional = getProfessionalById(id);
+    if (!loadedProfessional) {
       toast({
         title: 'Erro',
         description: 'Profissional/Recurso não encontrado',
@@ -58,13 +49,15 @@ export default function EditarProfissional() {
       return;
     }
 
-    setStaff(loadedStaff);
-    setTipo(loadedStaff.tipo);
-    setNome(loadedStaff.nome);
-    setFuncoes(loadedStaff.funcoes || []);
-    setCor(loadedStaff.cores?.agenda || '#6B7280');
-    setCapacidade((loadedStaff.capacidadeSimultanea || 1).toString());
-    setAtivo(loadedStaff.ativo);
+    setProfessional(loadedProfessional);
+    setRole(loadedProfessional.role);
+    setName(loadedProfessional.name);
+    setEmail(loadedProfessional.email || '');
+    setPhone(loadedProfessional.phone || '');
+    setSpecialty(loadedProfessional.specialty || '');
+    setDescription(loadedProfessional.description || '');
+    setServiceIds(loadedProfessional.serviceIds || []);
+    setActive(loadedProfessional.active);
     setLoading(false);
   }, [id, navigate, toast]);
 
@@ -73,7 +66,7 @@ export default function EditarProfissional() {
 
     if (!id) return;
 
-    if (!nome.trim()) {
+    if (!name.trim()) {
       toast({
         title: 'Erro',
         description: 'Nome é obrigatório',
@@ -82,26 +75,30 @@ export default function EditarProfissional() {
       return;
     }
 
-    const updated = updateStaff(id, {
-      nome: nome.trim(),
-      tipo,
-      funcoes: funcoes.length > 0 ? funcoes : undefined,
-      cores: { agenda: cor },
-      capacidadeSimultanea: parseInt(capacidade) || 1,
-      ativo,
-    });
+    const updateData: UpdateProfessionalDto = {
+      name: name.trim(),
+      role,
+      email: email.trim() || undefined,
+      phone: phone.trim() || undefined,
+      specialty: specialty.trim() || undefined,
+      description: description.trim() || undefined,
+      serviceIds: serviceIds.length > 0 ? serviceIds : undefined,
+      active,
+    };
+
+    const updated = updateProfessional(id, updateData);
 
     if (updated) {
       toast({
-        title: `${tipo === 'PROFISSIONAL' ? 'Profissional' : 'Recurso'} atualizado`,
-        description: `${updated.nome} foi atualizado com sucesso`,
+        title: `${role === 'Professional' ? 'Profissional' : 'Recurso'} atualizado`,
+        description: `${updated.name} foi atualizado com sucesso`,
       });
       navigate('/erp/agenda/profissionais');
     }
   };
 
-  const toggleFuncao = (serviceId: string) => {
-    setFuncoes(prev =>
+  const toggleService = (serviceId: string) => {
+    setServiceIds(prev =>
       prev.includes(serviceId) ? prev.filter(id => id !== serviceId) : [...prev, serviceId]
     );
   };
@@ -122,8 +119,8 @@ export default function EditarProfissional() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <PageHeader
-          title={`Editar ${tipo === 'PROFISSIONAL' ? 'Profissional' : 'Recurso'}`}
-          description={staff?.nome}
+          title={`Editar ${role === 'Professional' ? 'Profissional' : 'Recurso'}`}
+          description={professional?.name}
         />
       </div>
 
@@ -135,17 +132,17 @@ export default function EditarProfissional() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/50">
-              {tipo === 'PROFISSIONAL' ? (
+              {role === 'Professional' ? (
                 <User className="h-6 w-6" />
               ) : (
                 <Box className="h-6 w-6" />
               )}
               <div>
                 <p className="font-medium">
-                  {tipo === 'PROFISSIONAL' ? 'Profissional' : 'Recurso'}
+                  {role === 'Professional' ? 'Profissional' : 'Recurso'}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {tipo === 'PROFISSIONAL' ? 'Atendente, funcionário' : 'Sala, box, cadeira'}
+                  {role === 'Professional' ? 'Atendente, funcionário' : 'Sala, box, cadeira'}
                 </p>
               </div>
             </div>
@@ -159,26 +156,45 @@ export default function EditarProfissional() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="nome">Nome</Label>
-              <Input id="nome" value={nome} onChange={e => setNome(e.target.value)} required />
+              <Label htmlFor="name">Nome</Label>
+              <Input id="name" value={name} onChange={e => setName(e.target.value)} required />
             </div>
 
             <div>
-              <Label htmlFor="cor">Cor na Agenda</Label>
-              <div className="flex gap-2 mt-2">
-                {colorOptions.map(option => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setCor(option.value)}
-                    className={`h-8 w-8 rounded-full border-2 transition-all ${
-                      cor === option.value ? 'border-primary scale-110' : 'border-transparent'
-                    }`}
-                    style={{ backgroundColor: option.value }}
-                    title={option.label}
-                  />
-                ))}
-              </div>
+              <Label htmlFor="email">Email</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                value={email} 
+                onChange={e => setEmail(e.target.value)} 
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="phone">Telefone</Label>
+              <Input 
+                id="phone" 
+                value={phone} 
+                onChange={e => setPhone(e.target.value)} 
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="specialty">Especialidade</Label>
+              <Input 
+                id="specialty" 
+                value={specialty} 
+                onChange={e => setSpecialty(e.target.value)} 
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="description">Descrição</Label>
+              <Input 
+                id="description" 
+                value={description} 
+                onChange={e => setDescription(e.target.value)} 
+              />
             </div>
           </CardContent>
         </Card>
@@ -188,7 +204,7 @@ export default function EditarProfissional() {
           <CardHeader>
             <CardTitle>Serviços Atendidos</CardTitle>
             <CardDescription>
-              Selecione quais serviços este {tipo === 'PROFISSIONAL' ? 'profissional' : 'recurso'}{' '}
+              Selecione quais serviços este {role === 'Professional' ? 'profissional' : 'recurso'}{' '}
               pode atender
             </CardDescription>
           </CardHeader>
@@ -203,8 +219,8 @@ export default function EditarProfissional() {
                     <div key={service.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`service-${service.id}`}
-                        checked={funcoes.includes(service.id)}
-                        onCheckedChange={() => toggleFuncao(service.id)}
+                        checked={serviceIds.includes(service.id)}
+                        onCheckedChange={() => toggleService(service.id)}
                       />
                       <Label
                         htmlFor={`service-${service.id}`}
@@ -234,26 +250,12 @@ export default function EditarProfissional() {
             <CardTitle>Configurações</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="capacidade">Capacidade Simultânea</Label>
-              <Input
-                id="capacidade"
-                type="number"
-                min="1"
-                value={capacidade}
-                onChange={e => setCapacidade(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Número de agendamentos simultâneos permitidos
-              </p>
-            </div>
-
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label>Ativo</Label>
                 <p className="text-sm text-muted-foreground">Inativos não aparecem na agenda</p>
               </div>
-              <Switch checked={ativo} onCheckedChange={setAtivo} />
+              <Switch checked={active} onCheckedChange={setActive} />
             </div>
           </CardContent>
         </Card>
