@@ -210,7 +210,9 @@ export async function bootstrap(): Promise<void> {
     }
     
     // Start server
-    const port = process.env.PORT ? Number(process.env.PORT) : 3001;
+    const port = process.env.CLIENT_HTTP_PORT
+      ? Number(process.env.CLIENT_HTTP_PORT)
+      : (process.env.PORT ? Number(process.env.PORT) : 8081);
     const host = '127.0.0.1';
     
     await app.listen(port, host);

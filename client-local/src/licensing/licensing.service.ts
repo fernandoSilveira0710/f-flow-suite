@@ -31,7 +31,7 @@ export class LicensingService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService
   ) {
-    this.hubBaseUrl = this.configService.get<string>('HUB_BASE_URL', process.env.HUB_API_URL || 'http://localhost:8081');
+    this.hubBaseUrl = this.configService.get<string>('HUB_BASE_URL', process.env.HUB_API_URL || 'http://localhost:3001');
     this.licensingEnforced = this.configService.get<string>('LICENSING_ENFORCED', 'false') === 'true';
     this.deviceId = this.configService.get<string>('DEVICE_ID', 'dev-device');
     

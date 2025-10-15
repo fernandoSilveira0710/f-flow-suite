@@ -23,8 +23,8 @@ Esta pasta contém a coleção completa de testes End-to-End (E2E) para o F-Flow
 
 1. Selecione o ambiente "F-Flow Suite Environment" no dropdown superior direito
 2. Verifique se as URLs estão corretas:
-   - `hub_url`: http://localhost:3000 (HUB)
-   - `client_url`: http://localhost:3001 (Client Local)
+   - `hub_url`: http://localhost:3001 (HUB)
+   - `client_url`: http://localhost:8081 (Client Local)
 
 ### 3. Executar Testes
 
@@ -89,8 +89,8 @@ Esta pasta contém a coleção completa de testes End-to-End (E2E) para o F-Flow
 ## 🔧 Variáveis de Ambiente
 
 ### URLs dos Serviços
-- `hub_url`: URL base do serviço HUB (padrão: http://localhost:3000)
-- `client_url`: URL base do serviço Client Local (padrão: http://localhost:3001)
+- `hub_url`: URL base do serviço HUB (padrão: http://localhost:3001)
+- `client_url`: URL base do serviço Client Local (padrão: http://localhost:8081)
 
 ### Identificadores de Teste
 - `tenant_id`: ID do tenant de teste (padrão: test-tenant-001)

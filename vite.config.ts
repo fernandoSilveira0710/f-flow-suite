@@ -15,14 +15,14 @@ export default defineConfig({
     host: true,
     proxy: {
       '/licensing': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:8081',
         changeOrigin: true,
         secure: false,
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {
             // Definir headers necessários para CORS
-            proxyReq.setHeader('Host', 'localhost:3001');
-            console.log('Proxy request:', req.method, req.url, '-> http://localhost:3001' + req.url);
+            proxyReq.setHeader('Host', 'localhost:8081');
+            console.log('Proxy request:', req.method, req.url, '-> http://localhost:8081' + req.url);
           });
           
           proxy.on('proxyRes', (proxyRes, req, res) => {

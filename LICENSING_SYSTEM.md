@@ -73,7 +73,7 @@ PUT  /licensing/plan/sync        # Sincronizar plano
 **Configuração:**
 ```env
 LICENSING_ENFORCED=true
-HUB_BASE_URL=http://localhost:3000
+HUB_BASE_URL=http://localhost:3001
 GRACE_PERIOD_DAYS=7
 ```
 
@@ -273,13 +273,13 @@ node test-sqlite-license.js
 
 ```powershell
 # Status da instalação
-Invoke-RestMethod -Uri "http://localhost:3001/licensing/install/status"
+Invoke-RestMethod -Uri "http://localhost:8081/licensing/install/status"
 
 # Ativação
-Invoke-RestMethod -Uri "http://localhost:3001/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "demo", "deviceId": "test-device"}'
+Invoke-RestMethod -Uri "http://localhost:8081/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "demo", "deviceId": "test-device"}'
 
 # Verificar licença
-Invoke-RestMethod -Uri "http://localhost:3001/licensing/license"
+Invoke-RestMethod -Uri "http://localhost:8081/licensing/license"
 ```
 
 ## Monitoramento
@@ -331,7 +331,7 @@ node generate-keys.js
 **Erro: "License expired"**
 ```bash
 # Forçar renovação
-curl -X POST http://localhost:3001/licensing/activate
+curl -X POST http://localhost:8081/licensing/activate
 ```
 
 ### 2. Logs de Debug

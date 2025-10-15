@@ -10,8 +10,8 @@ const getEnvVar = (key: string, fallback: string): string => {
 
 // URLs das APIs
 export const API_URLS = {
-  HUB: getEnvVar('VITE_HUB_API_URL', 'http://localhost:8081'),
-  CLIENT_LOCAL: getEnvVar('VITE_CLIENT_LOCAL_API_URL', 'http://localhost:3001'),
+  HUB: getEnvVar('VITE_HUB_API_URL', 'http://localhost:3001'),
+  CLIENT_LOCAL: getEnvVar('VITE_CLIENT_LOCAL_API_URL', 'http://localhost:8081'),
   SITE: getEnvVar('VITE_SITE_URL', 'http://localhost:5173'),
   FRONTEND: getEnvVar('VITE_FRONTEND_URL', 'http://localhost:5173'),
 } as const;

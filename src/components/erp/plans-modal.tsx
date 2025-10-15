@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, Zap, Crown, Star } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { ENDPOINTS } from '@/lib/env';
 import { useAuth } from '@/contexts/auth-context';
 
 interface Plan {
@@ -102,7 +103,7 @@ export function PlansModal({ open, onOpenChange, onPlanSelected }: PlansModalPro
 
   const loadPlansFromHub = async () => {
     try {
-      const response = await fetch('http://localhost:8081/plans');
+      const response = await fetch(ENDPOINTS.HUB_PLANS);
       if (response.ok) {
         const hubPlans = await response.json();
         

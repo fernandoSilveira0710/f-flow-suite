@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Package2, CreditCard, Check, Shield, Clock, Mail } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { API_URLS } from '@/lib/env';
 
 export default function Pagamento() {
   const navigate = useNavigate();
@@ -48,7 +49,7 @@ export default function Pagamento() {
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       // Chamar o HUB para criar a licença após pagamento aprovado
-      const response = await fetch('http://localhost:8081/licenses/create', {
+      const response = await fetch(`${API_URLS.HUB}/licenses/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
