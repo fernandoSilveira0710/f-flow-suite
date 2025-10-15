@@ -1,0 +1,1 @@
+SELECT id, email, displayName, active, tenantId, createdAt FROM User WHERE email = 'fernando@2fsolutions.com.br';

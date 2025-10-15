@@ -23,6 +23,7 @@ import { RolesModule } from './roles/roles.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 import { ConfigurationsModule } from './configurations/configurations.module';
 import { PlansModule } from './plans/plans.module';
+import { PublicModule } from './public/public.module';
 import { HealthController } from './health/health.controller';
 import { JwksController } from './auth/jwks.controller';
 import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
@@ -52,6 +53,7 @@ import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
     PaymentMethodsModule,
     ConfigurationsModule,
     PlansModule,
+    PublicModule,
   ],
   controllers: [HealthController, JwksController],
   providers: [PrismaService],
@@ -62,7 +64,7 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(PrismaTenantMiddleware)
-      .exclude('/.well-known/jwks.json', '/health')
+      .exclude('/.well-known/jwks.json', '/health', '/public/(.*)')
       .forRoutes('*');
   }
 }

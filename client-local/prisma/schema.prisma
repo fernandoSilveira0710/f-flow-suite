@@ -252,11 +252,14 @@ model User {
   email       String   @unique
   role        String   @default("user")
   active      Boolean  @default(true)
+  tenantId    String?
+  hubUserId   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([email])
   @@index([active])
+  @@index([tenantId])
 }
 
 model Role {
@@ -320,4 +323,38 @@ model OutboxEvent {
   @@index([processed])
   @@index([eventType])
   @@index([status])
+}
+
+model LicenseCache {
+  id           String    @id @default(uuid())
+  tenantId     String    @unique
+  registered   Boolean   @default(false)
+  licensed     Boolean   @default(false)
+  status       String    // 'active', 'expired', 'inactive', 'not_registered'
+  planKey      String?
+  maxSeats     Int?
+  expiresAt    DateTime?
+  graceDays    Int?      @default(7)
+  lastChecked  DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([lastChecked])
+}
+
+model LicenseToken {
+  id        String   @id @default(uuid())
+  tenantId  String
+  deviceId  String
+  token     String
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  @@unique([tenantId, deviceId])
+  @@index([tenantId])
+  @@index([deviceId])
+  @@index([expiresAt])
 }

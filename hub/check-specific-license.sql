@@ -1,0 +1,1 @@
+SELECT * FROM "License" WHERE "tenantId" = '510da090-7c56-45cd-9b74-5294555c1812';

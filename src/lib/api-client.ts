@@ -7,8 +7,8 @@ const BASE_URL = import.meta.env.VITE_LICENSE_HUB_URL || '';
 const TENANT_KEY = '2f.tenantId';
 
 export function getTenantId(): string {
-  if (typeof window === 'undefined') return 'demo-tenant';
-  return localStorage.getItem(TENANT_KEY) || 'demo-tenant';
+  if (typeof window === 'undefined') return 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
+  return localStorage.getItem(TENANT_KEY) || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
 }
 
 export function setTenantId(tenantId: string): void {

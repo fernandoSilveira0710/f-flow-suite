@@ -103,10 +103,60 @@ const PLANS: Record<PlanType, Plan> = {
 
 const STORAGE_KEY = '2f.plan';
 
+// Função para buscar plano atual do Client-Local
+async function fetchCurrentPlanFromHub(): Promise<PlanType | null> {
+  try {
+    const tenantId = localStorage.getItem('2f.tenantId') || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
+    const response = await fetch(`http://localhost:3001/plans/tenants/${tenantId}/subscription`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-tenant-id': tenantId,
+      },
+    });
+
+    if (response.ok) {
+      const subscription = await response.json();
+      if (subscription && subscription.plan) {
+        const planKey = subscription.plan.name?.toLowerCase() || 'starter';
+        return ['starter', 'pro', 'max'].includes(planKey) ? planKey as PlanType : 'starter';
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Erro ao buscar plano do Hub:', error);
+    return null;
+  }
+}
+
+// Função para buscar plano do client-local
+async function fetchCurrentPlanFromClientLocal(): Promise<PlanType | null> {
+  try {
+    const response = await fetch('http://localhost:3001/licensing/plan/current', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const planKey = data.planKey?.toLowerCase() || 'starter';
+      return ['starter', 'pro', 'max'].includes(planKey) ? planKey as PlanType : 'starter';
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Erro ao buscar plano do client-local:', error);
+    return null;
+  }
+}
+
 export function getCurrentPlan(): PlanType {
   if (typeof window === 'undefined') return 'starter';
   
-  // Primeiro tentar pegar do novo storage key
+  // Fallback para localStorage apenas se os serviços não estiverem disponíveis
   const newStored = localStorage.getItem('selectedPlan');
   if (newStored && ['starter', 'pro', 'max'].includes(newStored)) {
     return newStored as PlanType;
@@ -115,6 +165,30 @@ export function getCurrentPlan(): PlanType {
   // Fallback para o storage key antigo
   const oldStored = localStorage.getItem(STORAGE_KEY);
   return (oldStored as PlanType) || 'starter';
+}
+
+// Nova função assíncrona para buscar plano atual com prioridade Hub -> client-local -> localStorage
+export async function getCurrentPlanAsync(): Promise<PlanType> {
+  if (typeof window === 'undefined') return 'starter';
+  
+  // 1. Tentar buscar do Hub primeiro
+  const hubPlan = await fetchCurrentPlanFromHub();
+  if (hubPlan) {
+    // Atualizar localStorage para cache
+    localStorage.setItem('selectedPlan', hubPlan);
+    return hubPlan;
+  }
+  
+  // 2. Fallback para client-local
+  const clientLocalPlan = await fetchCurrentPlanFromClientLocal();
+  if (clientLocalPlan) {
+    // Atualizar localStorage para cache
+    localStorage.setItem('selectedPlan', clientLocalPlan);
+    return clientLocalPlan;
+  }
+  
+  // 3. Fallback final para localStorage
+  return getCurrentPlan();
 }
 
 export function setPlan(plan: PlanType): void {

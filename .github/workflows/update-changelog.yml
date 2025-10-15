@@ -1,0 +1,233 @@
+name: Update Changelog
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to generate changelog for'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  update-changelog:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Get version info
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          elif [ "${{ github.event.inputs.version }}" != "" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Get latest tag or use v1.0.0 as default
+            VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version_clean=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag for comparison
+          CURRENT_TAG="${{ steps.version.outputs.version }}"
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -A1 "$CURRENT_TAG" | tail -1)
+          
+          if [ -z "$PREVIOUS_TAG" ] || [ "$PREVIOUS_TAG" = "$CURRENT_TAG" ]; then
+            # If no previous tag, get all commits
+            COMMIT_RANGE="HEAD"
+          else
+            COMMIT_RANGE="$PREVIOUS_TAG..$CURRENT_TAG"
+          fi
+          
+          echo "Generating changelog for range: $COMMIT_RANGE"
+          
+          # Generate changelog sections
+          cat > changelog_temp.md << 'EOF'
+          ## [${{ steps.version.outputs.version_clean }}] - $(date +%Y-%m-%d)
+          
+          EOF
+          
+          # Added features
+          FEATURES=$(git log $COMMIT_RANGE --oneline --grep="^feat" --pretty=format:"- %s" | sed 's/^feat[(:]/- /' | sed 's/)://')
+          if [ ! -z "$FEATURES" ]; then
+            echo "### Added" >> changelog_temp.md
+            echo "$FEATURES" >> changelog_temp.md
+            echo "" >> changelog_temp.md
+          fi
+          
+          # Bug fixes
+          FIXES=$(git log $COMMIT_RANGE --oneline --grep="^fix" --pretty=format:"- %s" | sed 's/^fix[(:]/- /' | sed 's/)://')
+          if [ ! -z "$FIXES" ]; then
+            echo "### Fixed" >> changelog_temp.md
+            echo "$FIXES" >> changelog_temp.md
+            echo "" >> changelog_temp.md
+          fi
+          
+          # Changes
+          CHANGES=$(git log $COMMIT_RANGE --oneline --grep="^refactor\|^perf\|^style" --pretty=format:"- %s")
+          if [ ! -z "$CHANGES" ]; then
+            echo "### Changed" >> changelog_temp.md
+            echo "$CHANGES" >> changelog_temp.md
+            echo "" >> changelog_temp.md
+          fi
+          
+          # Documentation
+          DOCS=$(git log $COMMIT_RANGE --oneline --grep="^docs" --pretty=format:"- %s" | sed 's/^docs[(:]/- /' | sed 's/)://')
+          if [ ! -z "$DOCS" ]; then
+            echo "### Documentation" >> changelog_temp.md
+            echo "$DOCS" >> changelog_temp.md
+            echo "" >> changelog_temp.md
+          fi
+          
+          # Security
+          SECURITY=$(git log $COMMIT_RANGE --oneline --grep="security\|vulnerability\|CVE" --pretty=format:"- %s")
+          if [ ! -z "$SECURITY" ]; then
+            echo "### Security" >> changelog_temp.md
+            echo "$SECURITY" >> changelog_temp.md
+            echo "" >> changelog_temp.md
+          fi
+          
+          # Breaking changes
+          BREAKING=$(git log $COMMIT_RANGE --oneline --grep="BREAKING CHANGE\|!" --pretty=format:"- %s")
+          if [ ! -z "$BREAKING" ]; then
+            echo "### Breaking Changes" >> changelog_temp.md
+            echo "$BREAKING" >> changelog_temp.md
+            echo "" >> changelog_temp.md
+          fi
+
+      - name: Update CHANGELOG.md
+        run: |
+          # Create backup
+          cp CHANGELOG.md CHANGELOG.md.bak
+          
+          # Find the line with [Unreleased] and insert new version after it
+          if grep -q "## \[Unreleased\]" CHANGELOG.md; then
+            # Insert new version after [Unreleased] section
+            awk '
+              /^## \[Unreleased\]/ { 
+                print; 
+                getline; 
+                print; 
+                print ""; 
+                system("cat changelog_temp.md"); 
+                print ""; 
+                next 
+              } 
+              { print }
+            ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+          else
+            # If no [Unreleased] section, add at the top after the header
+            awk '
+              /^# Changelog/ { 
+                print; 
+                getline; 
+                print; 
+                print ""; 
+                print "## [Unreleased]"; 
+                print ""; 
+                system("cat changelog_temp.md"); 
+                print ""; 
+                next 
+              } 
+              { print }
+            ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+          fi
+          
+          # Clean up
+          rm changelog_temp.md
+
+      - name: Get contributors for this release
+        id: contributors
+        run: |
+          CURRENT_TAG="${{ steps.version.outputs.version }}"
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -A1 "$CURRENT_TAG" | tail -1)
+          
+          if [ -z "$PREVIOUS_TAG" ] || [ "$PREVIOUS_TAG" = "$CURRENT_TAG" ]; then
+            COMMIT_RANGE="HEAD"
+          else
+            COMMIT_RANGE="$PREVIOUS_TAG..$CURRENT_TAG"
+          fi
+          
+          CONTRIBUTORS=$(git log $COMMIT_RANGE --format='%aN' | sort -u | tr '\n' ', ' | sed 's/, $//')
+          echo "contributors=$CONTRIBUTORS" >> $GITHUB_OUTPUT
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet CHANGELOG.md; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add CHANGELOG.md
+          git commit -m "chore: update changelog for ${{ steps.version.outputs.version }} [skip ci]"
+          git push
+
+      - name: Create release notes
+        if: github.event_name == 'release'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+            
+            // Extract the latest version section
+            const versionRegex = new RegExp(`## \\[${{ steps.version.outputs.version_clean }}\\].*?(?=## \\[|$)`, 's');
+            const match = changelog.match(versionRegex);
+            
+            if (match) {
+              const releaseNotes = match[0]
+                .replace(/^## \[.*?\] - .*?\n/, '') // Remove version header
+                .trim();
+              
+              // Update the release with the generated notes
+              await github.rest.repos.updateRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: ${{ github.event.release.id }},
+                body: releaseNotes
+              });
+            }
+
+      - name: Create summary
+        run: |
+          echo "## Changelog Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Contributors**: ${{ steps.contributors.outputs.contributors }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changes Made**: ${{ steps.changes.outputs.has_changes }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.changes.outputs.has_changes }}" = "true" ]; then
+            echo "### Changes Preview" >> $GITHUB_STEP_SUMMARY
+            echo '```markdown' >> $GITHUB_STEP_SUMMARY
+            git show HEAD:CHANGELOG.md | head -50 >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi

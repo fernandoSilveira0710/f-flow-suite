@@ -4,6 +4,7 @@
  */
 
 import { getCurrentPlan, setPlan as setEntitlementsPlan, getEntitlements } from './entitlements';
+import { ENDPOINTS } from './env';
 
 // Types
 export interface Organization {
@@ -409,9 +410,71 @@ export const getSeatsByRole = async (roleId: string): Promise<Seat[]> => {
   return seats.filter(s => s.roleId === roleId);
 };
 
+// Função para buscar assinatura ativa do tenant no Client-Local
+const fetchTenantSubscription = async (tenantId: string) => {
+  try {
+    const response = await fetch(ENDPOINTS.CLIENT_PLANS_SUBSCRIPTION(tenantId), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-tenant-id': tenantId,
+      },
+    });
+
+    if (response.ok) {
+      const subscription = await response.json();
+      return subscription;
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Erro ao buscar assinatura do Hub:', error);
+    return null;
+  }
+};
+
 // Plan
 export const getPlanInfo = async (): Promise<PlanInfo> => {
   await delay(300);
+  
+  // Tentar buscar dados do Hub primeiro
+  const tenantId = localStorage.getItem('2f.tenantId') || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
+  const hubSubscription = await fetchTenantSubscription(tenantId);
+  
+  if (hubSubscription && hubSubscription.plan) {
+    // Mapear dados do Hub para o formato esperado
+    const planKey = hubSubscription.plan.name?.toLowerCase() || 'starter';
+    const mappedPlan = ['starter', 'pro', 'max'].includes(planKey) ? planKey : 'starter';
+    
+    // Calcular próxima cobrança baseada na assinatura
+    const nextBilling = hubSubscription.expiresAt 
+      ? new Date(hubSubscription.expiresAt).toISOString()
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    
+    // Mapear recursos do plano do Hub
+    const planFeatures = hubSubscription.plan.featuresEnabled 
+      ? (typeof hubSubscription.plan.featuresEnabled === 'string' 
+         ? JSON.parse(hubSubscription.plan.featuresEnabled) 
+         : hubSubscription.plan.featuresEnabled)
+      : {};
+    
+    return {
+      plano: mappedPlan as 'starter' | 'pro' | 'max',
+      seatLimit: hubSubscription.plan.maxSeats || 1,
+      recursos: {
+        products: { enabled: planFeatures.products !== false },
+        pdv: { enabled: planFeatures.pdv !== false },
+        stock: { enabled: planFeatures.stock !== false },
+        agenda: { enabled: planFeatures.agenda !== false },
+        banho_tosa: { enabled: planFeatures.banho_tosa !== false },
+        reports: { enabled: planFeatures.reports !== false },
+      },
+      ciclo: 'MENSAL' as 'MENSAL' | 'ANUAL', // Por enquanto assumindo mensal
+      proximoCobranca: nextBilling,
+    };
+  }
+  
+  // Fallback para dados locais se o Hub não estiver disponível
   const plan = getCurrentPlan();
   const entitlements = getEntitlements();
   const cycle = getFromStorage(STORAGE_KEYS.planCycle, 'MENSAL' as 'MENSAL' | 'ANUAL');
@@ -433,45 +496,25 @@ export const getPlanInfo = async (): Promise<PlanInfo> => {
 };
 
 export const updatePlan = async (planKey: 'starter' | 'pro' | 'max') => {
+  const tenantId = localStorage.getItem('2f.tenantId') || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
+  const userId = localStorage.getItem('user_id') || 'unknown';
+  
   try {
-    // Tentar sincronizar com o client-local primeiro
-    const clientLocalResponse = await fetch('http://localhost:3001/licensing/plan/sync', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ 
-        tenantId: 'demo',
-        planKey 
-      }),
-    });
-
-    if (clientLocalResponse.ok) {
-      console.log('Plan synchronized successfully with client-local and Hub');
+    // Usar PlanSyncService para sincronização completa
+    const { PlanSyncService } = await import('../services/plan-sync.service');
+    const result = await PlanSyncService.syncPlansAfterPlanChange(tenantId, userId, planKey);
+    
+    if (result.success) {
+      console.log('Plan synchronized successfully across all services');
     } else {
-      console.warn('Failed to sync with client-local, trying Hub directly');
-      
-      // Fallback para Hub direto
-      const hubResponse = await fetch('http://localhost:3000/licenses/demo/plan', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ planKey }),
-      });
-
-      if (hubResponse.ok) {
-        console.log('Plan updated successfully in Hub');
-      } else {
-        console.warn('Failed to update plan in Hub, falling back to localStorage');
-      }
+      console.warn('Plan synchronization completed with some issues:', result.errors);
     }
   } catch (error) {
-    console.warn('Services not available, using localStorage fallback:', error);
+    console.warn('PlanSyncService not available, using fallback:', error);
+    
+    // Fallback para localStorage se o serviço não estiver disponível
+    localStorage.setItem('selectedPlan', planKey);
   }
-
-  // Atualizar localStorage como fallback ou confirmação
-  localStorage.setItem('selectedPlan', planKey);
   
   // Disparar evento customizado para notificar outras partes da aplicação
   window.dispatchEvent(new CustomEvent('planChanged', { detail: { planKey } }));

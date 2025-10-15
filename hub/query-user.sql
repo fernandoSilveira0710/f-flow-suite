@@ -1,0 +1,1 @@
+SELECT id, email, "tenantId" FROM "User" WHERE email = 'teste@teste1.com';

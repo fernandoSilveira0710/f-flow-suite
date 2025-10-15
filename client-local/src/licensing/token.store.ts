@@ -124,16 +124,52 @@ export class TokenStore {
           decrypted += decipher.final('utf8');
           
           const data = JSON.parse(decrypted);
-          if (data.tenantId === tenantId && data.deviceId === deviceId) {
+          
+          // If specific tenantId is provided, match it exactly
+          if (tenantId && data.tenantId === tenantId && data.deviceId === deviceId) {
+            return data.token;
+          }
+          
+          // If no specific tenantId provided but deviceId matches, return the token
+          if (!tenantId && data.deviceId === deviceId) {
             return data.token;
           }
         } catch (error) {
-          // Continue to try without specific deviceId
+          this.logger.warn('Failed to decrypt token with provided deviceId, trying fallback approach', error);
         }
       }
 
-      // If no specific deviceId or decryption failed, try to read any stored token
-      // This is for backward compatibility or when we just need to check if any token exists
+      // If no deviceId provided or decryption failed, try to read any stored token
+      // This requires trying different deviceIds or using a more generic approach
+      // For now, we'll try with the configured DEVICE_ID from environment
+      if (!deviceId) {
+        const configuredDeviceId = process.env.DEVICE_ID || 'dev-device';
+        try {
+          const [ivHex, encrypted] = fileContent.split(':');
+          if (ivHex && encrypted) {
+            const key = this.generateKey(configuredDeviceId);
+            const iv = Buffer.from(ivHex, 'hex');
+            const decipher = createDecipheriv('aes-256-cbc', Buffer.from(key, 'hex'), iv);
+            let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+            
+            const data = JSON.parse(decrypted);
+            
+            // If specific tenantId is provided, match it
+            if (tenantId && data.tenantId === tenantId) {
+              return data.token;
+            }
+            
+            // If no specific tenantId provided, return any valid token
+            if (!tenantId && data.token) {
+              return data.token;
+            }
+          }
+        } catch (error) {
+          this.logger.warn('Failed to decrypt token with configured deviceId', error);
+        }
+      }
+
       return null;
     } catch (error) {
       this.logger.error('Failed to read token from fallback storage', error);

@@ -47,14 +47,33 @@ export default function Pagamento() {
       // Simular processamento do pagamento
       await new Promise(resolve => setTimeout(resolve, 3000));
       
-      // Simular criação da licença no HUB
-      const licenseKey = `FL-${userData?.email?.split('@')[0]?.toUpperCase()}-${Date.now().toString().slice(-6)}`;
+      // Chamar o HUB para criar a licença após pagamento aprovado
+      const response = await fetch('http://localhost:8081/licenses/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': 'system', // Tenant do sistema para criação de licenças
+        },
+        body: JSON.stringify({
+          name: userData.name,
+          email: userData.email,
+          cpf: userData.cpf,
+          planKey: plan.id,
+          paymentId: `pay_${Date.now()}`,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha ao criar licença');
+      }
+
+      const licenseData = await response.json();
       
       console.log('Payment processed:', {
         userData,
         plan,
         paymentData,
-        licenseKey
+        licenseData
       });
 
       toast({
@@ -67,11 +86,14 @@ export default function Pagamento() {
         state: {
           userData,
           plan,
-          licenseKey,
-          downloadUrl: 'https://releases.2fsolutions.com/f-flow-suite/latest'
+          licenseKey: licenseData.data.licenseKey,
+          tenantId: licenseData.data.tenantId,
+          downloadUrl: licenseData.data.downloadUrl,
+          expiresAt: licenseData.data.expiresAt,
         }
       });
     } catch (error) {
+      console.error('Payment error:', error);
       toast({
         title: 'Erro no pagamento',
         description: 'Não foi possível processar o pagamento. Tente novamente.',

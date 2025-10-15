@@ -98,7 +98,7 @@ export class LicensingRenewalService implements OnModuleInit, OnModuleDestroy {
             currentLicense.did
           );
 
-          if (renewalResult.status === 'activated') {
+          if (renewalResult.success) {
             this.logger.log('License renewed successfully');
           } else {
             this.logger.warn('License renewal failed', renewalResult.message);
