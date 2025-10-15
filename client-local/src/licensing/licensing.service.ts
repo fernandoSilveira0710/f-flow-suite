@@ -248,6 +248,51 @@ export class LicensingService implements OnModuleInit {
     }
   }
 
+  /**
+   * Retorna o token de licença bruto (JWT) armazenado localmente.
+   * Prioriza o TokenStore e faz fallback para o banco de dados.
+   * Em modo de desenvolvimento, tenta ler de arquivo se configurado.
+   */
+  async getRawLicenseToken(tenantId?: string, deviceId?: string): Promise<string | null> {
+    try {
+      // Primeiro tenta obter do armazenamento seguro
+      let token = await this.tokenStore.getToken(tenantId, deviceId || this.deviceId);
+
+      // Fallback: buscar do banco de dados se não encontrado
+      if (!token) {
+        const dbToken = await this.prisma.licenseToken.findFirst({
+          where: {
+            ...(tenantId ? { tenantId } : {}),
+            deviceId: deviceId || this.deviceId,
+            revokedAt: null,
+            expiresAt: { gt: new Date() }
+          },
+          orderBy: { issuedAt: 'desc' }
+        });
+
+        if (dbToken?.token) {
+          token = dbToken.token;
+          // Sincroniza de volta para o TokenStore para próximas leituras
+          await this.tokenStore.saveToken(dbToken.tenantId, dbToken.deviceId, dbToken.token);
+        }
+      }
+
+      // Em desenvolvimento, permitir token via arquivo de conveniência
+      if (!token && !this.licensingEnforced) {
+        const devTokenPath = this.configService.get<string>('LICENSE_DEV_FILE_PATH') || 'license.jwt';
+        const fileToken = this.loadLicenseFromFile(devTokenPath);
+        if (fileToken) {
+          return fileToken;
+        }
+      }
+
+      return token || null;
+    } catch (error) {
+      this.logger.warn('Falha ao obter token de licença bruto', error as Error);
+      return null;
+    }
+  }
+
   async getCurrentLicense(): Promise<LicenseToken | null> {
     if (!this.licensingEnforced) {
       // Get development license expiration from environment or default to 24 hours

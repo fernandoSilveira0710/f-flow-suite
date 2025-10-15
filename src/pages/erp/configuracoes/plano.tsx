@@ -150,9 +150,10 @@ export default function PlanoPage() {
         return;
       }
 
-      const tenantId = 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
+      const tenantId = localStorage.getItem('2f.tenantId') || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
       const timestamp = new Date().getTime();
-      const url = `${ENDPOINTS.HUB_SUBSCRIPTION}?_t=${timestamp}`;
+      // Usar a rota correta de assinatura por tenant
+      const url = `${ENDPOINTS.HUB_TENANTS_SUBSCRIPTION(tenantId)}?_t=${timestamp}`;
       
       const response = await fetch(url, {
         method: 'GET',
@@ -165,30 +166,92 @@ export default function PlanoPage() {
 
       if (response.ok) {
         const subscription = await response.json();
-        
-        const mappedPlanInfo: PlanInfo = {
-          plano: subscription.planKey || 'starter',
-          seatLimit: subscription.maxSeats || 1,
+
+        // Se não houver assinatura ativa para o tenant, tentar usar validação de licença como fallback
+        if (!subscription) {
+          const validateUrl = `${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${tenantId}`;
+          const validateRes = await fetch(validateUrl, { method: 'GET' });
+          if (validateRes.ok) {
+            const data = await validateRes.json();
+            if (data?.licensed && data?.license?.planKey) {
+              const mappedPlanInfo: PlanInfo = {
+                plano: (data.license.planKey || 'starter') as 'starter' | 'pro' | 'max',
+                seatLimit: data.license.maxSeats || 1,
+                recursos: {
+                  products: { enabled: true },
+                  pdv: { enabled: true },
+                  stock: { enabled: true },
+                  agenda: { enabled: data.license.planKey !== 'starter' },
+                  banho_tosa: { enabled: data.license.planKey !== 'starter' },
+                  reports: { enabled: data.license.planKey !== 'starter' },
+                },
+                ciclo: 'MENSAL',
+                proximoCobranca: data.license.expiresAt,
+              };
+              console.log('🎯 Plano via licença (fallback):', mappedPlanInfo);
+              setPlanInfo(mappedPlanInfo);
+              return;
+            }
+          }
+          // Sem assinatura e sem licença válida: não lançar erro
+          console.warn('⚠️ Nenhuma assinatura ativa encontrada para o tenant');
+          return;
+        }
+
+        // Mapear dados da assinatura do Hub
+        const planKeyFromHub = (subscription?.plan?.name || 'starter').toLowerCase();
+        const featuresEnabled = subscription?.plan?.featuresEnabled || {};
+        const cycleRaw = (subscription?.billingCycle || 'MONTHLY').toString().toLowerCase();
+        const mappedCycle: 'MENSAL' | 'ANUAL' = cycleRaw.includes('year') ? 'ANUAL' : 'MENSAL';
+
+        let mappedPlanInfo: PlanInfo = {
+          plano: (['starter', 'pro', 'max'].includes(planKeyFromHub) ? planKeyFromHub : 'starter') as 'starter' | 'pro' | 'max',
+          seatLimit: subscription?.plan?.maxSeats || 1,
           recursos: {
-            products: { enabled: true },
-            pdv: { enabled: true },
-            stock: { enabled: true },
-            agenda: { enabled: subscription.planKey !== 'starter' },
-            banho_tosa: { enabled: subscription.planKey !== 'starter' },
-            reports: { enabled: subscription.planKey !== 'starter' },
+            products: { enabled: featuresEnabled.products !== false },
+            pdv: { enabled: featuresEnabled.pdv !== false },
+            stock: { enabled: featuresEnabled.stock !== false },
+            agenda: { enabled: featuresEnabled.agenda !== false },
+            banho_tosa: { enabled: featuresEnabled.banho_tosa !== false },
+            reports: { enabled: featuresEnabled.reports !== false },
           },
-          ciclo: subscription.billingCycle === 'yearly' ? 'ANUAL' : 'MENSAL',
-          proximoCobranca: subscription.nextBillingDate,
+          ciclo: mappedCycle,
+          proximoCobranca: subscription?.expiresAt,
         };
-        
+
+        // Reconciliar com licença se houver divergência (plano da licença é o preferido para exibição)
+        try {
+          const validateUrl = `${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${tenantId}`;
+          const validateRes = await fetch(validateUrl, { method: 'GET' });
+          if (validateRes.ok) {
+            const data = await validateRes.json();
+            const licensePlanKey = (data?.license?.planKey || data?.planKey || '').toLowerCase();
+            const isValidLicense = data?.valid === true || data?.licensed === true;
+            if (isValidLicense && ['starter', 'pro', 'max'].includes(licensePlanKey) && licensePlanKey !== mappedPlanInfo.plano) {
+              mappedPlanInfo = {
+                ...mappedPlanInfo,
+                plano: licensePlanKey as 'starter' | 'pro' | 'max',
+                seatLimit: data?.license?.maxSeats || mappedPlanInfo.seatLimit,
+                proximoCobranca: data?.license?.expiresAt || mappedPlanInfo.proximoCobranca,
+              };
+              console.log('🔁 Plano ajustado via licença válida:', mappedPlanInfo.plano);
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Falha ao validar licença para conciliação de plano', e);
+        }
+
         console.log('🎯 Dados do plano carregados do Hub:', subscription);
         setPlanInfo(mappedPlanInfo);
       } else {
-        throw new Error(`Erro ao buscar plano: ${response.status}`);
+        // Evitar derrubar o modo online por causa de uma falha aqui
+        console.warn(`⚠️ Falha ao buscar assinatura (HTTP ${response.status})`);
+        return;
       }
     } catch (error) {
       console.error('Erro ao carregar plano do Hub:', error);
-      throw error;
+      // Não lançar erro para não marcar Hub como offline
+      return;
     }
   };
 
@@ -456,6 +519,12 @@ export default function PlanoPage() {
 
   const allPlans = getAllPlans();
   const currentPlanData = allPlans.find(p => p.id === planInfo.plano);
+  // Tentar pegar o nome do plano diretamente do Hub se disponível
+  const currentHubPlan = hubPlans.find(p => 
+    p.id === planInfo.plano || 
+    p.name.toLowerCase() === planInfo.plano.toLowerCase()
+  );
+  const displayPlanName = currentHubPlan?.name || currentPlanData?.name || planInfo.plano;
 
   return (
     <div className="space-y-6">
@@ -481,7 +550,7 @@ export default function PlanoPage() {
         <CardHeader>
           <CardTitle>Plano Atual</CardTitle>
           <CardDescription>
-            {currentPlanData?.name} • {planInfo.ciclo}
+            {displayPlanName} • {planInfo.ciclo}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
