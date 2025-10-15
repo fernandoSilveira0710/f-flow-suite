@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { EventsService } from '../common/events.service';
 import { CreateCheckInDto, CheckOutDto, CheckInResponseDto } from './dto';
 
 @Injectable()
 export class CheckInsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private eventsService: EventsService) {}
 
   async checkIn(tenantId: string, createCheckInDto: CreateCheckInDto): Promise<CheckInResponseDto> {
     // Check if pet is already checked in (no checkout time)
@@ -202,11 +203,11 @@ export class CheckInsService {
       notes: checkIn.notes,
     };
 
-    await this.prisma.outboxEvent.create({
-      data: {
-        eventType,
-        payload: JSON.stringify(payload),
-      },
+    await this.eventsService.createEvent(checkIn.tenantId, {
+      eventType,
+      entityType: 'checkin',
+      entityId: checkIn.id,
+      data: payload,
     });
   }
 }

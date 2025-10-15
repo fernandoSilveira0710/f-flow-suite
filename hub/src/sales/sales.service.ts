@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { EventsService } from '../common/events.service';
 import { SaleResponseDto, CreateSaleDto, UpdateSaleDto } from './dto';
 
 export interface SaleCreatedEventPayload {
@@ -26,7 +27,7 @@ export interface SaleCreatedEventPayload {
 export class SalesService {
   private readonly logger = new Logger(SalesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly eventsService: EventsService) {}
 
   async upsertFromEvent(tenantId: string, eventPayload: SaleCreatedEventPayload): Promise<void> {
     this.logger.log(`Upserting sale ${eventPayload.id} for tenant: ${tenantId}`);
@@ -187,7 +188,14 @@ export class SalesService {
     });
 
     this.logger.log(`Successfully created sale ${saleId}`);
-    return this.findOneByTenant(tenantId, saleId);
+    const createdSale = await this.findOneByTenant(tenantId, saleId);
+    await this.eventsService.createEvent(tenantId, {
+      eventType: 'sale.created.v1',
+      entityType: 'sale',
+      entityId: createdSale.id,
+      data: createdSale,
+    });
+    return createdSale;
   }
 
   async update(tenantId: string, saleId: string, updateSaleDto: UpdateSaleDto): Promise<SaleResponseDto> {
@@ -276,7 +284,14 @@ export class SalesService {
     });
 
     this.logger.log(`Successfully updated sale ${saleId}`);
-    return this.findOneByTenant(tenantId, saleId);
+    const updatedSale = await this.findOneByTenant(tenantId, saleId);
+    await this.eventsService.createEvent(tenantId, {
+      eventType: 'sale.updated.v1',
+      entityType: 'sale',
+      entityId: saleId,
+      data: updatedSale,
+    });
+    return updatedSale;
   }
 
   async remove(tenantId: string, saleId: string): Promise<void> {

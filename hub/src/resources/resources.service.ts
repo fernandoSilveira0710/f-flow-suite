@@ -120,8 +120,7 @@ export class ResourcesService {
   }
 
   private async generateResourceEvent(eventType: string, resource: ResourceResponseDto): Promise<void> {
-    await this.eventsService.emit(eventType, {
-      tenantId: resource.tenantId,
+    await this.eventsService.createEvent(resource.tenantId, {
       eventType,
       entityType: 'resource',
       entityId: resource.id,

@@ -1,10 +1,11 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { EventsService } from '../common/events.service';
 import { CreateAppointmentDto, UpdateAppointmentDto, AppointmentResponseDto } from './dto';
 
 @Injectable()
 export class AppointmentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private eventsService: EventsService) {}
 
   async create(tenantId: string, createAppointmentDto: CreateAppointmentDto): Promise<AppointmentResponseDto> {
     // Validate schedule conflicts
@@ -411,11 +412,11 @@ export class AppointmentsService {
       updatedAt: appointment.updatedAt,
     };
 
-    await this.prisma.outboxEvent.create({
-      data: {
-        eventType,
-        payload: JSON.stringify(payload),
-      },
+    await this.eventsService.createEvent(appointment.tenantId, {
+      eventType,
+      entityType: 'appointment',
+      entityId: appointment.id,
+      data: payload,
     });
   }
 }
