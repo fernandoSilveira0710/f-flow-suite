@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth-context';
 import { toast } from '@/hooks/use-toast';
+import { setPlan, getCurrentPlan, PlanType } from '@/lib/entitlements';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -60,6 +61,32 @@ export function ProtectedRoute({
       }
     }
   }, [user, licenseStatus, isLoading, requireAuth, requireLicense]);
+
+  // Sincroniza entitlements do frontend com o plano da licença válida
+  useEffect(() => {
+    if (licenseStatus?.isValid && licenseStatus.plan) {
+      const rawPlan = String(licenseStatus.plan).toLowerCase();
+      // Normaliza possíveis variações de nomes
+      const map: Record<string, PlanType> = {
+        starter: 'starter',
+        basico: 'starter',
+        básico: 'starter',
+        basic: 'starter',
+        pro: 'pro',
+        profissional: 'pro',
+        max: 'max',
+        enterprise: 'max'
+      };
+      const normalized = map[rawPlan] || (['starter','pro','max'].includes(rawPlan) ? (rawPlan as PlanType) : 'starter');
+      const current = getCurrentPlan();
+      if (current !== normalized) {
+        console.log('🔄 PROTECTED ROUTE - Atualizando plano local para refletir licença:', { normalized, rawPlan });
+        setPlan(normalized);
+        // Dispara evento para atualizar hooks que observam mudanças de plano
+        window.dispatchEvent(new Event('planChanged'));
+      }
+    }
+  }, [licenseStatus]);
 
   // Mostrar loading enquanto verifica autenticação
   if (isLoading || checkingInstallation) {

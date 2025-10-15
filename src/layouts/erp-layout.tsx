@@ -86,7 +86,7 @@ export default function ErpLayout() {
       path: '/erp/agenda',
       enabled: entitlements.agenda,
       feature: 'Agenda',
-      plan: 'Starter',
+      plan: 'Pro',
     },
     {
       label: 'Banho & Tosa',
@@ -102,7 +102,7 @@ export default function ErpLayout() {
       path: '/erp/relatorios',
       enabled: entitlements.reports,
       feature: 'Relatórios',
-      plan: 'Pro',
+      plan: 'Max',
     },
   ];
 

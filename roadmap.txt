@@ -2,6 +2,37 @@
 
 > **Regra de ouro:** cada etapa fecha com **critérios de aceite**, **flag de segurança** e **rollback** simples. Só avançamos quando a etapa anterior estiver verde em PR.
 
+## Status Atual — Concluídos e Pendências
+
+### Concluídos (✅)
+- ✅ Etapa 1 — Setup de DEV e Padrões de Projeto
+- ✅ Etapa 2 — Hub: Banco + RLS + JWKS
+- ✅ Etapa 3 — Client-Local Executável (DB embutido + Serviço SO)
+- ✅ Etapa 4 — Licenciamento ponta-a-ponta (Ativar, Guardar, Renovar)
+- ✅ Etapa 5 — Autenticação OIDC real + Dupla Validação no Hub
+- ✅ Etapas 6.8, 6.9 e 6.10 — Configurações/Dashboard, Integração & Saúde, Documentação & Flags
+- ✅ Etapa 10 — Site Institucional + Postman E2E + Releases/Auto-update
+
+### Pendências
+- Etapa 1: fechar "Lint e typecheck OK" nos 3 pacotes (corrigir pequenos erros de TypeScript no Hub)
+- Etapa 6 — POS/Inventory MVP + Espelho básico no Hub:
+  - 6.1 Modelagem e Migrations: revisar entidades e aplicar RLS nas novas tabelas
+  - 6.2 CRUD de Produtos e Estoque: endpoints, ajustes de estoque e eventos `event.product.*`
+    - ✅ Hub: `EventsService.createEvent` unificado para produtos (Outbox normalizado)
+    - ✅ Hub: modelo `InventoryAdjustment` criado e migrado
+    - ⏳ Client-local: endpoints e ajuste de estoque
+  - 6.3 CRUD de Vendas/PDV: endpoints, cálculo de totais e evento `event.sale.created.v1`
+    - ✅ Hub: emissão de eventos `sale.created.v1` e `sale.updated.v1` após create/update
+    - ⏳ Client-local: cálculo automático de totais e endpoints completos
+  - 6.4 Clientes (Tutores) e Pets: CRUD e eventos `event.customer.*` e `event.pet.*`
+  - 6.5 Serviços e Profissionais: CRUD e eventos de sync
+  - 6.6 Agenda, Check‑in e Recursos: CRUD, check‑in/out e eventos `event.appointment.*` e `event.checkin.*`
+    - ✅ Hub: geração de eventos padronizada via `EventsService.createEvent` (appointments, check-ins e resources)
+  - 6.7 Grooming (Banho e tosa): tickets, itens, status e espelho no Hub
+- Etapa 7 — Sync Agent (Outbox/Inbox, Idempotência, Backoff, DLQ): implementar Outbox/Inboux, scheduler, schemas versionados e DLQ
+- Etapa 8 — Pagamentos Mínimo Viável + Conciliação: módulo `payments`, conciliação no Hub e validação de schemas
+- Etapa 9 — Frontend Integrado ao Client-Local + Status de Sync: trocar mocks por client-local, UI de status e integração CRUD via React Query
+
 ## Etapa 1 — Setup de DEV e Padrões de Projeto ✅
 
 **Objetivo:** time ligar o projeto em 1 comando e alinhar padrões (lint, testes, branch/PR).
