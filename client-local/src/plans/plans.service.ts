@@ -51,12 +51,22 @@ export class PlansService {
 
   private async fetchSubscriptionFromHub(tenantId: string) {
     try {
+      // Obter token de licença bruto para autenticação no Hub
+      const licenseToken = await this.licensingService.getRawLicenseToken(tenantId);
+      if (!licenseToken) {
+        this.logger.warn('No license token available to call Hub');
+        return null;
+      }
+
       const response = await axios.get(
         `${this.hubBaseUrl}/tenants/${tenantId}/subscription`,
         { 
           timeout: 5000,
           headers: {
-            'x-tenant-id': tenantId
+            'x-tenant-id': tenantId,
+            'X-License-Token': licenseToken,
+            // Backward compatibility for LicenseGuard accepting Authorization header
+            'Authorization': `Bearer ${licenseToken}`
           }
         }
       );
@@ -72,12 +82,21 @@ export class PlansService {
 
   private async fetchInvoicesFromHub(tenantId: string) {
     try {
+      // Obter token de licença bruto para autenticação no Hub
+      const licenseToken = await this.licensingService.getRawLicenseToken(tenantId);
+      if (!licenseToken) {
+        this.logger.warn('No license token available to call Hub');
+        return null;
+      }
+
       const response = await axios.get(
         `${this.hubBaseUrl}/tenants/${tenantId}/invoices`,
         { 
           timeout: 5000,
           headers: {
-            'x-tenant-id': tenantId
+            'x-tenant-id': tenantId,
+            'X-License-Token': licenseToken,
+            'Authorization': `Bearer ${licenseToken}`
           }
         }
       );

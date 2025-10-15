@@ -30,7 +30,7 @@ export const ENDPOINTS = {
   HUB_PLANS: `${API_URLS.HUB}/public/plans`,
   HUB_HEALTH: `${API_URLS.HUB}/health`,
   HUB_LICENSES_VALIDATE: `${API_URLS.HUB}/licenses/validate`,
-  HUB_SUBSCRIPTION: `${API_URLS.HUB}/plans/subscriptions`,
+  HUB_SUBSCRIPTION: `${API_URLS.HUB}/subscriptions`,
   HUB_TENANTS_SUBSCRIPTION: (tenantId: string) => `${API_URLS.HUB}/tenants/${tenantId}/subscription`,
   HUB_LICENSES_UPDATE_PLAN: (tenantId: string) => `${API_URLS.HUB}/licenses/tenant/${tenantId}/update-plan`,
 

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { ENDPOINTS } from '@/lib/env';
 
 export default function ErpLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -197,9 +198,17 @@ export default function ErpLayout() {
           <div className="p-4 border-t">
             <div className="rounded-lg bg-sidebar-accent p-3">
               <p className="text-xs text-sidebar-accent-foreground/70 mb-1">Plano Atual</p>
-              <p className="text-sm font-semibold capitalize">{currentPlan}</p>
+              {(() => {
+                const hubPlanLabels: Record<string, string> = {
+                  starter: 'Básico',
+                  pro: 'Profissional',
+                  max: 'Enterprise',
+                };
+                const label = hubPlanLabels[String(currentPlan)] || String(currentPlan);
+                return <p className="text-sm font-semibold capitalize">{label}</p>;
+              })()}
               <Button variant="link" size="sm" className="p-0 h-auto mt-1" asChild>
-                <Link to="/planos">Fazer Upgrade</Link>
+                <a href={ENDPOINTS.SITE_RENOVACAO} target="_blank" rel="noopener noreferrer">Fazer Upgrade</a>
               </Button>
             </div>
           </div>

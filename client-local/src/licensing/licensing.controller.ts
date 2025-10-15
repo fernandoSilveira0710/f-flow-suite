@@ -251,4 +251,31 @@ export class LicensingController {
       };
     }
   }
+
+  /**
+   * Exposes the raw license token (JWT) stored locally for authenticated Hub calls.
+   */
+  @Get('token')
+  async getLicenseToken(@Headers('x-tenant-id') headerTenantId?: string) {
+    try {
+      const tenantId = headerTenantId || this.configService.get<string>('TENANT_ID', 'default-tenant');
+      this.logger.log(`Retrieving raw license token for tenant: ${tenantId}`);
+
+      const token = await this.licensingService.getRawLicenseToken(tenantId);
+      if (!token) {
+        throw new HttpException('No license token found', HttpStatus.NOT_FOUND);
+      }
+
+      return { token };
+    } catch (error: any) {
+      this.logger.error('Failed to retrieve license token', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        `Failed to retrieve license token: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
 }
