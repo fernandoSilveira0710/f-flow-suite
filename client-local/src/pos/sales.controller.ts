@@ -39,4 +39,11 @@ export class SalesController {
     this.logger.log(`GET /sales/${id} - Fetching sale by ID`);
     return this.salesService.findOne(id);
   }
+
+  @Post(':id/refund')
+  @HttpCode(HttpStatus.OK)
+  async refund(@Param('id') id: string): Promise<SaleResponseDto> {
+    this.logger.log(`POST /sales/${id}/refund - Refunding sale`);
+    return this.salesService.refundSale(id);
+  }
 }

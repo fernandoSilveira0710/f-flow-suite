@@ -47,7 +47,7 @@ export interface SaleItem {
 
 export interface CashEntry {
   id: string;
-  tipo: 'entrada' | 'saida';
+  tipo: 'SANGRIA' | 'SUPRIMENTO';
   valor: number;
   descricao: string;
   timestamp: string;
@@ -117,53 +117,21 @@ const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> =
 };
 
 // Import mockAPI to get products from the Products tab
-import { mockAPI } from './mock-data';
+ 
 
 // Products API
 export const searchProducts = async (query: string): Promise<Product[]> => {
   try {
-    // Get products from mockAPI (same data used in Products tab)
-    const products = mockAPI.getProducts();
-    const categories = mockAPI.getCategories();
-    
-    if (!query.trim()) {
-      return products
-        .filter(p => p.active) // Only show active products
-        .map(p => {
-          const category = categories.find(c => c.id === p.categoryId);
-          return {
-            id: p.id,
-            nome: p.name,
-            sku: p.sku,
-            preco: p.price,
-            estoque: p.stock,
-            categoria: category?.name,
-            barcode: p.barcode,
-          };
-        });
-    }
-    
+    const products = await getProducts();
+    if (!query.trim()) return products;
+
     const lowerQuery = query.toLowerCase();
-    return products
-      .filter(p => 
-        p.active && (
-          p.name?.toLowerCase().includes(lowerQuery) ||
-          p.sku?.toLowerCase().includes(lowerQuery) ||
-          p.barcode?.toLowerCase().includes(lowerQuery)
-        )
-      )
-      .map(p => {
-        const category = categories.find(c => c.id === p.categoryId);
-        return {
-          id: p.id,
-          nome: p.name,
-          sku: p.sku,
-          preco: p.price,
-          estoque: p.stock,
-          categoria: category?.name,
-          barcode: p.barcode,
-        };
-      });
+    return products.filter(
+      (p) =>
+        p.nome?.toLowerCase().includes(lowerQuery) ||
+        p.sku?.toLowerCase().includes(lowerQuery) ||
+        (p.barcode || '').toLowerCase().includes(lowerQuery)
+    );
   } catch (error) {
     console.error('Error searching products:', error);
     return [];
@@ -172,26 +140,11 @@ export const searchProducts = async (query: string): Promise<Product[]> => {
 
 export const findProductByBarcode = async (barcode: string): Promise<Product | null> => {
   try {
-    // Get products from mockAPI (same data used in Products tab)
-    const products = mockAPI.getProducts();
-    const categories = mockAPI.getCategories();
-    
-    const product = products.find(p => 
-      p.active && (p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase())
+    const products = await getProducts();
+    const product = products.find(
+      (p) => p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase()
     );
-    
-    if (!product) return null;
-    
-    const category = categories.find(c => c.id === product.categoryId);
-    return {
-      id: product.id,
-      nome: product.name,
-      sku: product.sku,
-      preco: product.price,
-      estoque: product.stock,
-      categoria: category?.name,
-      barcode: product.barcode,
-    };
+    return product || null;
   } catch (error) {
     console.error('Error finding product by barcode:', error);
     return null;
@@ -201,15 +154,17 @@ export const findProductByBarcode = async (barcode: string): Promise<Product | n
 export const getProducts = async (): Promise<Product[]> => {
   try {
     const products = await apiCall<any[]>('/products');
-    return products.map(p => ({
-      id: p.id,
-      nome: p.name,
-      sku: p.sku,
-      preco: p.salePrice || p.price,
-      estoque: p.stockQty || 0,
-      categoria: p.category,
-      barcode: p.barcode,
-    }));
+    return products
+      .filter((p) => p.active !== false)
+      .map((p) => ({
+        id: p.id,
+        nome: p.name,
+        sku: p.sku,
+        preco: Number(p.price ?? 0),
+        estoque: Number(p.currentStock ?? 0),
+        categoria: p.category,
+        barcode: p.barcode,
+      }));
   } catch (error) {
     console.error('Error getting products:', error);
     return [];
@@ -218,22 +173,16 @@ export const getProducts = async (): Promise<Product[]> => {
 
 export const getProductById = async (id: string): Promise<Product | null> => {
   try {
-    // Get products from mockAPI (same data used in Products tab)
-    const products = mockAPI.getProducts();
-    const categories = mockAPI.getCategories();
-    
-    const product = products.find(p => p.active && p.id === id);
-    if (!product) return null;
-    
-    const category = categories.find(c => c.id === product.categoryId);
+    const p = await apiCall<any>(`/products/${id}`);
+    if (!p) return null;
     return {
-      id: product.id,
-      nome: product.name,
-      sku: product.sku,
-      preco: product.price,
-      estoque: product.stock,
-      categoria: category?.name,
-      barcode: product.barcode,
+      id: p.id,
+      nome: p.name,
+      sku: p.sku,
+      preco: Number(p.price ?? 0),
+      estoque: Number(p.currentStock ?? 0),
+      categoria: p.category,
+      barcode: p.barcode,
     };
   } catch (error) {
     console.error('Error getting product by id:', error);
@@ -321,45 +270,72 @@ export const createSale = async (
   discount?: number
 ): Promise<Sale> => {
   try {
-    // Get existing sales from localStorage
-    const existingSales = getFromStorage<Sale[]>('2f.pos.sales', []);
-    
-    // Calculate subtotal from cart
-    const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
-    
-    // Apply discount if provided
-    const total = subtotal - (discount || 0);
-    
-    // Get current session for operator
+    // Helper: aplica desconto global proporcionalmente
+    const applyGlobalDiscount = (items: CartItem[], discountValue = 0) => {
+      const subtotal = items.reduce((sum, it) => sum + it.subtotal, 0);
+      if (!subtotal || !discountValue) {
+        return items.map((it) => ({
+          productId: it.produto.id,
+          qty: it.qtd,
+          unitPrice: Number(it.produto.preco.toFixed(2)),
+        }));
+      }
+      let remaining = Number((discountValue || 0).toFixed(2));
+      const mapped = items.map((it, idx) => {
+        const share = idx === items.length - 1
+          ? remaining
+          : Number(((it.subtotal / subtotal) * (discountValue || 0)).toFixed(2));
+        remaining = Number((remaining - share).toFixed(2));
+        const unit = Math.max((it.subtotal - share) / it.qtd, 0);
+        return {
+          productId: it.produto.id,
+          qty: it.qtd,
+          unitPrice: Number(unit.toFixed(2)),
+        };
+      });
+      return mapped;
+    };
+
     const currentSession = getCurrentSession();
     const operator = currentSession?.operador?.nome || 'Sistema';
-    
-    // Create new sale
-    const newSale: Sale = {
-      id: `sale_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      code: `VND${String(existingSales.length + 1).padStart(6, '0')}`,
+
+    const payload = {
       operator,
       paymentMethod,
-      status: 'completed',
-      total,
-      customerId: undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      items: cart.map((item, index) => ({
-        id: `item_${Date.now()}_${index}`,
-        productId: item.produto.id,
-        qty: item.qtd,
-        unitPrice: item.produto.preco,
-        subtotal: item.subtotal,
-        createdAt: new Date().toISOString(),
+      items: applyGlobalDiscount(cart, discount || 0),
+    } as any;
+
+    const created = await apiCall<any>('/sales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const newSale: Sale = {
+      id: created.id,
+      code: created.code,
+      operator: created.operator,
+      paymentMethod: created.paymentMethod,
+      status: created.status,
+      total: created.total,
+      customerId: created.customerId,
+      createdAt: created.createdAt,
+      updatedAt: created.updatedAt,
+      items: (created.items || []).map((it: any) => ({
+        id: it.id,
+        productId: it.productId,
+        qty: it.qty,
+        unitPrice: it.unitPrice,
+        subtotal: it.subtotal,
+        createdAt: it.createdAt,
       })),
     };
 
-    // Save to localStorage
-    const updatedSales = [...existingSales, newSale];
-    setInStorage('2f.pos.sales', updatedSales);
+    if (currentSession) {
+      currentSession.vendasIds.push(newSale.id);
+      setInStorage(STORAGE_KEYS.session, { ...currentSession });
+    }
 
-    // Clear cart after successful sale
     await clearCart();
 
     return newSale;
@@ -371,8 +347,26 @@ export const createSale = async (
 
 export const getSales = async (): Promise<Sale[]> => {
   try {
-    const sales = getFromStorage<Sale[]>('2f.pos.sales', []);
-    return Array.isArray(sales) ? sales : [];
+    const sales = await apiCall<any[]>('/sales');
+    return (sales || []).map((s) => ({
+      id: s.id,
+      code: s.code,
+      operator: s.operator,
+      paymentMethod: s.paymentMethod,
+      status: s.status,
+      total: s.total,
+      customerId: s.customerId,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+      items: (s.items || []).map((it: any) => ({
+        id: it.id,
+        productId: it.productId,
+        qty: it.qty,
+        unitPrice: it.unitPrice,
+        subtotal: it.subtotal,
+        createdAt: it.createdAt,
+      })),
+    }));
   } catch (error) {
     console.error('Error getting sales:', error);
     return [];
@@ -381,9 +375,27 @@ export const getSales = async (): Promise<Sale[]> => {
 
 export const getSaleById = async (id: string): Promise<Sale | null> => {
   try {
-    const sales = getFromStorage<Sale[]>('2f.pos.sales', []);
-    const sale = sales.find(s => s.id === id);
-    return sale || null;
+    const s = await apiCall<any>(`/sales/${id}`);
+    if (!s) return null;
+    return {
+      id: s.id,
+      code: s.code,
+      operator: s.operator,
+      paymentMethod: s.paymentMethod,
+      status: s.status,
+      total: s.total,
+      customerId: s.customerId,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+      items: (s.items || []).map((it: any) => ({
+        id: it.id,
+        productId: it.productId,
+        qty: it.qty,
+        unitPrice: it.unitPrice,
+        subtotal: it.subtotal,
+        createdAt: it.createdAt,
+      })),
+    };
   } catch (error) {
     console.error('Error getting sale by id:', error);
     return null;
@@ -435,7 +447,11 @@ export const closeSession = async (resumoFechamento: Session['resumoFechamento']
   return session;
 };
 
-export const addCashEntry = async (entry: Omit<CashEntry, 'id' | 'timestamp'>): Promise<Session> => {
+export const addCashEntry = async (
+  tipo: 'SANGRIA' | 'SUPRIMENTO',
+  valor: number,
+  descricao: string,
+): Promise<Session> => {
   await delay(200);
   
   const session = getCurrentSession();
@@ -444,8 +460,10 @@ export const addCashEntry = async (entry: Omit<CashEntry, 'id' | 'timestamp'>): 
   }
 
   const cashEntry: CashEntry = {
-    ...entry,
     id: Date.now().toString(),
+    tipo,
+    valor,
+    descricao,
     timestamp: new Date().toISOString(),
   };
 
@@ -487,8 +505,9 @@ export const applyItemDiscount = (item: CartItem, discountPercent: number): Cart
 
 // Refund function
 export const refundSale = async (saleId: string): Promise<void> => {
-  await delay(500);
-  // In a real app, this would call the API to process the refund
-  // For now, we'll just simulate the operation
-  console.log(`Processing refund for sale ${saleId}`);
+  // Calls the local client API to process the refund and revert inventory
+  await apiCall<any>(`/sales/${saleId}/refund`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
 };
