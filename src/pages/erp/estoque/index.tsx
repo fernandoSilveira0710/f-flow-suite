@@ -32,7 +32,8 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { getProducts, createMovement, getStockPrefs, type Product } from '@/lib/stock-api';
+import { getProducts as getMockProducts, getStockPrefs, adjustStock } from '@/lib/stock-api';
+import { getProducts as fetchProductsApi, updateProduct, type ProductResponse } from '@/lib/products-api';
 import { useToast } from '@/hooks/use-toast';
 import { useEntitlements } from '@/hooks/use-entitlements';
 import { useNavigate } from 'react-router-dom';
@@ -53,11 +54,26 @@ const defaultFilters: StockFilters = {
   category: [],
 };
 
+// Tipo local para a UI da página de Estoque
+interface UIProduct {
+  id: string;
+  nome: string;
+  sku: string;
+  preco?: number;
+  estoque: number;
+  estoqueAtual: number;
+  estoqueMinimo?: number;
+  categoria?: string;
+  barcode?: string;
+  unidade?: string;
+  validade?: string;
+}
+
 export default function StockPositionPage() {
-  const [products, setProducts] = useState<Product[]>(getProducts());
+  const [products, setProducts] = useState<UIProduct[]>([]);
   const { filters, setFilters, clearFilters, activeFiltersCount } = useUrlFilters(defaultFilters);
   const [movementDialog, setMovementDialog] = useState<MovementDialogType>(null);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<UIProduct | null>(null);
   const [quantity, setQuantity] = useState('');
   const [cost, setCost] = useState('');
   const [document, setDocument] = useState('');
@@ -71,6 +87,47 @@ export default function StockPositionPage() {
   const { entitlements } = useEntitlements();
   const navigate = useNavigate();
   const prefs = getStockPrefs();
+
+  // Carregar produtos da API real com fallback para mock
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const list = await fetchProductsApi();
+        const mapped: UIProduct[] = list.map((p: ProductResponse) => ({
+          id: p.id,
+          nome: p.name,
+          sku: p.sku || '',
+          preco: p.price,
+          estoque: p.currentStock,
+          estoqueAtual: p.currentStock,
+          estoqueMinimo: p.minStock ?? prefs.estoqueMinimoPadrao ?? undefined,
+          categoria: p.category,
+          barcode: p.barcode,
+          unidade: p.unit || 'un',
+          validade: undefined,
+        }));
+        setProducts(mapped);
+      } catch (error) {
+        console.warn('API de produtos indisponível, usando dados mock:', error);
+        const mockList = getMockProducts();
+        setProducts(mockList.map(p => ({
+          id: p.id,
+          nome: p.nome,
+          sku: p.sku,
+          preco: p.preco,
+          estoque: p.estoque,
+          estoqueAtual: p.estoqueAtual,
+          estoqueMinimo: p.estoqueMinimo,
+          categoria: p.categoria,
+          barcode: p.barcode,
+          unidade: p.unidade,
+          validade: p.validade,
+        })));
+      }
+    };
+    loadProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredProducts = useMemo(() => {
     let result = products;
@@ -110,7 +167,7 @@ export default function StockPositionPage() {
     return result;
   }, [products, filters, prefs]);
 
-  const openMovementDialog = (type: MovementDialogType, product: Product) => {
+  const openMovementDialog = (type: MovementDialogType, product: UIProduct) => {
     setSelectedProduct(product);
     setMovementDialog(type);
     setQuantity('');
@@ -123,7 +180,76 @@ export default function StockPositionPage() {
     setAlterarMinimo(false);
   };
 
-  const handleMovement = () => {
+  // Sanitização e formatação de custo com 2 casas decimais
+  const sanitizeCurrencyInput = (input: string) => {
+    if (input === '') return '';
+    let v = input.replace(',', '.');
+    // Mantém apenas dígitos e um ponto
+    v = v.replace(/[^\d.]/g, '');
+    const parts = v.split('.');
+    if (parts.length > 2) {
+      v = parts[0] + '.' + parts.slice(1).join('').replace(/\./g, '');
+    }
+    const [intPart, decPart] = v.split('.');
+    if (decPart !== undefined) {
+      return `${intPart}${decPart ? '.' + decPart.slice(0, 2) : ''}`;
+    }
+    return intPart;
+  };
+
+  const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const sanitized = sanitizeCurrencyInput(raw);
+    setCost(sanitized);
+  };
+
+  const handleCostBlur = () => {
+    if (!cost) return;
+    const num = parseFloat(cost);
+    if (!isNaN(num) && num >= 0) {
+      setCost(num.toFixed(2));
+    } else {
+      setCost('');
+    }
+  };
+
+  const refreshProducts = async () => {
+    try {
+      const list = await fetchProductsApi();
+      const mapped: UIProduct[] = list.map((p: ProductResponse) => ({
+        id: p.id,
+        nome: p.name,
+        sku: p.sku || '',
+        preco: p.price,
+        estoque: p.currentStock,
+        estoqueAtual: p.currentStock,
+        estoqueMinimo: p.minStock ?? prefs.estoqueMinimoPadrao ?? undefined,
+        categoria: p.category,
+        barcode: p.barcode,
+        unidade: p.unit || 'un',
+        validade: undefined,
+      }));
+      setProducts(mapped);
+    } catch (error) {
+      console.warn('Falha ao atualizar via API, fallback para mock:', error);
+      const mockList = getMockProducts();
+      setProducts(mockList.map(p => ({
+        id: p.id,
+        nome: p.nome,
+        sku: p.sku,
+        preco: p.preco,
+        estoque: p.estoque,
+        estoqueAtual: p.estoqueAtual,
+        estoqueMinimo: p.estoqueMinimo,
+        categoria: p.categoria,
+        barcode: p.barcode,
+        unidade: p.unidade,
+        validade: p.validade,
+      })));
+    }
+  };
+
+  const handleMovement = async () => {
     if (!selectedProduct || !movementDialog) return;
 
     // Para ajuste, verificar se pelo menos uma opção está habilitada
@@ -157,20 +283,47 @@ export default function StockPositionPage() {
     }
 
     try {
-      createMovement({
-        tipo: movementDialog,
-        produtoId: selectedProduct.id,
-        sku: selectedProduct.sku,
-        quantidade: movementDialog === 'AJUSTE' && alterarSaldo ? parseFloat(quantity) : movementDialog !== 'AJUSTE' ? parseFloat(quantity) : undefined,
-        custoUnit: cost ? parseFloat(cost) : undefined,
-        origem: movementDialog === 'ENTRADA' ? 'COMPRA' : movementDialog === 'SAIDA' ? 'VENDA' : 'INVENTARIO',
-        motivo: motivo || undefined,
-        documento: document || undefined,
-        observacao: notes || undefined,
-        estoqueMinimo: movementDialog === 'AJUSTE' && alterarMinimo ? parseFloat(minStock) : undefined,
-      });
+      // Determinar delta e razão para ajuste de estoque
+      let delta = 0;
+      let reason = 'Inventário';
+      if (movementDialog === 'ENTRADA') {
+        delta = parseFloat(quantity);
+        reason = 'Compra';
+      } else if (movementDialog === 'SAIDA') {
+        delta = -parseFloat(quantity);
+        reason = motivo || 'Venda';
+      } else if (movementDialog === 'AJUSTE' && alterarSaldo) {
+        const novoSaldo = parseFloat(quantity);
+        delta = novoSaldo - selectedProduct.estoqueAtual;
+        reason = 'Inventário';
+      }
 
-      setProducts(getProducts());
+      const ops: Promise<any>[] = [];
+      // Executar ajuste de estoque se aplicável
+      if (movementDialog !== 'AJUSTE' || alterarSaldo) {
+        ops.push(
+          adjustStock({
+            productId: selectedProduct.id,
+            delta,
+            reason,
+            notes: notes || undefined,
+            document: document || undefined,
+            unitCost:
+              movementDialog === 'ENTRADA' && cost
+                ? parseFloat(cost)
+                : undefined,
+          })
+        );
+      }
+      // Atualizar estoque mínimo quando solicitado
+      if (movementDialog === 'AJUSTE' && alterarMinimo) {
+        const minValue = parseFloat(minStock);
+        ops.push(updateProduct(selectedProduct.id, { minStock: minValue }));
+      }
+
+      await Promise.all(ops);
+
+      await refreshProducts();
       setMovementDialog(null);
       setAlterarSaldo(false);
       setAlterarMinimo(false);
@@ -189,7 +342,7 @@ export default function StockPositionPage() {
     }
   };
 
-  const getStockBadge = (product: Product) => {
+  const getStockBadge = (product: UIProduct) => {
     if (product.estoqueAtual <= 0) {
       return <Badge variant="destructive">Ruptura</Badge>;
     }
@@ -462,8 +615,10 @@ export default function StockPositionPage() {
                   id="cost"
                   type="number"
                   step="0.01"
+                  min={0}
                   value={cost}
-                  onChange={(e) => setCost(e.target.value)}
+                  onChange={handleCostChange}
+                  onBlur={handleCostBlur}
                   placeholder="0.00"
                 />
               </div>

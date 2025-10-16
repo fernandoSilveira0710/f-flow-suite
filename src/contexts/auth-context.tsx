@@ -37,6 +37,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Pequena utilidade para fetch com timeout explícito
+  const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 3000) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      return response;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
   // Verificar se há usuário logado no localStorage ao inicializar
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -46,8 +58,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(JSON.parse(storedUser));
         }
         
-        // Sempre verificar status da licença
-        await checkLicenseStatus();
+        // Iniciar verificação de licença sem bloquear indefinidamente o loading.
+        const licenseCheck = checkLicenseStatus();
+        // Espera no máximo 1.5s antes de liberar UI; licença continua em background.
+        await Promise.race([
+          licenseCheck,
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ]);
       } catch (error) {
         console.error('Erro ao verificar status de autenticação:', error);
         localStorage.removeItem('auth_user');
@@ -70,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLicenseStatus(null);
       
       // Consulta DIRETA ao client-local - SEM CACHE
-      const statusResponse = await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
+      const statusResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
         method: 'GET',
         cache: 'no-cache',
         headers: {
@@ -81,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           'Expires': '0',
           ...(tenantId && { 'x-tenant-id': tenantId })
         }
-      });
+      }, 3000);
       
       if (!statusResponse.ok) {
         throw new Error(`Status request failed: ${statusResponse.status}`);
@@ -90,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const statusData = await statusResponse.json();
       console.log('📊 Status data from client-local:', statusData);
       
-      const installResponse = await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/install-status?t=${Date.now()}`, {
+      const installResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/install-status?t=${Date.now()}`, {
         method: 'GET',
         cache: 'no-cache',
         headers: {
@@ -101,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           'Expires': '0',
           ...(tenantId && { 'x-tenant-id': tenantId })
         }
-      });
+      }, 3000);
       
       if (!installResponse.ok) {
         throw new Error(`Install status request failed: ${installResponse.status}`);

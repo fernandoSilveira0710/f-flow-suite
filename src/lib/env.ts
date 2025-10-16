@@ -3,23 +3,18 @@
  * Centraliza todas as URLs e configurações de ambiente
  */
 
-// Função para obter variável de ambiente com fallback
-const getEnvVar = (key: string, fallback: string): string => {
-  return import.meta.env[key] || fallback;
-};
-
 // URLs das APIs
 export const API_URLS = {
-  HUB: getEnvVar('VITE_HUB_API_URL', 'http://localhost:3001'),
-  CLIENT_LOCAL: getEnvVar('VITE_CLIENT_LOCAL_API_URL', 'http://localhost:8081'),
-  SITE: getEnvVar('VITE_SITE_URL', 'http://localhost:5173'),
-  FRONTEND: getEnvVar('VITE_FRONTEND_URL', 'http://localhost:5173'),
+  HUB: import.meta.env.VITE_HUB_API_URL || 'http://127.0.0.1:3001',
+  CLIENT_LOCAL: import.meta.env.VITE_CLIENT_LOCAL_API_URL || 'http://127.0.0.1:8081',
+  SITE: import.meta.env.VITE_SITE_URL || 'http://127.0.0.1:5173',
+  FRONTEND: import.meta.env.VITE_FRONTEND_URL || 'http://127.0.0.1:8080',
 } as const;
 
 // URLs de desenvolvimento
 export const DEV_URLS = {
-  PRISMA_STUDIO_HUB: getEnvVar('VITE_PRISMA_STUDIO_HUB_URL', 'http://localhost:5555'),
-  PRISMA_STUDIO_LOCAL: getEnvVar('VITE_PRISMA_STUDIO_LOCAL_URL', 'http://localhost:5556'),
+  PRISMA_STUDIO_HUB: import.meta.env.VITE_PRISMA_STUDIO_HUB_URL || 'http://127.0.0.1:5555',
+  PRISMA_STUDIO_LOCAL: import.meta.env.VITE_PRISMA_STUDIO_LOCAL_URL || 'http://127.0.0.1:5556',
 } as const;
 
 // Endpoints específicos
