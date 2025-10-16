@@ -39,6 +39,7 @@ export interface Sale {
 export interface SaleItem {
   id: string;
   productId: string;
+  productName?: string;
   qty: number;
   unitPrice: number;
   subtotal: number;
@@ -324,6 +325,7 @@ export const createSale = async (
       items: (created.items || []).map((it: any) => ({
         id: it.id,
         productId: it.productId,
+        productName: it.productName ?? undefined,
         qty: it.qty,
         unitPrice: it.unitPrice,
         subtotal: it.subtotal,
@@ -361,6 +363,7 @@ export const getSales = async (): Promise<Sale[]> => {
       items: (s.items || []).map((it: any) => ({
         id: it.id,
         productId: it.productId,
+        productName: it.productName ?? undefined,
         qty: it.qty,
         unitPrice: it.unitPrice,
         subtotal: it.subtotal,
@@ -390,6 +393,7 @@ export const getSaleById = async (id: string): Promise<Sale | null> => {
       items: (s.items || []).map((it: any) => ({
         id: it.id,
         productId: it.productId,
+        productName: it.productName ?? undefined,
         qty: it.qty,
         unitPrice: it.unitPrice,
         subtotal: it.subtotal,

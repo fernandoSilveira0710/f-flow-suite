@@ -103,7 +103,9 @@ export default function SalesPage() {
   useEffect(() => {
     const loadNames = async () => {
       if (!showDetailDialog || !selectedSale) return;
-      const ids = Array.from(new Set((selectedSale.items || []).map((i) => i.productId)));
+      const ids = Array.from(
+        new Set((selectedSale.items || []).filter((i) => !i.productName).map((i) => i.productId))
+      );
       const missing = ids.filter((id) => !productNameCache[id]);
       if (missing.length === 0) return;
       try {
@@ -495,7 +497,7 @@ export default function SalesPage() {
                   {selectedSale.items?.map((item, i) => (
                     <div key={i} className="flex justify-between text-sm">
                       <span>
-                        {item.qty}x {productNameCache[item.productId] || `Produto ${item.productId.slice(0, 8)}`}
+                        {item.qty}x {item.productName || productNameCache[item.productId] || `Produto ${item.productId.slice(0, 8)}`}
                       </span>
                       <span className="font-medium tabular-nums">{formatCurrency(item.unitPrice * item.qty)}</span>
                     </div>
