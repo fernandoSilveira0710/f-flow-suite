@@ -123,20 +123,29 @@ export class SalesService {
         throw invErr;
       }
 
-      // Return formatted response
+      // Fetch with product relation to enrich items with productName
+      const saleWithItems = await this.prisma.sale.findUnique({
+        where: { id: result.sale.id },
+        include: { items: { include: { product: true } } },
+      });
+      if (!saleWithItems) {
+        throw new NotFoundException(`Sale with ID ${result.sale.id} not found after creation`);
+      }
+
       return {
-        id: result.sale.id,
-        code: result.sale.code,
-        operator: result.sale.operator,
-        paymentMethod: result.sale.paymentMethod,
-        status: result.sale.status,
-        total: Number(result.sale.total),
-        customerId: result.sale.customerId || undefined,
-        createdAt: result.sale.createdAt.toISOString(),
-        updatedAt: result.sale.updatedAt.toISOString(),
-        items: result.items.map((item: any) => ({
+        id: saleWithItems.id,
+        code: saleWithItems.code,
+        operator: saleWithItems.operator,
+        paymentMethod: saleWithItems.paymentMethod,
+        status: saleWithItems.status,
+        total: Number(saleWithItems.total),
+        customerId: saleWithItems.customerId || undefined,
+        createdAt: saleWithItems.createdAt.toISOString(),
+        updatedAt: saleWithItems.updatedAt.toISOString(),
+        items: (saleWithItems.items || []).map((item: any) => ({
           id: item.id,
           productId: item.productId,
+          productName: item.product?.name,
           qty: item.qty,
           unitPrice: Number(item.unitPrice),
           subtotal: Number(item.subtotal),
@@ -154,7 +163,7 @@ export class SalesService {
 
     const sales = await this.prisma.sale.findMany({
       include: {
-        items: true,
+        items: { include: { product: true } },
       },
       orderBy: {
         createdAt: 'desc',
@@ -174,6 +183,7 @@ export class SalesService {
       items: sale.items.map((item: any) => ({
         id: item.id,
         productId: item.productId,
+        productName: item.product?.name,
         qty: item.qty,
         unitPrice: Number(item.unitPrice),
         subtotal: Number(item.subtotal),
@@ -188,7 +198,7 @@ export class SalesService {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
       include: {
-        items: true,
+        items: { include: { product: true } },
       },
     });
 
@@ -209,6 +219,7 @@ export class SalesService {
       items: sale.items.map((item: any) => ({
         id: item.id,
         productId: item.productId,
+        productName: item.product?.name,
         qty: item.qty,
         unitPrice: Number(item.unitPrice),
         subtotal: Number(item.subtotal),
@@ -238,7 +249,7 @@ export class SalesService {
     const updated = await this.prisma.sale.update({
       where: { id: sale.id },
       data: { status: 'refunded' },
-      include: { items: true },
+      include: { items: { include: { product: true } } },
     });
 
     // Adjust inventory (increase quantities back)
@@ -272,6 +283,7 @@ export class SalesService {
       items: (updated.items || []).map((item: any) => ({
         id: item.id,
         productId: item.productId,
+        productName: item.product?.name,
         qty: item.qty,
         unitPrice: Number(item.unitPrice),
         subtotal: Number(item.subtotal),
