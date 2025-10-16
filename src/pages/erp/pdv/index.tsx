@@ -495,21 +495,30 @@ export default function PdvPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
   const total = Math.max(subtotal - discount, 0);
 
-  // Calculate session totals
+  // Calculate session totals using API sales
   const sessionTotals = session && session.status === 'Aberto' ? (() => {
-    const allSales = JSON.parse(localStorage.getItem('2f.pos.sales') || '[]');
-    const sessionSales = allSales.filter((s: any) => 
-      session.vendasIds.includes(s.id) && s.status === 'Pago'
+    const normalize = (m: string) => (m || '').toUpperCase();
+    const isCash = (m: string) => ['DINHEIRO', 'CASH'].includes(normalize(m));
+    const isPix = (m: string) => normalize(m) === 'PIX';
+    const isCard = (m: string) => {
+      const n = normalize(m);
+      return n.includes('CART') || n.includes('CARD') || n.includes('CREDIT') || n.includes('CRÉDIT') || n.includes('DEBIT');
+    };
+
+    const sessionSales = sales.filter((s: any) =>
+      session.vendasIds.includes(s.id) && (s.status === 'completed')
     );
-    
-    const totalVendas = sessionSales.reduce((sum: number, s: any) => sum + s.total, 0);
-    const totalDinheiro = sessionSales.filter((s: any) => s.pagamento === 'Dinheiro').reduce((sum: number, s: any) => sum + s.total, 0);
-    const totalCartao = sessionSales.filter((s: any) => s.pagamento.includes('Cartão')).reduce((sum: number, s: any) => sum + s.total, 0);
-    const totalPix = sessionSales.filter((s: any) => s.pagamento === 'PIX').reduce((sum: number, s: any) => sum + s.total, 0);
+
+    const sumTotals = (arr: any[]) => arr.reduce((sum: number, s: any) => sum + (s.total || 0), 0);
+
+    const totalVendas = sumTotals(sessionSales);
+    const totalDinheiro = sumTotals(sessionSales.filter((s: any) => isCash(s.paymentMethod)));
+    const totalCartao = sumTotals(sessionSales.filter((s: any) => isCard(s.paymentMethod)));
+    const totalPix = sumTotals(sessionSales.filter((s: any) => isPix(s.paymentMethod)));
     const totalSangria = session.cash.filter(c => c.tipo === 'SANGRIA').reduce((sum, c) => sum + c.valor, 0);
     const totalSuprimento = session.cash.filter(c => c.tipo === 'SUPRIMENTO').reduce((sum, c) => sum + c.valor, 0);
     const saldoFinalCalculado = session.saldoInicial + totalSuprimento - totalSangria + totalDinheiro;
-    
+
     return { totalVendas, totalDinheiro, totalCartao, totalPix, totalSangria, totalSuprimento, saldoFinalCalculado, qtdVendas: sessionSales.length };
   })() : null;
 
@@ -849,7 +858,7 @@ export default function PdvPage() {
                               <Button size="sm" variant="outline">
                                 Imprimir
                               </Button>
-                              {sale.status === 'Pago' && (
+                              {sale.status === 'completed' && (
                                 <Button
                                   size="sm"
                                   variant="destructive"
@@ -976,7 +985,7 @@ export default function PdvPage() {
                         {session.cash.filter(c => c.tipo === 'SANGRIA').map(c => (
                           <div key={c.id} className="text-xs flex justify-between">
                             <span className="text-muted-foreground">
-                              {new Date(c.dataISO).toLocaleTimeString('pt-BR')}
+                              {new Date(c.timestamp).toLocaleTimeString('pt-BR')}
                             </span>
                             <span className="font-medium">R$ {c.valor.toFixed(2)}</span>
                           </div>
@@ -1029,7 +1038,7 @@ export default function PdvPage() {
                         {session.cash.filter(c => c.tipo === 'SUPRIMENTO').map(c => (
                           <div key={c.id} className="text-xs flex justify-between">
                             <span className="text-muted-foreground">
-                              {new Date(c.dataISO).toLocaleTimeString('pt-BR')}
+                              {new Date(c.timestamp).toLocaleTimeString('pt-BR')}
                             </span>
                             <span className="font-medium">R$ {c.valor.toFixed(2)}</span>
                           </div>

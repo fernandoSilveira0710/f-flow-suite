@@ -1,9 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EventValidatorService } from '../common/validation';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { SaleResponseDto, SaleItemResponseDto } from './dto/sale-response.dto';
 import { v4 as uuidv4 } from 'uuid';
+import { InventoryService } from '../inventory/inventory.service';
 
 @Injectable()
 export class SalesService {
@@ -12,6 +13,7 @@ export class SalesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventValidator: EventValidatorService,
+    private readonly inventoryService: InventoryService,
   ) {}
 
   async createSale(createSaleDto: CreateSaleDto): Promise<SaleResponseDto> {
@@ -101,6 +103,26 @@ export class SalesService {
         };
       });
 
+      // After committing the sale transaction, adjust inventory (decrease)
+      try {
+        const adjustments = result.items.map((item: any) => ({
+          productId: item.productId,
+          delta: -Number(item.qty),
+          reason: 'sale.pdv',
+          notes: `PDV sale ${result.sale.code}`,
+          document: result.sale.code,
+        }));
+
+        if (adjustments.length > 0) {
+          await this.inventoryService.adjustInventory({ adjustments });
+        }
+      } catch (invErr) {
+        this.logger.error('Failed to adjust inventory after sale creation', invErr as any);
+        // Propagate to let caller know inventory did not update
+        // Note: sale is already created at this point
+        throw invErr;
+      }
+
       // Return formatted response
       return {
         id: result.sale.id,
@@ -185,6 +207,69 @@ export class SalesService {
       createdAt: sale.createdAt.toISOString(),
       updatedAt: sale.updatedAt.toISOString(),
       items: sale.items.map((item: any) => ({
+        id: item.id,
+        productId: item.productId,
+        qty: item.qty,
+        unitPrice: Number(item.unitPrice),
+        subtotal: Number(item.subtotal),
+        createdAt: item.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async refundSale(id: string): Promise<SaleResponseDto> {
+    this.logger.log(`Refunding sale: ${id}`);
+
+    // Fetch sale with items
+    const sale = await this.prisma.sale.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+
+    if (!sale) {
+      throw new NotFoundException(`Sale with ID ${id} not found`);
+    }
+
+    if (sale.status === 'refunded') {
+      throw new BadRequestException('Sale already refunded');
+    }
+
+    // Update sale status first
+    const updated = await this.prisma.sale.update({
+      where: { id: sale.id },
+      data: { status: 'refunded' },
+      include: { items: true },
+    });
+
+    // Adjust inventory (increase quantities back)
+    try {
+      const adjustments = (updated.items || []).map((item: any) => ({
+        productId: item.productId,
+        delta: Number(item.qty),
+        reason: 'sale.refund',
+        notes: `Refund of sale ${updated.code}`,
+        document: updated.code,
+      }));
+      if (adjustments.length > 0) {
+        await this.inventoryService.adjustInventory({ adjustments });
+      }
+    } catch (invErr) {
+      this.logger.error('Failed to adjust inventory for refund', invErr as any);
+      // We choose to propagate error so caller is aware; sale status is already updated
+      throw invErr;
+    }
+
+    return {
+      id: updated.id,
+      code: updated.code,
+      operator: updated.operator,
+      paymentMethod: updated.paymentMethod,
+      status: updated.status,
+      total: Number(updated.total),
+      customerId: updated.customerId || undefined,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+      items: (updated.items || []).map((item: any) => ({
         id: item.id,
         productId: item.productId,
         qty: item.qty,
