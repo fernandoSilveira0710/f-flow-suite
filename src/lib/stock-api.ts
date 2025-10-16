@@ -1,6 +1,7 @@
 // Import mockAPI to use the same products data
 import { mockAPI, type Product as MockProduct } from './mock-data';
 import { API_URLS } from './env';
+import { apiClient, getTenantId } from './api-client';
 
 /**
  * Stock/Inventory API - Real API Integration
@@ -21,6 +22,7 @@ export interface StockMovement {
   documento?: string;
   data: string;
   usuario: string;
+  observacao?: string;
 }
 
 export interface CreateMovementDto {
@@ -66,6 +68,8 @@ export interface AdjustInventoryItemDto {
   delta: number; // positivo para entrada, negativo para saída
   reason: string;
   notes?: string;
+  document?: string;
+  unitCost?: number;
 }
 
 export interface BulkAdjustInventoryDto {
@@ -199,14 +203,61 @@ export const getLowStockItems = async (): Promise<StockItem[]> => {
   }
 };
 
-export const getStockMovements = async (productId?: string): Promise<StockAdjustment[]> => {
+export const getStockMovements = async (productId?: string): Promise<StockMovement[]> => {
   try {
-    // Note: This would require a new endpoint in client-local to get stock movements/adjustments history
-    // For now, we'll return an empty array as this functionality needs to be implemented in client-local
-    console.warn('Stock movements endpoint not yet implemented in client-local');
-    return [];
+    const tenantId = getTenantId();
+    const endpoint = productId
+      ? `/tenants/${tenantId}/inventory/adjustments/product/${productId}`
+      : `/tenants/${tenantId}/inventory/adjustments`;
+
+    type HubAdjustment = {
+      id: string;
+      tenantId: string;
+      productId: string;
+      productName: string;
+      productSku: string | null;
+      delta: number;
+      reason: string | null;
+      previousStock: number | null;
+      newStock: number | null;
+      adjustedAt: string;
+      createdAt: string;
+      updatedAt: string;
+    };
+
+    const adjustments = await apiClient<HubAdjustment[]>(endpoint, { method: 'GET' });
+
+    return adjustments.map((adj) => {
+      // Determine UI movement type
+      let tipo: 'ENTRADA' | 'SAIDA' | 'AJUSTE';
+      const reasonUpper = (adj.reason || '').toUpperCase();
+      if (['AJUSTE', 'ADJUSTMENT', 'INVENTARIO', 'INVENTORY'].includes(reasonUpper)) {
+        tipo = 'AJUSTE';
+      } else if (adj.delta > 0) {
+        tipo = 'ENTRADA';
+      } else {
+        tipo = 'SAIDA';
+      }
+
+      const quantidade = Math.abs(adj.delta || 0);
+
+      return {
+        id: adj.id,
+        tipo,
+        produtoId: adj.productId,
+        produtoNome: adj.productName,
+        sku: adj.productSku || '',
+        quantidade,
+        origem: tipo === 'ENTRADA' ? 'COMPRA' : tipo === 'SAIDA' ? 'VENDA' : 'INVENTARIO',
+        motivo: adj.reason || undefined,
+        documento: undefined,
+        observacao: adj.reason || undefined,
+        data: adj.adjustedAt,
+        usuario: 'Sistema',
+      } as StockMovement;
+    });
   } catch (error) {
-    console.error('Error fetching stock movements:', error);
+    console.error('Error fetching stock movements from Hub:', error);
     return [];
   }
 };

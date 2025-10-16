@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreVertical, Eye, Pencil, Trash2, Filter, X } from 'lucide-react';
 import { PageHeader } from '@/components/erp/page-header';
 import { EmptyState } from '@/components/erp/empty-state';
@@ -40,6 +40,7 @@ import { ProductImage } from '@/components/products/product-image';
 import { formatCurrencyDot } from '@/lib/utils';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 interface ProductFilters {
   q: string;
@@ -48,6 +49,9 @@ interface ProductFilters {
   withImage: boolean;
   expiringSoon: boolean;
   days: number;
+  lowStock: boolean;
+  page: number;
+  pageSize: number;
 }
 
 const defaultFilters: ProductFilters = {
@@ -57,9 +61,13 @@ const defaultFilters: ProductFilters = {
   withImage: false,
   expiringSoon: false,
   days: 30,
+  lowStock: false,
+  page: 1,
+  pageSize: 20,
 };
 
 export default function ProdutosIndex() {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<ProductResponse[]>([]);
   const [productToDelete, setProductToDelete] = useState<ProductResponse | null>(null);
   const { filters, setFilters, clearFilters, activeFiltersCount } = useUrlFilters(defaultFilters);
@@ -127,6 +135,14 @@ export default function ProdutosIndex() {
       result = result.filter((_, i) => i % 3 === 0);
     }
 
+    // Low stock (estoque baixo): currentStock <= minStock (quando minStock > 0)
+    if (filters.lowStock) {
+      result = result.filter(p => {
+        const min = typeof p.minStock === 'number' ? p.minStock : 0;
+        return p.trackStock && min > 0 && p.currentStock <= min;
+      });
+    }
+
     return result;
   }, [products, filters]);
 
@@ -174,7 +190,7 @@ export default function ProdutosIndex() {
           title="Nenhum produto cadastrado"
           description="Comece criando seu primeiro produto"
           actionLabel="Novo Produto"
-          onAction={() => {}}
+          onAction={() => navigate('/erp/produtos/novo')}
         />
       </>
     );
@@ -262,6 +278,33 @@ export default function ProdutosIndex() {
           </Label>
         </div>
 
+        {/* Estoque baixo */}
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="low-stock"
+            checked={filters.lowStock}
+            onCheckedChange={(v) => setFilters({ lowStock: Boolean(v), page: 1 })}
+          />
+          <Label htmlFor="low-stock" className="text-sm cursor-pointer">
+            Estoque baixo
+          </Label>
+        </div>
+
+        {/* Itens por página */}
+        <Select
+          value={String(filters.pageSize)}
+          onValueChange={(value: any) => setFilters({ pageSize: Number(value), page: 1 })}
+        >
+          <SelectTrigger className="w-full md:w-[160px]">
+            <SelectValue placeholder="Itens por página" />
+          </SelectTrigger>
+          <SelectContent className="bg-background z-50">
+            <SelectItem value="10">10 por página</SelectItem>
+            <SelectItem value="20">20 por página</SelectItem>
+            <SelectItem value="50">50 por página</SelectItem>
+          </SelectContent>
+        </Select>
+
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -326,86 +369,182 @@ export default function ProdutosIndex() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredProducts.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <ProductImage
-                        imageUrl={product.imageUrl}
-                        productName={product.name}
-                        size={40}
-                        className="rounded-md"
-                      />
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        {product.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-1">
-                            {product.description}
-                          </p>
-                        )}
+              (() => {
+                const totalItems = filteredProducts.length;
+                const pageSize = Math.max(1, filters.pageSize);
+                const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+                const currentPage = Math.min(Math.max(1, filters.page), totalPages);
+                const startIndex = (currentPage - 1) * pageSize;
+                const endIndex = startIndex + pageSize;
+                const pageItems = filteredProducts.slice(startIndex, endIndex);
+
+                return pageItems.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <ProductImage
+                          imageUrl={product.imageUrl}
+                          productName={product.name}
+                          size={40}
+                          className="rounded-md"
+                        />
+                        <div>
+                          <p className="font-medium">{product.name}</p>
+                          {product.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-1">
+                              {product.description}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">{product.sku}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {product.category || '-'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-semibold tabular-nums">
-                    {formatCurrencyDot(product.price)}
-                  </TableCell>
-                  <TableCell>
-                    <span className={product.currentStock < 10 ? 'text-destructive font-semibold' : ''}>
-                      {product.currentStock}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={product.active ? 'default' : 'secondary'}>
-                      {product.active ? 'Ativo' : 'Inativo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <Link to={`/erp/produtos/${product.id}`}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link
-                            to={`/erp/produtos/${product.id}/editar`}
-                            onClick={() => {
-                              console.info('[Produtos] Clique em Editar', { id: product.id, name: product.name });
-                            }}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">{product.sku}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {product.category || '-'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-semibold tabular-nums">
+                      {formatCurrencyDot(product.price)}
+                    </TableCell>
+                    <TableCell>
+                      <span className={product.currentStock < 10 ? 'text-destructive font-semibold' : ''}>
+                        {product.currentStock}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={product.active ? 'default' : 'secondary'}>
+                        {product.active ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link to={`/erp/produtos/${product.id}`}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Ver
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link
+                              to={`/erp/produtos/${product.id}/editar`}
+                              onClick={() => {
+                                console.info('[Produtos] Clique em Editar', { id: product.id, name: product.name });
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Editar
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setProductToDelete(product)}
+                            className="text-destructive"
                           >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Editar
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setProductToDelete(product)}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ));
+              })()
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {filteredProducts.length > 0 && (
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="text-sm text-muted-foreground">
+            {(() => {
+              const totalItems = filteredProducts.length;
+              const pageSize = Math.max(1, filters.pageSize);
+              const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+              const currentPage = Math.min(Math.max(1, filters.page), totalPages);
+              const start = (currentPage - 1) * pageSize + 1;
+              const end = Math.min(start + pageSize - 1, totalItems);
+              return `Mostrando ${start}-${end} de ${totalItems}`;
+            })()}
+          </div>
+          {(() => {
+            const totalItems = filteredProducts.length;
+            const pageSize = Math.max(1, filters.pageSize);
+            const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+            const currentPage = Math.min(Math.max(1, filters.page), totalPages);
+
+            const pagesToShow = 5;
+            const half = Math.floor(pagesToShow / 2);
+            let startPage = Math.max(1, currentPage - half);
+            let endPage = Math.min(totalPages, startPage + pagesToShow - 1);
+            if (endPage - startPage < pagesToShow - 1) {
+              startPage = Math.max(1, endPage - pagesToShow + 1);
+            }
+            const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+
+            return (
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); if (currentPage > 1) setFilters({ page: currentPage - 1 }); }}
+                    />
+                  </PaginationItem>
+                  {startPage > 1 && (
+                    <PaginationItem>
+                      <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setFilters({ page: 1 }); }}>
+                        1
+                      </PaginationLink>
+                    </PaginationItem>
+                  )}
+                  {startPage > 2 && (
+                    <PaginationItem>
+                      <span className="px-2">...</span>
+                    </PaginationItem>
+                  )}
+                  {pageNumbers.map((p) => (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        href="#"
+                        isActive={p === currentPage}
+                        onClick={(e) => { e.preventDefault(); setFilters({ page: p }); }}
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  {endPage < totalPages - 1 && (
+                    <PaginationItem>
+                      <span className="px-2">...</span>
+                    </PaginationItem>
+                  )}
+                  {endPage < totalPages && (
+                    <PaginationItem>
+                      <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setFilters({ page: totalPages }); }}>
+                        {totalPages}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); if (currentPage < totalPages) setFilters({ page: currentPage + 1 }); }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Delete confirmation */}
       <AlertDialog open={!!productToDelete} onOpenChange={() => setProductToDelete(null)}>

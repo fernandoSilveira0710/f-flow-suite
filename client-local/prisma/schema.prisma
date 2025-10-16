@@ -67,6 +67,9 @@ model InventoryAdjustment {
   productId String
   delta     Int
   reason    String
+  notes     String?
+  document  String?
+  unitCost  Decimal?
   createdAt DateTime @default(now())
   product   Product  @relation(fields: [productId], references: [id])
 

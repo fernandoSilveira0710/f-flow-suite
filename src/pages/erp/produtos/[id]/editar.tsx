@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { getProductById, updateProduct, type ProductResponse } from '@/lib/products-api';
+import { adjustStock } from '@/lib/stock-api';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import { ImageUpload } from '@/components/products/image-upload';
@@ -27,6 +28,7 @@ export default function ProdutoEditar() {
   const [loading, setLoading] = useState(true);
   const categories = mockAPI.getCategories();
   const unitsOfMeasure = mockAPI.getUnitsOfMeasure();
+  const [currentStockEdit, setCurrentStockEdit] = useState<string>('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -75,6 +77,7 @@ export default function ProdutoEditar() {
             active: p.active,
             imageUrl: p.imageUrl,
           });
+          setCurrentStockEdit(String(p.currentStock ?? 0));
         }
       } catch (error) {
         console.error('Erro ao carregar produto:', error);
@@ -150,7 +153,7 @@ export default function ProdutoEditar() {
         ? unitsOfMeasure.find(u => u.id === formData.unitOfMeasureId)?.abbreviation
         : undefined;
 
-      await updateProduct(id, {
+      const updated = await updateProduct(id, {
         name: formData.name,
         description: formData.description || undefined,
         sku: formData.sku || undefined,
@@ -164,11 +167,31 @@ export default function ProdutoEditar() {
         imageUrl: formData.imageUrl,
       });
 
+      // Ajuste de estoque atual, caso o valor tenha sido alterado
+      const desiredStock = currentStockEdit.trim() === '' ? NaN : parseInt(currentStockEdit, 10);
+      if (!Number.isNaN(desiredStock)) {
+        const baseStock = product?.currentStock ?? 0;
+        if (desiredStock !== baseStock) {
+          const delta = desiredStock - baseStock;
+          await adjustStock({
+            productId: id,
+            delta,
+            reason: 'Ajuste Manual (Editar Produto)',
+            notes: `Ajuste aplicado na tela de edição. De ${baseStock} para ${desiredStock}.`,
+          });
+        }
+      }
+
       toast({
         title: 'Produto atualizado!',
         description: `${formData.name} foi atualizado com sucesso.`,
       });
 
+      // Recarrega produto para refletir estoque atualizado antes de navegar
+      try {
+        const refreshed = await getProductById(id);
+        setProduct(refreshed);
+      } catch {}
       navigate(`/erp/produtos/${id}`);
     } catch (error: any) {
       console.error('Erro ao atualizar produto:', error);
@@ -335,10 +358,14 @@ export default function ProdutoEditar() {
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Estoque Atual</Label>
+                  <Label htmlFor="currentStock">Estoque Atual</Label>
                   <Input
-                    value={(product?.currentStock ?? 0).toString()}
-                    readOnly
+                    id="currentStock"
+                    type="number"
+                    value={currentStockEdit}
+                    onChange={(e) => setCurrentStockEdit(e.target.value)}
+                    min={0}
+                    step={1}
                   />
                 </div>
 

@@ -40,6 +40,9 @@ export class InventoryService {
             productId: adjustment.productId,
             delta: adjustment.delta,
             reason: adjustment.reason,
+            notes: adjustment.notes ?? null,
+            document: adjustment.document ?? null,
+            unitCost: adjustment.unitCost !== undefined ? adjustment.unitCost : null,
           },
         });
 
@@ -50,6 +53,9 @@ export class InventoryService {
             stockQty: {
               increment: adjustment.delta,
             },
+            ...(adjustment.unitCost !== undefined && adjustment.delta > 0
+              ? { costPrice: adjustment.unitCost }
+              : {}),
           },
         });
 
@@ -58,6 +64,12 @@ export class InventoryService {
           productId: inventoryAdjustment.productId,
           delta: inventoryAdjustment.delta,
           reason: inventoryAdjustment.reason,
+          notes: inventoryAdjustment.notes ?? undefined,
+          document: inventoryAdjustment.document ?? undefined,
+          unitCost:
+            inventoryAdjustment.unitCost !== null && inventoryAdjustment.unitCost !== undefined
+              ? Number(inventoryAdjustment.unitCost)
+              : undefined,
           createdAt: inventoryAdjustment.createdAt,
         });
 
