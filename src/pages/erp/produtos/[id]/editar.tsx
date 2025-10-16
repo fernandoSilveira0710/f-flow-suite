@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/erp/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,32 +14,96 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { mockAPI } from '@/lib/mock-data';
+import { getProductById, updateProduct, type ProductResponse } from '@/lib/products-api';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import { ImageUpload } from '@/components/products/image-upload';
+import { mockAPI } from '@/lib/mock-data';
 
 export default function ProdutoEditar() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const product = id ? mockAPI.getProduct(id) : undefined;
+  const [product, setProduct] = useState<ProductResponse | null>(null);
+  const [loading, setLoading] = useState(true);
   const categories = mockAPI.getCategories();
   const unitsOfMeasure = mockAPI.getUnitsOfMeasure();
 
   const [formData, setFormData] = useState({
-    name: product?.name || '',
-    description: product?.description || '',
-    sku: product?.sku || '',
-    barcode: product?.barcode || '',
-    categoryId: product?.categoryId || '',
-    unitOfMeasureId: product?.unitOfMeasureId || '',
-    price: product?.price.toString() || '',
-    cost: product?.cost.toString() || '',
-    stock: product?.stock.toString() || '',
-    minStock: product?.minStock?.toString() || '',
-    active: product?.active ?? true,
-    imageUrl: product?.imageUrl,
+    name: '',
+    description: '',
+    sku: '',
+    barcode: '',
+    categoryId: '',
+    unitOfMeasureId: '',
+    price: '',
+    cost: '',
+    minStock: '',
+    active: true,
+    imageUrl: undefined as string | undefined,
   });
+
+  useEffect(() => {
+    let mounted = true;
+    console.info('[ProdutoEditar] Tela de edição aberta', { id });
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+    (async () => {
+      try {
+        console.info('[ProdutoEditar] Iniciando carregamento do produto', { id });
+        const p = await getProductById(id);
+        if (mounted) {
+          setProduct(p);
+          console.info('[ProdutoEditar] Produto carregado com sucesso', { id: p.id, name: p.name });
+          const selectedCategoryId = p.category
+            ? (categories.find(c => c.name === p.category)?.id || '')
+            : '';
+          const selectedUnitId = p.unit
+            ? (unitsOfMeasure.find(u => u.abbreviation === p.unit)?.id || '')
+            : '';
+          setFormData({
+            name: p.name || '',
+            description: p.description || '',
+            sku: p.sku || '',
+            barcode: p.barcode || '',
+            categoryId: selectedCategoryId,
+            unitOfMeasureId: selectedUnitId,
+            price: p.price.toFixed(2),
+            cost: (p.cost ?? 0).toFixed(2),
+            minStock: p.minStock?.toString() || '',
+            active: p.active,
+            imageUrl: p.imageUrl,
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao carregar produto:', error);
+        toast({
+          title: 'Erro ao carregar produto',
+          description:
+            (error as any)?.message || 'Não foi possível obter os dados do produto.',
+          variant: 'destructive',
+        });
+        if (mounted) setProduct(null);
+      } finally {
+        if (mounted) setLoading(false);
+        console.info('[ProdutoEditar] Finalizou carregamento', { id, loadingEnded: true });
+      }
+    })();
+    return () => { mounted = false; };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div>
+        <PageHeader title="Carregando produto..." />
+        <Button onClick={() => navigate('/erp/produtos')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Voltar
+        </Button>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -53,32 +117,67 @@ export default function ProdutoEditar() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Máscara de moeda com ponto: converte SEMPRE a partir de dígitos para centavos
+  // Exemplos: "1" -> "0.01", "199" -> "1.99", "1234" -> "12.34"
+  // Ignora ponto digitado previamente para evitar travar a digitação
+  const applyMoneyMask = (raw: string): string => {
+    if (!raw) return '';
+    const digits = raw.replace(/\D/g, '');
+    if (digits === '') return '';
+    if (digits.length <= 2) {
+      return `0.${digits.padStart(2, '0')}`;
+    }
+    const intPartNum = parseInt(digits.slice(0, -2), 10);
+    const intPart = Number.isNaN(intPartNum) ? '0' : String(intPartNum);
+    const decPart = digits.slice(-2);
+    return `${intPart}.${decPart}`;
+  };
+
+  const handleMoneyInputChange = (field: 'price' | 'cost', raw: string) => {
+    const formatted = applyMoneyMask(raw);
+    setFormData({ ...formData, [field]: formatted });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!id) return;
+    try {
+      const categoryName = formData.categoryId
+        ? categories.find(c => c.id === formData.categoryId)?.name
+        : undefined;
+      const unitAbbr = formData.unitOfMeasureId
+        ? unitsOfMeasure.find(u => u.id === formData.unitOfMeasureId)?.abbreviation
+        : undefined;
 
-    mockAPI.updateProduct(id, {
-      name: formData.name,
-      description: formData.description,
-      sku: formData.sku,
-      barcode: formData.barcode,
-      categoryId: formData.categoryId,
-      unitOfMeasureId: formData.unitOfMeasureId,
-      price: parseFloat(formData.price),
-      cost: parseFloat(formData.cost),
-      stock: parseInt(formData.stock),
-      minStock: formData.minStock ? parseInt(formData.minStock) : undefined,
-      active: formData.active,
-      imageUrl: formData.imageUrl,
-    });
+      await updateProduct(id, {
+        name: formData.name,
+        description: formData.description || undefined,
+        sku: formData.sku || undefined,
+        barcode: formData.barcode || undefined,
+        category: categoryName,
+        unit: unitAbbr,
+        price: parseFloat(formData.price.replace(',', '.')),
+        cost: formData.cost ? parseFloat(formData.cost.replace(',', '.')) : undefined,
+        minStock: formData.minStock ? parseInt(formData.minStock) : undefined,
+        active: formData.active,
+        imageUrl: formData.imageUrl,
+      });
 
-    toast({
-      title: 'Produto atualizado!',
-      description: `${formData.name} foi atualizado com sucesso.`,
-    });
+      toast({
+        title: 'Produto atualizado!',
+        description: `${formData.name} foi atualizado com sucesso.`,
+      });
 
-    navigate(`/erp/produtos/${id}`);
+      navigate(`/erp/produtos/${id}`);
+    } catch (error: any) {
+      console.error('Erro ao atualizar produto:', error);
+      toast({
+        title: 'Erro ao atualizar produto',
+        description: error?.message || 'Tente novamente mais tarde.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -129,14 +228,13 @@ export default function ProdutoEditar() {
                 </div>
 
                 <div>
-                  <Label htmlFor="categoryId">Categoria *</Label>
+                  <Label htmlFor="category">Categoria</Label>
                   <Select
                     value={formData.categoryId}
                     onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((cat) => (
@@ -151,14 +249,13 @@ export default function ProdutoEditar() {
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="unitOfMeasureId">Unidade de Medida *</Label>
+                  <Label htmlFor="unitOfMeasure">Unidade de Medida</Label>
                   <Select
                     value={formData.unitOfMeasureId}
                     onValueChange={(value) => setFormData({ ...formData, unitOfMeasureId: value })}
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
                       {unitsOfMeasure.map((unit) => (
@@ -214,10 +311,11 @@ export default function ProdutoEditar() {
                   <Label htmlFor="price">Preço de Venda *</Label>
                   <Input
                     id="price"
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
+                    pattern={/^\d+(\.\d{0,2})?$/.source}
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    onChange={(e) => handleMoneyInputChange('price', e.target.value)}
                     required
                   />
                 </div>
@@ -226,23 +324,21 @@ export default function ProdutoEditar() {
                   <Label htmlFor="cost">Custo</Label>
                   <Input
                     id="cost"
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
+                    pattern={/^\d+(\.\d{0,2})?$/.source}
                     value={formData.cost}
-                    onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                    onChange={(e) => handleMoneyInputChange('cost', e.target.value)}
                   />
                 </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="stock">Estoque Atual</Label>
+                  <Label>Estoque Atual</Label>
                   <Input
-                    id="stock"
-                    type="number"
-                    value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    required
+                    value={(product?.currentStock ?? 0).toString()}
+                    readOnly
                   />
                 </div>
 

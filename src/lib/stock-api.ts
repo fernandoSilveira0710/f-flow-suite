@@ -60,16 +60,16 @@ export interface StockAdjustment {
   createdBy: string;
 }
 
-export interface CreateStockAdjustmentDto {
+// Ajuste de estoque (shape compatível com client-local)
+export interface AdjustInventoryItemDto {
   productId: string;
-  type: 'IN' | 'OUT' | 'ADJUSTMENT';
-  quantity: number;
+  delta: number; // positivo para entrada, negativo para saída
   reason: string;
   notes?: string;
 }
 
-export interface BulkStockAdjustmentDto {
-  adjustments: CreateStockAdjustmentDto[];
+export interface BulkAdjustInventoryDto {
+  adjustments: AdjustInventoryItemDto[];
 }
 
 // API Configuration
@@ -135,7 +135,7 @@ export const getStockByProductId = async (productId: string): Promise<StockItem 
   }
 };
 
-export const adjustStock = async (adjustment: CreateStockAdjustmentDto): Promise<StockAdjustment> => {
+export const adjustStock = async (adjustment: AdjustInventoryItemDto): Promise<StockAdjustment> => {
   try {
     const result = await apiCall<any>('/inventory/adjust', {
       method: 'POST',
@@ -150,8 +150,8 @@ export const adjustStock = async (adjustment: CreateStockAdjustmentDto): Promise
     return {
       id: adjustmentResult.id,
       productId: adjustmentResult.productId,
-      type: adjustmentResult.type,
-      quantity: adjustmentResult.quantity,
+      type: adjustmentResult.delta >= 0 ? 'IN' : 'OUT',
+      quantity: Math.abs(adjustmentResult.delta),
       reason: adjustmentResult.reason,
       notes: adjustmentResult.notes,
       createdAt: adjustmentResult.createdAt,
@@ -163,7 +163,7 @@ export const adjustStock = async (adjustment: CreateStockAdjustmentDto): Promise
   }
 };
 
-export const bulkAdjustStock = async (bulkAdjustment: BulkStockAdjustmentDto): Promise<StockAdjustment[]> => {
+export const bulkAdjustStock = async (bulkAdjustment: BulkAdjustInventoryDto): Promise<StockAdjustment[]> => {
   try {
     const result = await apiCall<any>('/inventory/adjust', {
       method: 'POST',
@@ -173,8 +173,8 @@ export const bulkAdjustStock = async (bulkAdjustment: BulkStockAdjustmentDto): P
     return result.adjustments.map((adj: any) => ({
       id: adj.id,
       productId: adj.productId,
-      type: adj.type,
-      quantity: adj.quantity,
+      type: adj.delta >= 0 ? 'IN' : 'OUT',
+      quantity: Math.abs(adj.delta),
       reason: adj.reason,
       notes: adj.notes,
       createdAt: adj.createdAt,

@@ -20,6 +20,7 @@ export class InventoryService {
   async adjustInventory(adjustInventoryDto: AdjustInventoryDto): Promise<AdjustInventoryResponseDto> {
     const { adjustments } = adjustInventoryDto;
     const results: InventoryAdjustmentResponseDto[] = [];
+    const eventsToGenerate: { inventoryAdjustment: any; product: any }[] = [];
 
     // Process each adjustment in a transaction
     await this.prisma.$transaction(async (tx) => {
@@ -60,10 +61,15 @@ export class InventoryService {
           createdAt: inventoryAdjustment.createdAt,
         });
 
-        // Generate inventory adjustment event
-        await this.generateInventoryEvent(inventoryAdjustment, product);
+        // Queue inventory adjustment event to be generated after transaction commits
+        eventsToGenerate.push({ inventoryAdjustment, product });
       }
     });
+
+    // Generate inventory adjustment events after transaction commits
+    for (const { inventoryAdjustment, product } of eventsToGenerate) {
+      await this.generateInventoryEvent(inventoryAdjustment, product);
+    }
 
     return {
       adjustments: results,
@@ -119,11 +125,11 @@ export class InventoryService {
       id: inventoryAdjustment.id,
       productId: inventoryAdjustment.productId,
       productName: product.name,
-      productSku: product.sku,
+      productSku: product.sku ?? null,
       delta: inventoryAdjustment.delta,
       reason: inventoryAdjustment.reason,
-      previousStock: product.stockQty - inventoryAdjustment.delta,
-      newStock: product.stockQty,
+      previousStock: product.stockQty,
+      newStock: product.stockQty + inventoryAdjustment.delta,
       adjustedAt: inventoryAdjustment.createdAt?.toISOString() || new Date().toISOString(),
     };
 

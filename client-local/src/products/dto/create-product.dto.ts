@@ -10,6 +10,10 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
   sku?: string;
 
   @IsOptional()
