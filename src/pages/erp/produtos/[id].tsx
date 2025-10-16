@@ -1,17 +1,54 @@
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/erp/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { mockAPI } from '@/lib/mock-data';
+import { getProductById, deleteProduct, type ProductResponse } from '@/lib/products-api';
 import { ArrowLeft, Edit, Trash2, Barcode } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { ProductImage } from '@/components/products/product-image';
+import { formatCurrencyDot } from '@/lib/utils';
 
 export default function ProdutoDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const product = id ? mockAPI.getProduct(id) : undefined;
+  const [product, setProduct] = useState<ProductResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+    (async () => {
+      try {
+        const p = await getProductById(id);
+        if (mounted) setProduct(p);
+      } catch (error) {
+        console.error('Erro ao carregar produto:', error);
+        if (mounted) setProduct(null);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div>
+        <PageHeader title="Carregando produto..." />
+        <Button onClick={() => navigate('/erp/produtos')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Voltar
+        </Button>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -25,15 +62,18 @@ export default function ProdutoDetalhe() {
     );
   }
 
-  const category = mockAPI.getCategories().find(c => c.id === product.categoryId);
+  const categoryName = product.category;
 
-  const handleDelete = () => {
-    if (mockAPI.deleteProduct(product.id)) {
+  const handleDelete = async () => {
+    try {
+      await deleteProduct(product.id);
       toast({
         title: 'Produto excluído',
         description: 'O produto foi removido com sucesso.',
       });
       navigate('/erp/produtos');
+    } catch (error) {
+      console.error('Erro ao excluir produto:', error);
     }
   };
 
@@ -50,7 +90,12 @@ export default function ProdutoDetalhe() {
           Voltar
         </Button>
         <Button asChild>
-          <Link to={`/erp/produtos/${product.id}/editar`}>
+          <Link
+            to={`/erp/produtos/${product.id}/editar`}
+            onClick={() => {
+              console.info('[ProdutoDetalhe] Clique em Editar', { id: product.id, name: product.name });
+            }}
+          >
             <Edit className="mr-2 h-4 w-4" />
             Editar
           </Link>
@@ -86,7 +131,7 @@ export default function ProdutoDetalhe() {
                       Scan Ready
                     </Badge>
                   )}
-                  <Badge variant="secondary">{category?.name || 'Sem categoria'}</Badge>
+                  <Badge variant="secondary">{categoryName || 'Sem categoria'}</Badge>
                 </div>
               </div>
             </div>
@@ -121,28 +166,28 @@ export default function ProdutoDetalhe() {
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Preço de Venda</p>
                 <p className="text-2xl font-bold text-primary">
-                  R$ {product.price.toFixed(2)}
+                  {formatCurrencyDot(product.price)}
                 </p>
               </div>
 
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Custo</p>
                 <p className="text-2xl font-bold">
-                  R$ {product.cost.toFixed(2)}
+                  {formatCurrencyDot(product.cost ?? 0)}
                 </p>
               </div>
 
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Estoque Atual</p>
-                <p className={`text-2xl font-bold ${product.stock < 10 ? 'text-destructive' : ''}`}>
-                  {product.stock} un.
+                <p className={`text-2xl font-bold ${product.currentStock < 10 ? 'text-destructive' : ''}`}>
+                  {product.currentStock} un.
                 </p>
               </div>
 
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Margem</p>
                 <p className="text-lg font-semibold text-secondary">
-                  {((product.price - product.cost) / product.cost * 100).toFixed(1)}%
+                  {product.cost && product.cost > 0 ? (((product.price - product.cost) / product.cost) * 100).toFixed(1) : '0.0'}%
                 </p>
               </div>
             </div>

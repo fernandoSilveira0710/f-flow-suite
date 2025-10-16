@@ -2,6 +2,7 @@ export class ProductResponseDto {
   id: string;
   name: string;
   description?: string;
+  imageUrl?: string;
   sku?: string;
   barcode?: string;
   price: number;

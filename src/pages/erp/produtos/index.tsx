@@ -6,7 +6,12 @@ import { EmptyState } from '@/components/erp/empty-state';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { mockAPI, type Product } from '@/lib/mock-data';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getProducts as getProductsAPI, deleteProduct as deleteProductAPI, type ProductResponse } from '@/lib/products-api';
+import { toast } from '@/hooks/use-toast';
 import {
   Table,
   TableBody,
@@ -32,12 +37,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ProductImage } from '@/components/products/product-image';
+import { formatCurrencyDot } from '@/lib/utils';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ProductFilters {
   q: string;
-  status: string;
+  status: 'all' | 'active' | 'inactive';
   category: string[];
   withImage: boolean;
   expiringSoon: boolean;
@@ -46,7 +52,7 @@ interface ProductFilters {
 
 const defaultFilters: ProductFilters = {
   q: '',
-  status: '',
+  status: 'all',
   category: [],
   withImage: false,
   expiringSoon: false,
@@ -54,20 +60,48 @@ const defaultFilters: ProductFilters = {
 };
 
 export default function ProdutosIndex() {
-  const [products, setProducts] = useState<Product[]>(mockAPI.getProducts());
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [products, setProducts] = useState<ProductResponse[]>([]);
+  const [productToDelete, setProductToDelete] = useState<ProductResponse | null>(null);
   const { filters, setFilters, clearFilters, activeFiltersCount } = useUrlFilters(defaultFilters);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getProductsAPI();
+        setProducts(data);
+      } catch (error) {
+        console.error('Erro ao carregar produtos:', error);
+      }
+    })();
+  }, []);
+
+  // Categorias únicas para filtros
+  const allCategories = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach((p) => {
+      if (p.category) set.add(p.category);
+    });
+    return Array.from(set).sort();
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
     let result = products;
 
     // Search
     if (filters.q) {
-      const lower = filters.q.toLowerCase();
-      result = result.filter(p =>
-        p.name.toLowerCase().includes(lower) || 
-        p.sku.toLowerCase().includes(lower)
-      );
+      const lower = filters.q.trim().toLowerCase();
+      if (lower) {
+        result = result.filter((p) => {
+          const name = (p.name ?? '').toLowerCase();
+          const sku = (p.sku ?? '').toLowerCase();
+          const barcode = (p.barcode ?? '').toLowerCase();
+          return (
+            name.includes(lower) ||
+            sku.includes(lower) ||
+            barcode.includes(lower)
+          );
+        });
+      }
     }
 
     // Status
@@ -79,10 +113,7 @@ export default function ProdutosIndex() {
 
     // Category
     if (filters.category.length > 0) {
-      result = result.filter(p => {
-        const category = mockAPI.getCategories().find(c => c.id === p.categoryId);
-        return category && filters.category.includes(category.name);
-      });
+      result = result.filter(p => p.category && filters.category.includes(p.category));
     }
 
     // With Image
@@ -99,9 +130,36 @@ export default function ProdutosIndex() {
     return result;
   }, [products, filters]);
 
-  const handleDelete = (product: Product) => {
-    setProducts(products.filter(p => p.id !== product.id));
-    setProductToDelete(null);
+  const handleDelete = async (product: ProductResponse) => {
+    try {
+      await deleteProductAPI(product.id);
+      setProducts(products.filter(p => p.id !== product.id));
+      setProductToDelete(null);
+      toast({
+        title: 'Produto excluído',
+        description: 'O produto foi removido (inativado) com sucesso.',
+      });
+    } catch (error) {
+      console.error('Erro ao excluir produto:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      // Tenta extrair corpo JSON retornado pela API (incluído na mensagem pelo apiCall)
+      let serverMsg: string | undefined;
+      try {
+        const jsonStart = message.lastIndexOf('{');
+        if (jsonStart !== -1) {
+          const jsonText = message.substring(jsonStart);
+          const parsed = JSON.parse(jsonText);
+          serverMsg = parsed?.message || parsed?.error;
+        }
+      } catch {}
+
+      const isConflict = message.includes('409') || message.toLowerCase().includes('conflict');
+      toast({
+        title: isConflict ? 'Não foi possível excluir' : 'Erro ao excluir produto',
+        description: serverMsg || 'Ocorreu um erro inesperado ao excluir o produto.',
+        variant: 'destructive',
+      });
+    }
   };
 
   if (products.length === 0) {
@@ -141,6 +199,69 @@ export default function ProdutosIndex() {
           />
         </div>
         
+        {/* Status */}
+        <Select
+          value={filters.status}
+          onValueChange={(value: any) => setFilters({ status: value })}
+        >
+          <SelectTrigger className="w-full md:w-[200px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent className="bg-background z-50">
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="active">Ativos</SelectItem>
+            <SelectItem value="inactive">Inativos</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Categorias */}
+        {allCategories.length > 0 && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full md:w-[200px]">
+                <Filter className="mr-2 h-4 w-4" /> Categorias
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 bg-background" align="start">
+              <div className="space-y-2">
+                {allCategories.map((cat) => {
+                  const checked = filters.category.includes(cat);
+                  return (
+                    <div key={cat} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`cat-${cat}`}
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          const isChecked = Boolean(v);
+                          const next = isChecked
+                            ? [...filters.category, cat]
+                            : filters.category.filter((c) => c !== cat);
+                          setFilters({ category: next });
+                        }}
+                      />
+                      <Label htmlFor={`cat-${cat}`} className="text-sm cursor-pointer">
+                        {cat}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+
+        {/* Com imagem */}
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="with-image"
+            checked={filters.withImage}
+            onCheckedChange={(v) => setFilters({ withImage: Boolean(v) })}
+          />
+          <Label htmlFor="with-image" className="text-sm cursor-pointer">
+            Com imagem
+          </Label>
+        </div>
+
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -167,6 +288,21 @@ export default function ProdutosIndex() {
           </Link>
         </Button>
       </div>
+
+      {/* Chips de categorias ativas */}
+      {filters.category.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {filters.category.map((cat) => (
+            <Badge key={cat} variant="secondary" className="gap-1">
+              {cat}
+              <X
+                className="ml-1 h-3 w-3 cursor-pointer"
+                onClick={() => setFilters({ category: filters.category.filter((c) => c !== cat) })}
+              />
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {/* Products table */}
       <div className="border rounded-lg">
@@ -213,15 +349,15 @@ export default function ProdutosIndex() {
                   <TableCell className="font-mono text-sm">{product.sku}</TableCell>
                   <TableCell>
                     <Badge variant="outline">
-                      {mockAPI.getCategories().find(c => c.id === product.categoryId)?.name || '-'}
+                      {product.category || '-'}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-semibold tabular-nums">
-                    R$ {product.price.toFixed(2)}
+                    {formatCurrencyDot(product.price)}
                   </TableCell>
                   <TableCell>
-                    <span className={product.stock < 10 ? 'text-destructive font-semibold' : ''}>
-                      {product.stock}
+                    <span className={product.currentStock < 10 ? 'text-destructive font-semibold' : ''}>
+                      {product.currentStock}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -244,7 +380,12 @@ export default function ProdutosIndex() {
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                          <Link to={`/erp/produtos/${product.id}/editar`}>
+                          <Link
+                            to={`/erp/produtos/${product.id}/editar`}
+                            onClick={() => {
+                              console.info('[Produtos] Clique em Editar', { id: product.id, name: product.name });
+                            }}
+                          >
                             <Pencil className="mr-2 h-4 w-4" />
                             Editar
                           </Link>

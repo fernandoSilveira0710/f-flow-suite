@@ -18,6 +18,8 @@ import { toast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { ImageUpload } from '@/components/products/image-upload';
+import { createProduct } from '@/lib/products-api';
+import { adjustStock } from '@/lib/stock-api';
 
 export default function ProdutosNovo() {
   const navigate = useNavigate();
@@ -39,30 +41,79 @@ export default function ProdutosNovo() {
     imageUrl: undefined as string | undefined,
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Máscara de moeda com ponto: converte SEMPRE a partir de dígitos para centavos
+  // Exemplos: "1" -> "0.01", "199" -> "1.99", "1234" -> "12.34"
+  // Ignora ponto digitado previamente para evitar travar a digitação
+  const applyMoneyMask = (raw: string): string => {
+    if (!raw) return '';
+    const digits = raw.replace(/\D/g, '');
+    if (digits === '') return '';
+    if (digits.length <= 2) {
+      return `0.${digits.padStart(2, '0')}`;
+    }
+    const intPartNum = parseInt(digits.slice(0, -2), 10);
+    const intPart = Number.isNaN(intPartNum) ? '0' : String(intPartNum);
+    const decPart = digits.slice(-2);
+    return `${intPart}.${decPart}`;
+  };
+
+  const handleMoneyInputChange = (field: 'price' | 'cost', raw: string) => {
+    const formatted = applyMoneyMask(raw);
+    setFormData({ ...formData, [field]: formatted });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const product = mockAPI.createProduct({
-      name: formData.name,
-      description: formData.description,
-      sku: formData.sku,
-      barcode: formData.barcode,
-      categoryId: formData.categoryId,
-      unitOfMeasureId: formData.unitOfMeasureId,
-      price: parseFloat(formData.price),
-      cost: parseFloat(formData.cost),
-      stock: parseInt(formData.stock),
-      minStock: formData.minStock ? parseInt(formData.minStock) : undefined,
-      active: formData.active,
-      imageUrl: formData.imageUrl,
-    });
+    try {
+      // Mapear categoria e unidade para strings esperadas pelo client-local
+      const categoryName = formData.categoryId
+        ? categories.find(c => c.id === formData.categoryId)?.name
+        : undefined;
+      const unitAbbr = formData.unitOfMeasureId
+        ? unitsOfMeasure.find(u => u.id === formData.unitOfMeasureId)?.abbreviation
+        : undefined;
 
-    toast({
-      title: 'Produto criado!',
-      description: `${product.name} foi adicionado ao catálogo.`,
-    });
+      // Criar produto no client-local
+      const product = await createProduct({
+        name: formData.name,
+        description: formData.description || undefined,
+        imageUrl: formData.imageUrl || undefined,
+        sku: formData.sku || undefined,
+        barcode: formData.barcode || undefined,
+        price: parseFloat(formData.price.replace(',', '.')),
+        cost: formData.cost ? parseFloat(formData.cost.replace(',', '.')) : undefined,
+        category: categoryName,
+        unit: unitAbbr,
+        minStock: formData.minStock ? parseInt(formData.minStock) : undefined,
+        trackStock: true,
+        active: formData.active,
+      });
 
-    navigate('/erp/produtos');
+      // Ajustar estoque inicial via endpoint de inventário
+      const initialQty = formData.stock ? parseInt(formData.stock) : 0;
+      if (initialQty > 0) {
+        await adjustStock({
+          productId: product.id,
+          delta: initialQty,
+          reason: 'INITIAL_STOCK',
+        });
+      }
+
+      toast({
+        title: 'Produto criado!',
+        description: `${product.name} foi adicionado ao catálogo.`,
+      });
+
+      navigate('/erp/produtos');
+    } catch (error: any) {
+      console.error('Erro ao criar produto:', error);
+      toast({
+        title: 'Erro ao criar produto',
+        description: error?.message || 'Tente novamente mais tarde.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -191,28 +242,30 @@ export default function ProdutosNovo() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="price">Preço de Venda *</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    required
-                  />
-                </div>
+              <div>
+                <Label htmlFor="price">Preço de Venda *</Label>
+                <Input
+                  id="price"
+                  type="text"
+                  inputMode="decimal"
+                  pattern={/^\d+(\.\d{0,2})?$/.source}
+                  value={formData.price}
+                  onChange={(e) => handleMoneyInputChange('price', e.target.value)}
+                  required
+                />
+              </div>
 
-                <div>
-                  <Label htmlFor="cost">Custo</Label>
-                  <Input
-                    id="cost"
-                    type="number"
-                    step="0.01"
-                    value={formData.cost}
-                    onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                  />
-                </div>
+              <div>
+                <Label htmlFor="cost">Custo</Label>
+                <Input
+                  id="cost"
+                  type="text"
+                  inputMode="decimal"
+                  pattern={/^\d+(\.\d{0,2})?$/.source}
+                  value={formData.cost}
+                  onChange={(e) => handleMoneyInputChange('cost', e.target.value)}
+                />
+              </div>
 
                 <div>
                   <Label htmlFor="stock">Estoque Inicial *</Label>

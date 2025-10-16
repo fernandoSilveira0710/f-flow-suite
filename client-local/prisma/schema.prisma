@@ -43,6 +43,7 @@ model Product {
   sku                  String?               @unique
   name                 String
   description          String?
+  imageUrl             String?
   salePrice            Decimal
   costPrice            Decimal?
   stockQty             Int                   @default(0)
