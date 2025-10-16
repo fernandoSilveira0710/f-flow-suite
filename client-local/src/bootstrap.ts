@@ -158,8 +158,29 @@ export async function bootstrap(): Promise<void> {
       (process.env.SITE_URL || 'http://localhost:5173').replace('localhost', '127.0.0.1'),
     ];
 
+    // Permite qualquer porta de localhost/127.0.0.1 em desenvolvimento
+    const isDevLocalOrigin = (origin: string): boolean => {
+      try {
+        const url = new URL(origin);
+        return (
+          (url.hostname === 'localhost' || url.hostname === '127.0.0.1') &&
+          (url.protocol === 'http:' || url.protocol === 'https:')
+        );
+      } catch {
+        return false;
+      }
+    };
+
     app.enableCors({
-      origin: allowedOrigins,
+      origin: (origin, callback) => {
+        // Allow non-browser requests (e.g., curl, server-to-server)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.includes(origin) || isDevLocalOrigin(origin)) {
+          return callback(null, true);
+        }
+        return callback(null, false);
+      },
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: [
         'Content-Type', 
