@@ -160,11 +160,23 @@ export default function PlanoPage() {
         headers: {
           'Content-Type': 'application/json',
           'x-tenant-id': tenantId,
-          'x-license-token': licenseToken,
+          // Enviar cabeçalhos de licença de forma compatível com o LicenseGuard do Hub
+          'X-License-Token': licenseToken,
+          'Authorization': `Bearer ${licenseToken}`,
         },
       });
 
       if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          const text = await response.text();
+          console.warn('⚠️ Hub retornou conteúdo não-JSON ao buscar assinatura do tenant', {
+            url,
+            contentType,
+            preview: text.slice(0, 200)
+          });
+          return;
+        }
         const subscription = await response.json();
 
         // Se não houver assinatura ativa para o tenant, tentar usar validação de licença como fallback
@@ -224,6 +236,17 @@ export default function PlanoPage() {
           const validateUrl = `${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${tenantId}`;
           const validateRes = await fetch(validateUrl, { method: 'GET' });
           if (validateRes.ok) {
+            const validateContentType = validateRes.headers.get('content-type') || '';
+            if (!validateContentType.includes('application/json')) {
+              const text = await validateRes.text();
+              console.warn('⚠️ Validação de licença retornou conteúdo não-JSON', {
+                url: validateUrl,
+                contentType: validateContentType,
+                preview: text.slice(0, 200)
+              });
+              // Sem dados JSON, não derrubar o fluxo
+              return;
+            }
             const data = await validateRes.json();
             const licensePlanKey = (data?.license?.planKey || data?.planKey || '').toLowerCase();
             const isValidLicense = data?.valid === true || data?.licensed === true;
