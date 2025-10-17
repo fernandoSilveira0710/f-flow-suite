@@ -22,10 +22,13 @@ import {
   Package2,
   LogOut,
   RefreshCw,
+  HelpCircle,
+  User as UserIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { ENDPOINTS } from '@/lib/env';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function ErpLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -34,7 +37,7 @@ export default function ErpLayout() {
   const [requiredPlan, setRequiredPlan] = useState('');
   const location = useLocation();
   const { entitlements, currentPlan } = useEntitlements();
-  const { logout, licenseStatus, isHubOnline, hubLastCheck, checkHubConnectivity, syncLicenseWithHub } = useAuth();
+  const { logout, licenseStatus, isHubOnline, hubLastCheck, checkHubConnectivity, syncLicenseWithHub, user, offlineDaysLeft, licenseCacheUpdatedAt } = useAuth();
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
@@ -233,38 +236,73 @@ export default function ErpLayout() {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <header className="h-16 border-b bg-background flex items-center justify-end px-6">
-          <div className="flex items-center gap-2">
-            {!isHubOnline ? (
-              <div className="flex items-center gap-2 pr-2">
-                <span className="inline-flex items-center gap-2 rounded-md bg-red-50 text-red-700 px-3 py-1 border border-red-200">
-                  <span className="h-2 w-2 rounded-full bg-red-500"></span>
-                  <span className="text-xs font-medium">Hub Offline</span>
-                </span>
-                <Button variant="ghost" size="icon" onClick={handleRefreshHub} title="Atualizar">
-                  <RefreshCw className="h-5 w-5" />
-                </Button>
-              </div>
-            ) : (
-              <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground pr-2">
-                <span>Atualizado: {formatDate(hubLastCheck || undefined)}</span>
-                {licenseStatus?.expiresAt && (
-                  <span>• Vencimento: {formatDateShort(licenseStatus.expiresAt)}</span>
+        <div className="flex items-center gap-3">
+             {!isHubOnline ? (
+        <div className="flex items-center gap-2 pr-2">
+                 <span className="inline-flex items-center gap-2 rounded-md bg-red-50 text-red-700 px-3 py-1 border border-red-200">
+                   <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                   <span className="text-xs font-medium">Hub Offline</span>
+                 </span>
+                {typeof offlineDaysLeft === 'number' && (
+                  <span className="text-xs text-muted-foreground">
+                    Restam {offlineDaysLeft} dias offline
+                  </span>
                 )}
+                {licenseStatus?.expiresAt && (
+                  <span className="text-xs text-muted-foreground">
+                    • Vencimento: {formatDateShort(licenseStatus.expiresAt)}
+                  </span>
+                )}
+                 <Button variant="ghost" size="icon" onClick={handleRefreshHub} title="Atualizar">
+                   <RefreshCw className="h-5 w-5" />
+                 </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" title="Ajuda">
+                        <HelpCircle className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <div className="space-y-1 text-xs">
+                        <p><strong>Hub Offline</strong>: sistema usa dados em cache.</p>
+                        <p>Última atualização: {formatDate(licenseCacheUpdatedAt || undefined)}</p>
+                        <p>Modo offline permite até 5 dias sem conexão.
+                          {typeof offlineDaysLeft === 'number' ? ` Restam ${offlineDaysLeft} dias.` : ''}
+                        </p>
+                        <p>Conecte ao Hub para renovar sincronização e licença.</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                </div>
+               ) : (
+               <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground pr-2">
+                 <span>Atualizado: {formatDate(hubLastCheck || undefined)}</span>
+                 {licenseStatus?.expiresAt && (
+                   <span>• Vencimento: {formatDateShort(licenseStatus.expiresAt)}</span>
+                 )}
+               </div>
+             )}
+            {user && (
+              <div className="hidden sm:flex items-center gap-2 px-2 text-xs text-muted-foreground">
+                <UserIcon className="h-4 w-4" />
+                <span>Usuário: {user.name || user.email}</span>
               </div>
             )}
-            <Button variant="ghost" size="icon" onClick={toggleTheme}>
-              {theme === 'light' ? (
-                <Moon className="h-5 w-5" />
-              ) : (
-                <Sun className="h-5 w-5" />
-              )}
-            </Button>
-            
-            <Button variant="ghost" size="icon" onClick={logout} title="Sair">
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
-        </header>
+             <Button variant="ghost" size="icon" onClick={toggleTheme}>
+                               {theme === 'light' ? (
+                                 <Moon className="h-5 w-5" />
+                               ) : (
+                                 <Sun className="h-5 w-5" />
+                               )}
+                             </Button>
+                             
+                             <Button variant="ghost" size="icon" onClick={logout} title="Sair">
+                               <LogOut className="h-5 w-5" />
+                             </Button>
+                           </div>
+                         </header>
 
         {/* Page Content */}
         <main className="flex-1 p-6 overflow-auto">

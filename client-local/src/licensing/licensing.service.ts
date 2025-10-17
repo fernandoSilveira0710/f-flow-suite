@@ -574,6 +574,9 @@ export class LicensingService implements OnModuleInit {
     cached?: boolean;
     planKey?: string;
     expiresAt?: Date;
+    lastChecked?: Date;
+    updatedAt?: Date;
+    graceDays?: number;
   }> {
     try {
       // Em modo desenvolvimento, considerar licença válida para não bloquear fluxo offline
@@ -585,6 +588,9 @@ export class LicensingService implements OnModuleInit {
           cached: !!cachedLicense,
           planKey: cachedLicense?.planKey || 'starter',
           expiresAt: cachedLicense?.expiresAt,
+          lastChecked: cachedLicense?.lastChecked,
+          updatedAt: cachedLicense?.updatedAt,
+          graceDays: cachedLicense?.graceDays,
         };
       }
 
@@ -598,18 +604,36 @@ export class LicensingService implements OnModuleInit {
           // Obtém novamente do cache após atualização
           const updatedCache = await this.getLicenseFromCache(tenantId);
           if (updatedCache) {
-            return this.evaluateLicenseStatus(updatedCache, false);
+            const evalResult = this.evaluateLicenseStatus(updatedCache, false);
+            return {
+              ...evalResult,
+              lastChecked: updatedCache.lastChecked,
+              updatedAt: updatedCache.updatedAt,
+              graceDays: updatedCache.graceDays,
+            };
           }
         } catch (error) {
           this.logger.warn(`Não foi possível atualizar cache do Hub, usando cache local se disponível`);
           // Se falhou ao atualizar do Hub, usa cache local se disponível
           if (cachedLicense) {
-            return this.evaluateLicenseStatus(cachedLicense, true);
+            const evalResult = this.evaluateLicenseStatus(cachedLicense, true);
+            return {
+              ...evalResult,
+              lastChecked: cachedLicense.lastChecked,
+              updatedAt: cachedLicense.updatedAt,
+              graceDays: cachedLicense.graceDays,
+            };
           }
         }
       } else {
         // Cache está atualizado, usa ele
-        return this.evaluateLicenseStatus(cachedLicense, true);
+        const evalResult = this.evaluateLicenseStatus(cachedLicense, true);
+        return {
+          ...evalResult,
+          lastChecked: cachedLicense.lastChecked,
+          updatedAt: cachedLicense.updatedAt,
+          graceDays: cachedLicense.graceDays,
+        };
       }
 
       // Se chegou aqui, não há cache e não conseguiu conectar ao Hub
