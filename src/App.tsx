@@ -159,11 +159,26 @@ function App() {
           <Route path="estoque/preferencias" element={<StockSettings />} />
           <Route path="estoque/etiquetas" element={<StockLabels />} />
           
-          {/* Agenda Routes */}
-          <Route path="agenda" element={<AgendaIndex />} />
-          <Route path="agenda/novo" element={<NovoAgendamento />} />
-          <Route path="agenda/:id" element={<AgendamentoDetalhe />} />
-          <Route path="agenda/servicos" element={<ServicosIndex />} />
+          {/* Agenda - bloqueada */}
+          <Route path="agenda/*" element={<Navigate to="/erp/dashboard" replace />} />
+          
+          {/* New Customers Routes */}
+          <Route path="clientes" element={<ClientesIndexNew />} />
+          <Route path="clientes/novo" element={<NovoClienteNew />} />
+          <Route path="clientes/:id" element={<EditarClienteNew />} />
+          <Route path="clientes/:id/pets" element={<GerenciarPetsCliente />} />
+          <Route path="clientes/:id/pets/novo" element={<NovoPetCliente />} />
+          <Route path="clientes/:id/pets/:petId" element={<EditarPetCliente />} />
+          
+          {/* Grooming - bloqueado */}
+          <Route path="grooming/*" element={<Navigate to="/erp/dashboard" replace />} />
+          {/* Banho & Tosa (alias) - bloqueado */}
+          <Route path="banho-tosa" element={<Navigate to="/erp/dashboard" replace />} />
+          
+          {/* Agenda - bloqueada */}
+          // ... existing code ...
+          {/* Remover rotas específicas de Agenda */}
+          // (rotas como agenda/novo, agenda/:id, agenda/servicos, profissionais, clientes foram removidas)
           <Route path="agenda/servicos/novo" element={<NovoServico />} />
           <Route path="agenda/servicos/:id/editar" element={<EditarServico />} />
           <Route path="agenda/profissionais" element={<ProfissionaisIndex />} />
@@ -201,8 +216,31 @@ function App() {
           <Route path="grooming/profissionais/:id/editar" element={<EditarGroomingProfissional />} />
           <Route path="grooming/categories" element={<GroomingCategoriesIndex />} />
           
-          {/* Banho & Tosa (alias for Grooming) */}
-          <Route path="banho-tosa" element={<GroomingIndex />} />
+          {/* Remover rotas específicas de Grooming */}
+          // (rotas como grooming, grooming/:id, grooming/new, services, pets, resources, tutors, profissionais, categories foram removidas)
+          <Route path="grooming/services/novo" element={<NovoGroomingService />} />
+          <Route path="grooming/services/:id/editar" element={<EditarGroomingService />} />
+          <Route path="grooming/pets" element={<GroomingPetsIndex />} />
+          <Route path="grooming/pets/novo" element={<NovoPet />} />
+          <Route path="grooming/pets/:id/editar" element={<EditarPet />} />
+          <Route path="grooming/resources" element={<GroomingResourcesIndex />} />
+          <Route path="grooming/resources/novo" element={<NovoRecurso />} />
+          <Route path="grooming/resources/:id/editar" element={<EditarRecurso />} />
+          <Route path="grooming/tutors" element={<TutorsIndex />} />
+          <Route path="grooming/tutors/novo" element={<NovoTutor />} />
+          <Route path="grooming/profissionais" element={<GroomingProfissionaisIndex />} />
+          <Route path="grooming/profissionais/novo" element={<NovoGroomingProfissional />} />
+          <Route path="grooming/profissionais/:id/editar" element={<EditarGroomingProfissional />} />
+          <Route path="grooming/categories" element={<GroomingCategoriesIndex />} />
+          
+          {/* Agenda - bloqueada */}
+          <Route path="agenda/*" element={<Navigate to="/erp/dashboard" replace />} />
+          
+          {/* Banho & Tosa (alias e grooming) - bloqueadas */}
+          <Route path="banho-tosa" element={<Navigate to="/erp/dashboard" replace />} />
+          <Route path="grooming/*" element={<Navigate to="/erp/dashboard" replace />} />
+          
+          {/* Relatórios - manter */}
           <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
           
           {/* Settings Routes (EN - canonical) */}
@@ -214,8 +252,10 @@ function App() {
             <Route path="billing" element={<PlanoPage />} />
             <Route path="licenses" element={<LicencasPage />} />
             <Route path="pos" element={<PosSettings />} />
-            <Route path="schedule" element={<ScheduleSettings />} />
-            <Route path="grooming" element={<GroomingSettings />} />
+            {/* Agenda (Settings) - bloqueada */}
+            <Route path="schedule" element={<Navigate to="/erp/settings/organization" replace />} />
+            {/* Banho & Tosa (Settings) - bloqueada */}
+            <Route path="grooming" element={<Navigate to="/erp/settings/organization" replace />} />
             <Route path="inventory" element={<InventorySettings />} />
             <Route path="units" element={<UnitsSettings />} />
             <Route path="payments" element={<PaymentsIndex />} />

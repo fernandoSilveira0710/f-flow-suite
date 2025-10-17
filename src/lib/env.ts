@@ -41,6 +41,9 @@ export const ENDPOINTS = {
   CLIENT_PLANS_SUBSCRIPTION: (tenantId: string) => `${API_URLS.CLIENT_LOCAL}/plans/tenants/${tenantId}/subscription`,
   CLIENT_PLANS_INVOICES: (tenantId: string) => `${API_URLS.CLIENT_LOCAL}/plans/tenants/${tenantId}/invoices`,
 
+  // Dashboard
+  CLIENT_DASHBOARD_SUMMARY: `${API_URLS.CLIENT_LOCAL}/dashboard/summary`,
+
   // Site endpoints
   SITE_PLANS: `${API_URLS.SITE}/planos`,
   SITE_CADASTRO: `${API_URLS.SITE}/cadastro`,

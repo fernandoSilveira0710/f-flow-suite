@@ -80,22 +80,8 @@ export default function ErpLayout() {
       feature: 'Controle de Estoque',
       plan: 'Starter',
     },
-    {
-      label: 'Agenda',
-      icon: Calendar,
-      path: '/erp/agenda',
-      enabled: entitlements.agenda,
-      feature: 'Agenda',
-      plan: 'Pro',
-    },
-    {
-      label: 'Banho & Tosa',
-      icon: Scissors,
-      path: '/erp/banho-tosa',
-      enabled: entitlements.banho_tosa,
-      feature: 'Banho & Tosa',
-      plan: 'Pro',
-    },
+    // Banho & Tosa removido (não visível para nenhum plano)
+    // Agenda removida (não visível para nenhum plano)
     {
       label: 'Relatórios',
       icon: BarChart3,
@@ -218,15 +204,7 @@ export default function ErpLayout() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="h-16 border-b bg-background flex items-center justify-between px-6">
-          <div className="flex items-center gap-4 flex-1 max-w-md">
-            <Search className="h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Buscar..."
-              className="border-0 shadow-none focus-visible:ring-0"
-            />
-          </div>
-
+        <header className="h-16 border-b bg-background flex items-center justify-end px-6">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={toggleTheme}>
               {theme === 'light' ? (
