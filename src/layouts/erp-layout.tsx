@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { ENDPOINTS } from '@/lib/env';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function ErpLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -38,6 +39,7 @@ export default function ErpLayout() {
   const location = useLocation();
   const { entitlements, currentPlan } = useEntitlements();
   const { logout, licenseStatus, isHubOnline, hubLastCheck, checkHubConnectivity, syncLicenseWithHub, user, offlineDaysLeft, licenseCacheUpdatedAt } = useAuth();
+  const queryClient = useQueryClient();
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
@@ -143,7 +145,9 @@ export default function ErpLayout() {
         {/* Logo */}
         <div className="flex h-16 items-center justify-between px-4 border-b">
           {!collapsed && (
-            <Link to="/erp/dashboard" className="flex items-center gap-2 font-bold">
+            <Link to="/erp/dashboard" className="flex items-center gap-2 font-bold" onClick={() => {
+              queryClient.refetchQueries({ queryKey: ['dashboard', 'summary'], type: 'active' });
+            }}>
               <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
                 <Package2 className="h-5 w-5 text-sidebar-primary-foreground" />
               </div>
@@ -178,6 +182,10 @@ export default function ErpLayout() {
                   if (!item.enabled) {
                     e.preventDefault();
                     handleMenuClick(item);
+                    return;
+                  }
+                  if (item.path === '/erp/dashboard') {
+                    queryClient.refetchQueries({ queryKey: ['dashboard', 'summary'], type: 'active' });
                   }
                 }}
                 className={cn(

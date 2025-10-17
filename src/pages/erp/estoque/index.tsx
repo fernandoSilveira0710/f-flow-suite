@@ -104,7 +104,7 @@ export default function StockPositionPage() {
           categoria: p.category,
           barcode: p.barcode,
           unidade: p.unit || 'un',
-          validade: undefined,
+          validade: p.expiryDate ?? undefined,
         }));
         setProducts(mapped);
       } catch (error) {
@@ -157,10 +157,10 @@ export default function StockPositionPage() {
       );
     } else if (filters.filter === 'expire-soon') {
       result = result.filter((p) => {
-        if (!prefs.considerarValidade || !p.validade) return false;
+        if (!p.validade) return false;
         const validadeDate = new Date(p.validade);
         const diffDays = Math.ceil((validadeDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-        return diffDays > 0 && diffDays <= (filters.days || 30);
+        return diffDays >= 0 && diffDays <= (filters.days || 30);
       });
     }
 
@@ -227,7 +227,7 @@ export default function StockPositionPage() {
         categoria: p.category,
         barcode: p.barcode,
         unidade: p.unit || 'un',
-        validade: undefined,
+        validade: p.expiryDate ?? undefined,
       }));
       setProducts(mapped);
     } catch (error) {
@@ -429,7 +429,7 @@ export default function StockPositionPage() {
               <TableHead>Unidade</TableHead>
               <TableHead>Estoque Atual</TableHead>
               <TableHead>Mínimo</TableHead>
-              {prefs.considerarValidade && <TableHead>Validade</TableHead>}
+              <TableHead>Validade</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Ações</TableHead>
             </TableRow>
@@ -449,11 +449,9 @@ export default function StockPositionPage() {
                   <TableCell>{product.unidade}</TableCell>
                   <TableCell>{product.estoqueAtual}</TableCell>
                   <TableCell>{product.estoqueMinimo || prefs.estoqueMinimoPadrao || '-'}</TableCell>
-                  {prefs.considerarValidade && (
-                    <TableCell>
-                      {product.validade ? new Date(product.validade).toLocaleDateString('pt-BR') : '-'}
-                    </TableCell>
-                  )}
+                  <TableCell>
+                    {product.validade ? new Date(product.validade).toLocaleDateString('pt-BR') : '-'}
+                  </TableCell>
                   <TableCell>{getStockBadge(product)}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
