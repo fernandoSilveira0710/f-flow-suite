@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { getSales } from '@/lib/pos-api';
 import { getDashboardSummary } from '@/lib/dashboard-api';
+import { getProducts as getProductsApi } from '@/lib/products-api';
+import { getProducts as getMockProducts } from '@/lib/stock-api';
 import { startOfMonth, startOfDay, endOfDay, differenceInDays, isAfter, isBefore } from 'date-fns';
 
 interface DashboardSummary {
@@ -26,7 +28,7 @@ async function fetchDashboardSummary(): Promise<DashboardSummary> {
 
   // Buscar vendas reais para calcular a série do mês
   const allSales = await getSales();
-  const monthSales = allSales.filter((sale) => new Date(sale.createdAt) >= monthStart);
+  const monthSales = allSales.filter((sale) => new Date(sale.createdAt) >= monthStart && sale.status !== 'refunded');
 
   // Série de receita do mês (agregada por dia)
   const daysInMonth = differenceInDays(now, monthStart) + 1;
@@ -42,6 +44,33 @@ async function fetchDashboardSummary(): Promise<DashboardSummary> {
   }
   const monthRevenueSeries = totalsByDay.map((total, idx) => ({ day: `${idx + 1}`, total }));
 
+  // Calcular produtos a vencer (30 dias) a partir dos produtos.
+  // Usa API real e faz fallback para mock se necessário.
+  let expiringSoonCount = 0;
+  try {
+    const products = await getProductsApi();
+    const nowTs = now.getTime();
+    expiringSoonCount = products.filter((p) => {
+      if (!p.expiryDate) return false;
+      const d = new Date(p.expiryDate);
+      const diffDays = Math.ceil((d.getTime() - nowTs) / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays <= 30;
+    }).length;
+  } catch {
+    try {
+      const products = getMockProducts().map((p) => ({ expiryDate: p.validade }));
+      const nowTs = now.getTime();
+      expiringSoonCount = products.filter((p) => {
+        if (!p.expiryDate) return false;
+        const d = new Date(p.expiryDate);
+        const diffDays = Math.ceil((d.getTime() - nowTs) / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= 30;
+      }).length;
+    } catch {
+      expiringSoonCount = 0;
+    }
+  }
+
   return {
     todaySalesCount: summary.vendas.quantidadeDia,
     todaySalesTotal: Number(summary.vendas.totalDia || 0),
@@ -50,7 +79,7 @@ async function fetchDashboardSummary(): Promise<DashboardSummary> {
     activeProducts: summary.estoque.produtosAtivos,
     lowStockCount: summary.estoque.produtosBaixoEstoque,
     outOfStockCount: summary.estoque.produtosSemEstoque,
-    expiringSoonCount: 0, // ainda não disponível no backend
+    expiringSoonCount,
     monthRevenueSeries,
   };
 }
@@ -60,6 +89,7 @@ export function useDashboard() {
     queryKey: ['dashboard', 'summary'],
     queryFn: fetchDashboardSummary,
     staleTime: 1000 * 60, // 1 minuto
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    refetchOnMount: 'always',
   });
 }

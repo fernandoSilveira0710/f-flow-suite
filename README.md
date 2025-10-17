@@ -75,12 +75,18 @@ Após o setup, você terá:
 ### Scripts principais
 | Script | Descrição |
 | ------ | --------- |
+| `npm run dev:all` | Sobe ERP (8080), client-local (8081) e hub (3001) juntos |
+| `npm run dev` | Sobe apenas o ERP (8080) |
+| `npm run dev:client` | Sobe apenas o client-local (8081) |
+| `npm run dev:hub` | Sobe apenas o hub (3001) |
 | `npm run dev:up` | Sobe PostgreSQL + Adminer via Docker |
 | `npm run dev:down` | Para e remove containers Docker |
 | `npm run check:all` | Executa lint + typecheck em todos os pacotes |
 | `npm run check:hub` | Lint + typecheck apenas no Hub |
 | `npm run check:client` | Lint + typecheck apenas no Client-local |
 | `npm run check:web` | Lint + typecheck apenas no Frontend |
+
+Observação: as portas padrão são 8080 (ERP), 8081 (client-local) e 3001 (hub). Se um serviço já estiver rodando, finalize antes de usar `dev:all` para evitar duplicação.
 
 ### Teste de saúde
 ```bash
