@@ -238,6 +238,24 @@ export default function PdvPage() {
     }
   };
 
+  // Permitir colar ou digitar + Enter no input do scanner
+  const handleScannerPaste = async (e: any) => {
+    const text = e.clipboardData?.getData('text')?.trim();
+    if (!text) return;
+    e.preventDefault();
+    await handleScan(text);
+    if (scannerInputRef.current) scannerInputRef.current.value = '';
+  };
+
+  const handleScannerKeyDown = async (e: any) => {
+    if (e.key !== 'Enter') return;
+    const code = (e.currentTarget?.value || '').trim();
+    if (!code) return;
+    e.preventDefault();
+    await handleScan(code);
+    e.currentTarget.value = '';
+  };
+
   useBarcodeScanner({
     onScan: handleScan,
     enabled: activeTab === 'vender' && !showSearch && !showDiscountItem && !showDiscountGlobal && !showCheckout && !showOpenSession && !showCloseSession && !showEditQty,
@@ -942,6 +960,8 @@ export default function PdvPage() {
                     className="border-green-600 focus:ring-green-600 text-lg h-12"
                     autoFocus
                     disabled={session?.status !== 'Aberto'}
+                    onPaste={handleScannerPaste}
+                    onKeyDown={handleScannerKeyDown}
                   />
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                     <div className="flex items-center justify-between">

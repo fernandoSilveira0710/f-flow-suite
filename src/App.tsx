@@ -90,7 +90,6 @@ import InventorySettings from "./pages/settings/inventory";
 import UnitsSettings from "./pages/settings/units";
 import ProductsSettings from "./pages/settings/products";
 import PaymentsIndex from "./pages/settings/payments/index";
-import NotificationsSettings from "./pages/settings/notifications";
 import ImportExportSettings from "./pages/settings/import-export";
 import NovoPagamento from "./pages/erp/configuracoes/pagamentos/novo";
 import ConfiguracoesRedirect from "./pages/erp/configuracoes/index";
@@ -263,7 +262,7 @@ function App() {
             <Route path="payments" element={<PaymentsIndex />} />
             <Route path="payments/new" element={<NovoPagamento />} />
             <Route path="payments/:id/edit" element={<NovoPagamento />} />
-            <Route path="notifications" element={<NotificationsSettings />} />
+            <Route path="notifications" element={<Navigate to="/erp/settings/organization" replace />} />
             <Route path="import-export" element={<ImportExportSettings />} />
           </Route>
 

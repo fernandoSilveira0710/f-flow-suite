@@ -12,7 +12,7 @@ import {
   Calendar,
   Scissors,
   Package,
-  Bell,
+  
   Upload,
   Wallet,
   LucideIcon,
@@ -106,12 +106,6 @@ export default function SettingsLayout() {
       label: 'Métodos de Pagamento',
       icon: Wallet,
       path: '/erp/settings/payments',
-      requiresPlan: null,
-    },
-    {
-      label: 'Notificações',
-      icon: Bell,
-      path: '/erp/settings/notifications',
       requiresPlan: null,
     },
     {
