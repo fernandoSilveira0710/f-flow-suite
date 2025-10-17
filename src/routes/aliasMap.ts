@@ -15,7 +15,7 @@ export const SETTINGS_ALIASES: Record<string, string> = {
   '/erp/configuracoes/banho-tosa': '/erp/settings/grooming',
   '/erp/configuracoes/estoque': '/erp/settings/inventory',
   '/erp/configuracoes/metodos-pagamento': '/erp/settings/payments',
-  '/erp/configuracoes/notificacoes': '/erp/settings/notifications',
+  '/erp/configuracoes/notificacoes': '/erp/settings/organization',
   '/erp/configuracoes/importar-exportar': '/erp/settings/import-export',
 };
 
