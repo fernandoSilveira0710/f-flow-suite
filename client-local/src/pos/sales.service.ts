@@ -10,6 +10,16 @@ import { InventoryService } from '../inventory/inventory.service';
 export class SalesService {
   private readonly logger = new Logger(SalesService.name);
 
+  // Safe ISO conversion for Date/string/unknown values
+  private toIsoSafe(val: any): string {
+    try {
+      const d = val instanceof Date ? val : new Date(val);
+      return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+    } catch {
+      return new Date().toISOString();
+    }
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventValidator: EventValidatorService,
@@ -68,7 +78,7 @@ export class SalesService {
           paymentMethod: sale.paymentMethod,
           total: parseFloat(sale.total.toString()),
           customerId: sale.customerId,
-          createdAt: sale.createdAt.toISOString(),
+          createdAt: this.toIsoSafe(sale.createdAt),
           items: saleItems.map((item: any) => ({
             id: item.id,
             productId: item.productId,
@@ -126,7 +136,7 @@ export class SalesService {
       // Fetch with product relation to enrich items with productName
       const saleWithItems = await this.prisma.sale.findUnique({
         where: { id: result.sale.id },
-        include: { items: { include: { product: true } } },
+        include: { items: { include: { product: { select: { name: true } } } } },
       });
       if (!saleWithItems) {
         throw new NotFoundException(`Sale with ID ${result.sale.id} not found after creation`);
@@ -140,8 +150,8 @@ export class SalesService {
         status: saleWithItems.status,
         total: Number(saleWithItems.total),
         customerId: saleWithItems.customerId || undefined,
-        createdAt: saleWithItems.createdAt.toISOString(),
-        updatedAt: saleWithItems.updatedAt.toISOString(),
+        createdAt: this.toIsoSafe(saleWithItems.createdAt),
+        updatedAt: this.toIsoSafe(saleWithItems.updatedAt),
         items: (saleWithItems.items || []).map((item: any) => ({
           id: item.id,
           productId: item.productId,
@@ -149,7 +159,7 @@ export class SalesService {
           qty: item.qty,
           unitPrice: Number(item.unitPrice),
           subtotal: Number(item.subtotal),
-          createdAt: item.createdAt.toISOString(),
+          createdAt: this.toIsoSafe(item.createdAt),
         })),
       };
     } catch (error) {
@@ -163,7 +173,7 @@ export class SalesService {
 
     const sales = await this.prisma.sale.findMany({
       include: {
-        items: { include: { product: true } },
+        items: { include: { product: { select: { name: true } } } },
       },
       orderBy: {
         createdAt: 'desc',
@@ -178,16 +188,16 @@ export class SalesService {
       status: sale.status,
       total: Number(sale.total),
       customerId: sale.customerId || undefined,
-      createdAt: sale.createdAt.toISOString(),
-      updatedAt: sale.updatedAt.toISOString(),
-      items: sale.items.map((item: any) => ({
+      createdAt: this.toIsoSafe(sale.createdAt),
+      updatedAt: this.toIsoSafe(sale.updatedAt),
+      items: (sale.items || []).map((item: any) => ({
         id: item.id,
         productId: item.productId,
         productName: item.product?.name,
         qty: item.qty,
         unitPrice: Number(item.unitPrice),
         subtotal: Number(item.subtotal),
-        createdAt: item.createdAt.toISOString(),
+        createdAt: this.toIsoSafe(item.createdAt),
       })),
     }));
   }
@@ -198,7 +208,7 @@ export class SalesService {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
       include: {
-        items: { include: { product: true } },
+        items: { include: { product: { select: { name: true } } } },
       },
     });
 
@@ -214,16 +224,16 @@ export class SalesService {
       status: sale.status,
       total: Number(sale.total),
       customerId: sale.customerId || undefined,
-      createdAt: sale.createdAt.toISOString(),
-      updatedAt: sale.updatedAt.toISOString(),
-      items: sale.items.map((item: any) => ({
+      createdAt: this.toIsoSafe(sale.createdAt),
+      updatedAt: this.toIsoSafe(sale.updatedAt),
+      items: (sale.items || []).map((item: any) => ({
         id: item.id,
         productId: item.productId,
         productName: item.product?.name,
         qty: item.qty,
         unitPrice: Number(item.unitPrice),
         subtotal: Number(item.subtotal),
-        createdAt: item.createdAt.toISOString(),
+        createdAt: this.toIsoSafe(item.createdAt),
       })),
     };
   }
@@ -249,7 +259,7 @@ export class SalesService {
     const updated = await this.prisma.sale.update({
       where: { id: sale.id },
       data: { status: 'refunded' },
-      include: { items: { include: { product: true } } },
+      include: { items: { include: { product: { select: { name: true } } } } },
     });
 
     // Adjust inventory (increase quantities back)
@@ -278,8 +288,8 @@ export class SalesService {
       status: updated.status,
       total: Number(updated.total),
       customerId: updated.customerId || undefined,
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
+      createdAt: this.toIsoSafe(updated.createdAt),
+      updatedAt: this.toIsoSafe(updated.updatedAt),
       items: (updated.items || []).map((item: any) => ({
         id: item.id,
         productId: item.productId,
@@ -287,7 +297,7 @@ export class SalesService {
         qty: item.qty,
         unitPrice: Number(item.unitPrice),
         subtotal: Number(item.subtotal),
-        createdAt: item.createdAt.toISOString(),
+        createdAt: this.toIsoSafe(item.createdAt),
       })),
     };
   }

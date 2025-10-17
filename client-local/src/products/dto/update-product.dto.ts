@@ -56,4 +56,13 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  marginPct?: number;
+
+  @IsOptional()
+  @IsString()
+  expiryDate?: string;
 }

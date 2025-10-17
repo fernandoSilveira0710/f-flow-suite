@@ -83,6 +83,7 @@ import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { useBarcodeScanner } from '@/hooks/use-barcode-scanner';
 import { ProductImage } from '@/components/products/product-image';
 import { cn } from '@/lib/utils';
+import { getUsablePaymentMethods, PaymentMethod, calculatePaymentTotal } from '@/lib/payments-api';
 
 export default function PdvPage() {
   const navigate = useNavigate();
@@ -131,12 +132,26 @@ export default function PdvPage() {
   // Checkout
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [installments, setInstallments] = useState(1);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   useEffect(() => {
     loadSession();
     loadCart();
     loadSales();
   }, []);
+
+  // Carrega métodos de pagamento dinâmicos (ativos e visíveis no PDV)
+  useEffect(() => {
+    (async () => {
+      try {
+        const caixaAberto = session?.status === 'Aberto';
+        const list = await getUsablePaymentMethods('Admin', !!caixaAberto);
+        setPaymentMethods(list);
+      } catch (err) {
+        // silencioso no PDV; falhas serão tratadas quando abrir o checkout
+      }
+    })();
+  }, [session?.status]);
 
   useEffect(() => {
     // Check scanner focus periodically
@@ -145,6 +160,17 @@ export default function PdvPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Ajusta parcelas conforme o método selecionado
+  useEffect(() => {
+    const method = paymentMethods.find((m) => m.nome === paymentMethod);
+    if (!method || !method.permiteParcelas) {
+      if (installments !== 1) setInstallments(1);
+      return;
+    }
+    const max = method.maxParcelas || 12;
+    if (installments > max) setInstallments(max);
+  }, [paymentMethod, paymentMethods]);
 
   const loadSession = () => {
     const currentSession = getCurrentSession();
@@ -240,12 +266,21 @@ export default function PdvPage() {
     { key: 'F8', handler: () => setShowDiscountGlobal(true), disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'F9', handler: () => {
       if (cart.length > 0 && session?.status === 'Aberto') {
-        setPaymentMethod('PIX');
+        const pix = paymentMethods.find((m) => m.tipo === 'PIX' && m.ativo && m.visibilidade?.mostrarNoPDV !== false);
+        if (!pix) {
+          toast.error('Nenhum método PIX configurado para o PDV');
+          return;
+        }
+        setPaymentMethod(pix.nome);
         setShowCheckout(true);
       }
     }, disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'F10', handler: () => {
       if (cart.length > 0 && session?.status === 'Aberto') {
+        if (paymentMethods.length === 0) {
+          toast.error('Nenhum método de pagamento configurado no PDV');
+          return;
+        }
         setShowCheckout(true);
       } else if (cart.length === 0) {
         toast.error('Carrinho vazio');
@@ -255,7 +290,12 @@ export default function PdvPage() {
     }, disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'F11', handler: () => {
       if (cart.length > 0 && session?.status === 'Aberto') {
-        setPaymentMethod('Cartão Crédito');
+        const credit = paymentMethods.find((m) => m.tipo === 'CREDIT' && m.ativo && m.visibilidade?.mostrarNoPDV !== false);
+        if (!credit) {
+          toast.error('Nenhum cartão de crédito configurado para o PDV');
+          return;
+        }
+        setPaymentMethod(credit.nome);
         setShowCheckout(true);
       }
     }, disabled: anyModalOpen || activeTab !== 'vender' },
@@ -476,7 +516,17 @@ export default function PdvPage() {
     }
 
     try {
-      const sale = await createSale(cart, paymentMethod, paymentMethod === 'Cartão Crédito' ? installments : undefined, discount);
+      const method = paymentMethods.find((m) => m.nome === paymentMethod);
+      if (!method) {
+        toast.error('Forma de pagamento inválida ou não configurada');
+        return;
+      }
+      const sale = await createSale(
+        cart,
+        method.nome,
+        method.permiteParcelas ? installments : undefined,
+        discount
+      );
       setCart([]);
       setDiscount(0);
       setCouponCode('');
@@ -773,11 +823,13 @@ export default function PdvPage() {
                         toast.error('Carrinho vazio');
                       } else if (session?.status !== 'Aberto') {
                         toast.error('Caixa não está aberto');
+                      } else if (paymentMethods.length === 0) {
+                        toast.error('Nenhum método de pagamento configurado no PDV');
                       } else {
                         setShowCheckout(true);
                       }
                     }}
-                    disabled={cart.length === 0 || session?.status !== 'Aberto'}
+                    disabled={cart.length === 0 || session?.status !== 'Aberto' || paymentMethods.length === 0}
                   >
                     Finalizar Venda (F10)
                   </Button>
@@ -1451,30 +1503,42 @@ export default function PdvPage() {
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="Cartão Débito">Cartão Débito</SelectItem>
-                  <SelectItem value="Cartão Crédito">Cartão Crédito</SelectItem>
-                  <SelectItem value="PIX">PIX</SelectItem>
+                  {paymentMethods.length === 0 ? (
+                    <SelectItem value="__no_methods__" disabled>Nenhum método disponível</SelectItem>
+                  ) : (
+                    paymentMethods.map((m) => (
+                      <SelectItem key={m.id} value={m.nome}>{m.nome}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
-            {paymentMethod === 'Cartão Crédito' && (
-              <div>
-                <Label>Parcelas</Label>
-                <Select value={installments.toString()} onValueChange={(v) => setInstallments(parseInt(v))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
-                      <SelectItem key={n} value={n.toString()}>
-                        {n}x de R$ {(total / n).toFixed(2)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {(() => {
+              const method = paymentMethods.find((m) => m.nome === paymentMethod);
+              if (!method || !method.permiteParcelas) return null;
+              const max = method.maxParcelas || 12;
+              return (
+                <div>
+                  <Label>Parcelas</Label>
+                  <Select value={installments.toString()} onValueChange={(v) => setInstallments(parseInt(v))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: max }, (_, i) => i + 1).map((n) => {
+                        const calc = calculatePaymentTotal(total, method, n);
+                        const per = calc.total / n;
+                        return (
+                          <SelectItem key={n} value={n.toString()}>
+                            {n}x de R$ {per.toFixed(2)}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCheckout(false)}>

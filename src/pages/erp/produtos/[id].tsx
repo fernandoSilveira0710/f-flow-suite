@@ -190,6 +190,14 @@ export default function ProdutoDetalhe() {
                   {product.cost && product.cost > 0 ? (((product.price - product.cost) / product.cost) * 100).toFixed(1) : '0.0'}%
                 </p>
               </div>
+
+
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Validade</p>
+                <p className="text-lg font-semibold">
+                  {product.expiryDate ? new Date(product.expiryDate).toLocaleDateString('pt-BR') : '-'}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>

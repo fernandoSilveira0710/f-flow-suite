@@ -15,6 +15,8 @@ export interface CreateProductPayload {
   maxStock?: number;
   trackStock?: boolean;
   active?: boolean;
+  marginPct?: number;
+  expiryDate?: string;
 }
 
 export interface ProductResponse {
@@ -35,9 +37,50 @@ export interface ProductResponse {
   currentStock: number;
   createdAt: string;
   updatedAt: string;
+  marginPct?: number;
+  expiryDate?: string;
 }
 
 export type UpdateProductPayload = Partial<CreateProductPayload>;
+
+export class ApiError extends Error {
+  status: number;
+  body?: any;
+  constructor(message: string, status: number, body?: any) {
+    super(message);
+    this.status = status;
+    this.body = body;
+    Object.setPrototypeOf(this, ApiError.prototype);
+  }
+}
+
+function buildFriendlyMessage(status: number, body: any, statusText: string): string {
+  const rawMessage = typeof body === 'string' ? body : (body?.message || body?.error || statusText);
+
+  // Mensagens amigáveis por status
+  if (status === 409) {
+    const msg: string = (typeof body === 'object' ? body?.message : rawMessage) || '';
+    const match = /duplicado em:\s*([a-zA-Z_]+)/i.exec(msg);
+    const campo = match?.[1]?.toLowerCase();
+    if (campo === 'barcode') {
+      return 'Já existe um produto com este código de barras. Altere o código e tente novamente.';
+    }
+    if (campo === 'sku') {
+      return 'Já existe um produto com este SKU. Altere o SKU e tente novamente.';
+    }
+    return 'Já existe um produto com valor duplicado. Verifique os campos únicos e tente novamente.';
+  }
+  if (status === 400 || status === 422) {
+    return rawMessage || 'Dados inválidos. Verifique os campos informados e tente novamente.';
+  }
+  if (status === 404) {
+    return 'Registro não encontrado.';
+  }
+  if (status >= 500) {
+    return 'Erro interno no serviço Client Local. Tente novamente mais tarde.';
+  }
+  return rawMessage || `Erro ${status} ${statusText}`;
+}
 
 const API_BASE_URL = API_URLS.CLIENT_LOCAL;
 
@@ -60,7 +103,7 @@ const apiCall = async <T>(
     });
   } catch (err: any) {
     if (err?.name === 'AbortError') {
-      throw new Error('Tempo limite excedido ao chamar a API. Verifique o serviço Client Local (porta 8081).');
+      throw new ApiError('Tempo limite excedido ao chamar a API. Verifique o serviço Client Local (porta 8081).', 0);
     }
     throw err;
   } finally {
@@ -68,12 +111,21 @@ const apiCall = async <T>(
   }
 
   if (!response.ok) {
-    // Tenta incluir mensagem do corpo em erros para facilitar debug
-    let errBody = '';
+    // Tenta ler e interpretar o corpo para mensagem amigável
+    let bodyText = '';
+    let parsedBody: any = undefined;
     try {
-      errBody = await response.text();
+      bodyText = await response.text();
     } catch {}
-    throw new Error(`API Error: ${response.status} ${response.statusText}${errBody ? ` - ${errBody}` : ''}`);
+    if (bodyText) {
+      try {
+        parsedBody = JSON.parse(bodyText);
+      } catch {
+        parsedBody = bodyText;
+      }
+    }
+    const friendly = buildFriendlyMessage(response.status, parsedBody ?? bodyText, response.statusText);
+    throw new ApiError(friendly, response.status, parsedBody ?? bodyText);
   }
 
   // DELETE e outros podem responder 204/205 (sem corpo)
@@ -129,6 +181,11 @@ const normalizeProduct = (raw: any): ProductResponse => {
         : Number(raw.currentStock ?? 0),
     createdAt: String(raw.createdAt),
     updatedAt: String(raw.updatedAt),
+    marginPct:
+      raw.marginPct !== undefined && raw.marginPct !== null
+        ? Number(raw.marginPct)
+        : undefined,
+    expiryDate: raw.expiryDate ? String(raw.expiryDate) : undefined,
   };
 };
 

@@ -20,13 +20,14 @@ import { toast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import { ImageUpload } from '@/components/products/image-upload';
 import { mockAPI } from '@/lib/mock-data';
+import { Category, fetchCategories } from '@/lib/categories-api';
 
 export default function ProdutoEditar() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [product, setProduct] = useState<ProductResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const categories = mockAPI.getCategories();
+  const [categories, setCategories] = useState<Category[]>([]);
   const unitsOfMeasure = mockAPI.getUnitsOfMeasure();
   const [currentStockEdit, setCurrentStockEdit] = useState<string>('');
 
@@ -42,6 +43,8 @@ export default function ProdutoEditar() {
     minStock: '',
     active: true,
     imageUrl: undefined as string | undefined,
+    marginPct: '',
+    expiryDate: '',
   });
 
   useEffect(() => {
@@ -76,6 +79,8 @@ export default function ProdutoEditar() {
             minStock: p.minStock?.toString() || '',
             active: p.active,
             imageUrl: p.imageUrl,
+            marginPct: p.marginPct !== undefined && p.marginPct !== null ? String(p.marginPct) : '',
+            expiryDate: p.expiryDate ? p.expiryDate.slice(0, 10) : '',
           });
           setCurrentStockEdit(String(p.currentStock ?? 0));
         }
@@ -95,6 +100,35 @@ export default function ProdutoEditar() {
     })();
     return () => { mounted = false; };
   }, [id]);
+
+  // Carregar categorias do client-local
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const data = await fetchCategories();
+        setCategories(data);
+      } catch (err: any) {
+        console.error('Erro ao carregar categorias:', err);
+        toast({
+          title: 'Erro ao carregar categorias',
+          description: err?.message || 'Falha ao obter categorias do servidor',
+          variant: 'destructive',
+        });
+      }
+    };
+    loadCategories();
+  }, []);
+
+  // Ajusta seleção de categoria quando categorias carregam
+  useEffect(() => {
+    if (!product) return;
+    const selectedCategoryId = product.category
+      ? (categories.find(c => c.name === product.category)?.id || '')
+      : '';
+    if (selectedCategoryId && formData.categoryId !== selectedCategoryId) {
+      setFormData(prev => ({ ...prev, categoryId: selectedCategoryId }));
+    }
+  }, [product, categories]);
 
   if (loading) {
     return (
@@ -141,6 +175,17 @@ export default function ProdutoEditar() {
     setFormData({ ...formData, [field]: formatted });
   };
 
+  // Sugestão de preço a partir da margem (%)
+  const getSuggestedPrice = (): number | undefined => {
+    const cost = formData.cost ? parseFloat(formData.cost.replace(',', '.')) : undefined;
+    const margin = formData.marginPct ? parseFloat(formData.marginPct.replace(',', '.')) : undefined;
+    if (cost === undefined || isNaN(cost) || margin === undefined || isNaN(margin)) return undefined;
+    return cost * (1 + margin / 100);
+  };
+
+  const formatBRL = (value: number): string =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -165,6 +210,8 @@ export default function ProdutoEditar() {
         minStock: formData.minStock ? parseInt(formData.minStock) : undefined,
         active: formData.active,
         imageUrl: formData.imageUrl,
+        marginPct: formData.marginPct ? parseFloat(formData.marginPct.replace(',', '.')) : undefined,
+        expiryDate: formData.expiryDate || undefined,
       });
 
       // Ajuste de estoque atual, caso o valor tenha sido alterado
@@ -329,7 +376,7 @@ export default function ProdutoEditar() {
               <CardTitle>Precificação e Estoque</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="price">Preço de Venda *</Label>
                   <Input
@@ -354,9 +401,29 @@ export default function ProdutoEditar() {
                     onChange={(e) => handleMoneyInputChange('cost', e.target.value)}
                   />
                 </div>
+
+                <div>
+                  <Label htmlFor="marginPct">Margem (%)</Label>
+                  <Input
+                    id="marginPct"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="ex.: 30"
+                    value={formData.marginPct}
+                    onChange={(e) => setFormData({ ...formData, marginPct: e.target.value })}
+                  />
+                  {(() => {
+                    const s = getSuggestedPrice();
+                    return s ? (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Preço sugerido: {formatBRL(s)}
+                      </p>
+                    ) : null;
+                  })()}
+                </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="currentStock">Estoque Atual</Label>
                   <Input
@@ -378,7 +445,19 @@ export default function ProdutoEditar() {
                     onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
                   />
                 </div>
+
+                <div>
+                  <Label htmlFor="expiryDate">Validade do Produto</Label>
+                  <Input
+                    id="expiryDate"
+                    type="date"
+                    value={formData.expiryDate}
+                    onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                  />
+                </div>
               </div>
+            </CardContent>
+          </Card>
 
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
@@ -392,8 +471,6 @@ export default function ProdutoEditar() {
                   onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
                 />
               </div>
-            </CardContent>
-          </Card>
 
           <div className="flex gap-4">
             <Button type="submit">Salvar Alterações</Button>

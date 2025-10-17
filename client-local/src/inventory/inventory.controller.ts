@@ -22,7 +22,7 @@ export class InventoryController {
   @Post('adjust')
   @HttpCode(HttpStatus.OK)
   async adjustInventory(
-    @Body(ValidationPipe) adjustInventoryDto: AdjustInventoryDto,
+    @Body(new ValidationPipe({ transform: true, whitelist: true, forbidUnknownValues: true })) adjustInventoryDto: AdjustInventoryDto,
   ): Promise<AdjustInventoryResponseDto> {
     return this.inventoryService.adjustInventory(adjustInventoryDto);
   }
