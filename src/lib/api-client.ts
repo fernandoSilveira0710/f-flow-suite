@@ -4,7 +4,7 @@
  */
 
 import { API_URLS } from './env';
-const BASE_URL = import.meta.env.VITE_LICENSE_HUB_URL || API_URLS.HUB;
+const BASE_URL = API_URLS.HUB;
 const TENANT_KEY = '2f.tenantId';
 
 export function getTenantId(): string {
@@ -48,11 +48,26 @@ export async function apiClient<T = any>(
     const response = await fetch(`${BASE_URL}${endpoint}`, config);
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      let errorMessage = `Erro HTTP ${response.status}`;
+      try {
+        const errorBody = await response.json();
+        errorMessage = errorBody?.message || errorMessage;
+      } catch (_) {
+        try {
+          const text = await response.text();
+          if (text) errorMessage = text;
+        } catch {}
+      }
+      throw new Error(errorMessage);
     }
     
-    const data = await response.json();
-    return data;
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      return data as T;
+    }
+    const text = await response.text();
+    return text as unknown as T;
   } catch (error) {
     console.error('[API Error]', error);
     throw error;

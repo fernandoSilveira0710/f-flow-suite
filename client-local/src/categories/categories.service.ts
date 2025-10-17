@@ -34,9 +34,13 @@ export class CategoriesService {
     return this.mapToResponseDto(category);
   }
 
-  async findAll(): Promise<CategoryResponseDto[]> {
+  async findAll(active?: string): Promise<CategoryResponseDto[]> {
+    const where = (active === 'true' || active === 'false')
+      ? { active: active === 'true' }
+      : undefined;
+
     const categories = await this.prisma.category.findMany({
-      where: { active: true },
+      where,
       orderBy: { name: 'asc' },
     });
 

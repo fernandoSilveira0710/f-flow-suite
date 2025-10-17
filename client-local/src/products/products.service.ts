@@ -26,12 +26,25 @@ export class ProductsService {
           salePrice: createProductDto.price,
           costPrice: createProductDto.cost,
           category: createProductDto.category,
-          unit: createProductDto.unit,
-          minStock: createProductDto.minStock,
-          maxStock: createProductDto.maxStock,
-          trackStock: createProductDto.trackStock ?? true,
           active: createProductDto.active ?? true,
-          stockQty: 0, // Initialize with 0 stock
+          stockQty: 0,
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          imageUrl: true,
+          sku: true,
+          barcode: true,
+          salePrice: true,
+          costPrice: true,
+          category: true,
+          stockQty: true,
+          marginPct: true,
+          expiryDate: true,
+          active: true,
+          createdAt: true,
+          updatedAt: true,
         },
       });
 
@@ -54,6 +67,28 @@ export class ProductsService {
   async findAll(): Promise<ProductResponseDto[]> {
     const products = await this.prisma.product.findMany({
       orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        imageUrl: true,
+        sku: true,
+        barcode: true,
+        salePrice: true,
+        costPrice: true,
+        category: true,
+        stockQty: true,
+        active: true,
+        createdAt: true,
+        updatedAt: true,
+        marginPct: true,
+        expiryDate: true,
+        minStock: true,
+        // intentionally omit fields that may not exist in older DBs
+        // unit: true,
+        // maxStock: true,
+        // trackStock: true,
+      },
     });
 
     return products.map(product => this.mapToResponseDto(product));
@@ -62,6 +97,27 @@ export class ProductsService {
   async findOne(id: string): Promise<ProductResponseDto> {
     const product = await this.prisma.product.findUnique({
       where: { id },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        imageUrl: true,
+        sku: true,
+        barcode: true,
+        salePrice: true,
+        costPrice: true,
+        category: true,
+        stockQty: true,
+        active: true,
+        createdAt: true,
+        updatedAt: true,
+        marginPct: true,
+        expiryDate: true,
+        unit: true,
+        minStock: true,
+        maxStock: true,
+        trackStock: true,
+      },
     });
 
     if (!product) {
@@ -74,6 +130,7 @@ export class ProductsService {
   async update(id: string, updateProductDto: UpdateProductDto): Promise<ProductResponseDto> {
     const existingProduct = await this.prisma.product.findUnique({
       where: { id },
+      select: { id: true },
     });
 
     if (!existingProduct) {
@@ -92,12 +149,35 @@ export class ProductsService {
           ...(updateProductDto.barcode !== undefined && { barcode: updateProductDto.barcode }),
           ...(updateProductDto.price !== undefined && { salePrice: updateProductDto.price }),
           ...(updateProductDto.cost !== undefined && { costPrice: updateProductDto.cost }),
+          ...(updateProductDto.marginPct !== undefined && { marginPct: updateProductDto.marginPct }),
+          ...(updateProductDto.expiryDate !== undefined && { expiryDate: new Date(updateProductDto.expiryDate) }),
           ...(updateProductDto.category !== undefined && { category: updateProductDto.category }),
           ...(updateProductDto.unit !== undefined && { unit: updateProductDto.unit }),
           ...(updateProductDto.minStock !== undefined && { minStock: updateProductDto.minStock }),
           ...(updateProductDto.maxStock !== undefined && { maxStock: updateProductDto.maxStock }),
           ...(updateProductDto.trackStock !== undefined && { trackStock: updateProductDto.trackStock }),
           ...(updateProductDto.active !== undefined && { active: updateProductDto.active }),
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          imageUrl: true,
+          sku: true,
+          barcode: true,
+          salePrice: true,
+          costPrice: true,
+          category: true,
+          stockQty: true,
+          active: true,
+          createdAt: true,
+          updatedAt: true,
+          marginPct: true,
+          expiryDate: true,
+          unit: true,
+          minStock: true,
+          maxStock: true,
+          trackStock: true,
         },
       });
     } catch (error: any) {
@@ -144,6 +224,8 @@ export class ProductsService {
       imageUrl: product.imageUrl,
       salePrice: product.salePrice,
       costPrice: product.costPrice,
+      marginPct: product.marginPct,
+      expiryDate: product.expiryDate?.toISOString(),
       category: product.category,
       barcode: product.barcode,
       unit: product.unit,
@@ -176,6 +258,8 @@ export class ProductsService {
       barcode: product.barcode,
       price: product.salePrice,
       cost: product.costPrice,
+      marginPct: product.marginPct,
+      expiryDate: product.expiryDate,
       category: product.category,
       unit: product.unit,
       minStock: product.minStock,

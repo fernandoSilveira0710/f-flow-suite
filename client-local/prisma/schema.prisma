@@ -46,6 +46,8 @@ model Product {
   imageUrl             String?
   salePrice            Decimal
   costPrice            Decimal?
+  marginPct            Float?
+  expiryDate           DateTime?
   stockQty             Int                   @default(0)
   category             String?
   barcode              String?               @unique

@@ -93,6 +93,12 @@ export default function SettingsLayout() {
       requiresPlan: null,
     },
     {
+      label: 'Produtos',
+      icon: Package,
+      path: '/erp/settings/products',
+      requiresPlan: null,
+    },
+    {
       type: 'separator' as const,
       label: 'Geral',
     },
