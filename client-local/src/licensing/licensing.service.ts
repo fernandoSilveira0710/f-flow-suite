@@ -576,6 +576,18 @@ export class LicensingService implements OnModuleInit {
     expiresAt?: Date;
   }> {
     try {
+      // Em modo desenvolvimento, considerar licença válida para não bloquear fluxo offline
+      if (!this.licensingEnforced) {
+        const cachedLicense = await this.getLicenseFromCache(tenantId);
+        return {
+          valid: true,
+          status: 'development',
+          cached: !!cachedLicense,
+          planKey: cachedLicense?.planKey || 'starter',
+          expiresAt: cachedLicense?.expiresAt,
+        };
+      }
+
       // Primeiro tenta obter do cache
       const cachedLicense = await this.getLicenseFromCache(tenantId);
 

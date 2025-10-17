@@ -27,6 +27,10 @@ interface AuthContextType {
   refreshLicenseStatus: (forceUpdate?: boolean) => Promise<void>;
   isFirstInstallation: () => Promise<boolean>;
   hasLocalUsers: () => Promise<boolean>;
+  isHubOnline: boolean;
+  hubLastCheck: string | null;
+  checkHubConnectivity: () => Promise<boolean>;
+  syncLicenseWithHub: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -559,6 +563,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Hub connectivity + license sync
+  const [isHubOnline, setIsHubOnline] = useState<boolean>(false);
+  const [hubLastCheck, setHubLastCheck] = useState<string | null>(null);
+
+  const checkHubConnectivity = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetchWithTimeout(`${ENDPOINTS.HUB_HEALTH}?t=${Date.now()}`, { method: 'GET' }, 3000);
+      const ok = res.ok;
+      setIsHubOnline(ok);
+      if (ok) setHubLastCheck(new Date().toISOString());
+      return ok;
+    } catch (e) {
+      setIsHubOnline(false);
+      return false;
+    }
+  }, [fetchWithTimeout]);
+
+  const syncLicenseWithHub = useCallback(async (): Promise<void> => {
+    const tenantId = localStorage.getItem('tenant_id') || localStorage.getItem('2f.tenantId') || '';
+    try {
+      const res = await fetchWithTimeout(`${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${tenantId}&t=${Date.now()}`, { method: 'GET' }, 5000);
+      if (!res.ok) {
+        setIsHubOnline(false);
+        return;
+      }
+      const data = await res.json();
+      const planKey = (data?.license?.planKey || data?.planKey || 'starter').toLowerCase();
+      const expiresAt = data?.license?.expiresAt || data?.expiresAt || undefined;
+      const valid = Boolean(data?.valid || data?.licensed);
+
+      setLicenseStatus({
+        isValid: valid,
+        isInstalled: true,
+        plan: planKey,
+        expiresAt
+      });
+
+      setIsHubOnline(true);
+      setHubLastCheck(new Date().toISOString());
+
+      try {
+        await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/update-cache`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantId,
+            planKey,
+            expiresAt,
+            valid,
+            updatedAt: new Date().toISOString()
+          })
+        });
+      } catch (e) {
+        console.warn('Falha ao atualizar cache de licença no client-local', e);
+      }
+    } catch (error) {
+      console.warn('Erro ao sincronizar licença com Hub', error);
+      setIsHubOnline(false);
+    }
+  }, [fetchWithTimeout]);
+
   const value: AuthContextType = {
     user,
     licenseStatus,
@@ -580,7 +645,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       checkLicenseStatus,
       refreshLicenseStatus,
       isFirstInstallation,
-      hasLocalUsers
+      hasLocalUsers,
+      isHubOnline,
+      hubLastCheck,
+      checkHubConnectivity,
+      syncLicenseWithHub
     }}>
       {children}
     </AuthContext.Provider>

@@ -21,6 +21,8 @@ export interface CartItem {
   produto: Product;
   qtd: number;
   subtotal: number;
+  itemDiscount?: number;
+  finalized?: boolean;
 }
 
 export interface Sale {
@@ -34,6 +36,8 @@ export interface Sale {
   createdAt: string;
   updatedAt: string;
   items: SaleItem[];
+  // Pagamentos fracionados persistidos localmente (opcional)
+  payments?: { method: string; amount: number; installments?: number }[];
 }
 
 export interface SaleItem {
@@ -84,6 +88,8 @@ const STORAGE_KEYS = {
   cart: '2f.pos.cart',
   session: '2f.pos.session.current',
   sessionsClosed: '2f.pos.sessions.closed',
+  // Mapa saleId -> pagamentos fracionados
+  salePayments: '2f.pos.sale.payments',
 };
 
 // Utility functions
@@ -98,6 +104,16 @@ const getFromStorage = <T>(key: string, defaultValue: T): T => {
 const setInStorage = <T>(key: string, value: T): void => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(key, JSON.stringify(value));
+};
+
+// Helpers: pagamentos fracionados
+const getSalePaymentsMap = (): Record<string, { method: string; amount: number; installments?: number }[]> =>
+  getFromStorage<Record<string, { method: string; amount: number; installments?: number }[]>>(STORAGE_KEYS.salePayments, {} as any);
+
+const saveSalePayments = (saleId: string, payments: { method: string; amount: number; installments?: number }[]) => {
+  const map = getSalePaymentsMap();
+  map[saleId] = payments.map(p => ({ method: p.method, amount: Number(p.amount.toFixed(2)), installments: p.installments }));
+  setInStorage(STORAGE_KEYS.salePayments, map);
 };
 
 // API Helper function
@@ -209,13 +225,16 @@ export const addToCart = async (productId: string, qtd: number = 1): Promise<Car
 
   if (existingItem) {
     existingItem.qtd += qtd;
-    existingItem.subtotal = existingItem.qtd * existingItem.produto.preco;
+    const currentDiscount = existingItem.itemDiscount ?? 0;
+    existingItem.subtotal = Math.max(0, existingItem.qtd * existingItem.produto.preco - currentDiscount);
   } else {
     const newItem: CartItem = {
       id: Date.now().toString(),
       produto: product,
       qtd,
       subtotal: qtd * product.preco,
+      itemDiscount: 0,
+      finalized: false,
     };
     cart.push(newItem);
   }
@@ -236,7 +255,8 @@ export const updateCartItem = async (itemId: string, qtd: number): Promise<CartI
       cart.splice(index, 1);
     } else {
       item.qtd = qtd;
-      item.subtotal = qtd * item.produto.preco;
+      const currentDiscount = item.itemDiscount ?? 0;
+      item.subtotal = Math.max(0, qtd * item.produto.preco - currentDiscount);
     }
   }
 
@@ -263,12 +283,48 @@ export const clearCart = async (): Promise<void> => {
   setInStorage(STORAGE_KEYS.cart, []);
 };
 
+export const updateCartItemDiscount = async (itemId: string, discountAmount: number): Promise<CartItem[]> => {
+  await delay(150);
+  const cart = getCart();
+  const item = cart.find((it) => it.id === itemId);
+  if (item) {
+    item.itemDiscount = Math.max(0, Number((discountAmount || 0).toFixed(2)));
+    const base = item.qtd * item.produto.preco;
+    item.subtotal = Math.max(0, Number((base - (item.itemDiscount || 0)).toFixed(2)));
+  }
+  setInStorage(STORAGE_KEYS.cart, cart);
+  return cart;
+};
+
+export const finalizeCartItem = async (itemId: string): Promise<CartItem[]> => {
+  await delay(100);
+  const cart = getCart();
+  const item = cart.find((it) => it.id === itemId);
+  if (item) {
+    item.finalized = true;
+  }
+  setInStorage(STORAGE_KEYS.cart, cart);
+  return cart;
+};
+
+export const unfinalizeCartItem = async (itemId: string): Promise<CartItem[]> => {
+  await delay(80);
+  const cart = getCart();
+  const item = cart.find((it) => it.id === itemId);
+  if (item) {
+    item.finalized = false;
+  }
+  setInStorage(STORAGE_KEYS.cart, cart);
+  return cart;
+};
+
 // Sales API
 export const createSale = async (
   cart: CartItem[],
   paymentMethod: string,
   installments?: number,
-  discount?: number
+  discount?: number,
+  payments?: { method: string; amount: number; installments?: number }[]
 ): Promise<Sale> => {
   try {
     // Helper: aplica desconto global proporcionalmente
@@ -300,9 +356,13 @@ export const createSale = async (
     const currentSession = getCurrentSession();
     const operator = currentSession?.operador?.nome || 'Sistema';
 
+    const pmLabel = payments && payments.length > 0
+      ? payments.map(p => `${p.method} R$ ${p.amount.toFixed(2)}`).join(' + ')
+      : paymentMethod;
+
     const payload = {
       operator,
-      paymentMethod,
+      paymentMethod: pmLabel,
       items: applyGlobalDiscount(cart, discount || 0),
     } as any;
 
@@ -333,6 +393,11 @@ export const createSale = async (
       })),
     };
 
+    if (payments && payments.length > 0) {
+      saveSalePayments(newSale.id, payments);
+      newSale.payments = payments.map(p => ({ method: p.method, amount: Number(p.amount.toFixed(2)), installments: p.installments }));
+    }
+
     if (currentSession) {
       currentSession.vendasIds.push(newSale.id);
       setInStorage(STORAGE_KEYS.session, { ...currentSession });
@@ -350,6 +415,7 @@ export const createSale = async (
 export const getSales = async (): Promise<Sale[]> => {
   try {
     const sales = await apiCall<any[]>('/sales');
+    const map = getSalePaymentsMap();
     return (sales || []).map((s) => ({
       id: s.id,
       code: s.code,
@@ -369,6 +435,7 @@ export const getSales = async (): Promise<Sale[]> => {
         subtotal: it.subtotal,
         createdAt: it.createdAt,
       })),
+      payments: map[s.id] ? map[s.id].map((p: any) => ({ method: p.method, amount: Number(p.amount), installments: p.installments })) : undefined,
     }));
   } catch (error) {
     console.error('Error getting sales:', error);
@@ -380,6 +447,7 @@ export const getSaleById = async (id: string): Promise<Sale | null> => {
   try {
     const s = await apiCall<any>(`/sales/${id}`);
     if (!s) return null;
+    const map = getSalePaymentsMap();
     return {
       id: s.id,
       code: s.code,
@@ -399,6 +467,7 @@ export const getSaleById = async (id: string): Promise<Sale | null> => {
         subtotal: it.subtotal,
         createdAt: it.createdAt,
       })),
+      payments: map[s.id] ? map[s.id].map((p: any) => ({ method: p.method, amount: Number(p.amount), installments: p.installments })) : undefined,
     };
   } catch (error) {
     console.error('Error getting sale by id:', error);
