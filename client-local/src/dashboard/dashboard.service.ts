@@ -28,6 +28,7 @@ export class DashboardService {
             gte: startOfToday,
             lte: endOfToday,
           },
+          status: { not: 'refunded' },
         },
       }),
       // Quantidade de vendas no mês
@@ -37,6 +38,7 @@ export class DashboardService {
             gte: startOfCurrentMonth,
             lte: endOfCurrentMonth,
           },
+          status: { not: 'refunded' },
         },
       }),
       // Total de vendas hoje
@@ -46,6 +48,7 @@ export class DashboardService {
             gte: startOfToday,
             lte: endOfToday,
           },
+          status: { not: 'refunded' },
         },
         _sum: {
           total: true,
@@ -58,6 +61,7 @@ export class DashboardService {
             gte: startOfCurrentMonth,
             lte: endOfCurrentMonth,
           },
+          status: { not: 'refunded' },
         },
         _sum: {
           total: true,
@@ -68,7 +72,7 @@ export class DashboardService {
     // Métricas de estoque
     const [
       produtosAtivos,
-      produtosBaixoEstoque,
+      lowStockRows,
       produtosSemEstoque,
       valorTotalEstoque,
     ] = await Promise.all([
@@ -76,21 +80,21 @@ export class DashboardService {
       this.prisma.product.count({
         where: { active: true },
       }),
-      // Produtos com estoque baixo (menos de 10 unidades)
+      // Produtos com estoque baixo (estoqueAtual > 0 e estoqueAtual < minStock)
+      this.prisma.$queryRaw<{ cnt: number }[]>`\
+        SELECT COUNT(*) as cnt\
+        FROM Product\
+        WHERE stockQty > 0\
+          AND minStock IS NOT NULL\
+          AND minStock > 0\
+          AND stockQty < minStock\
+      `,
+      // Produtos sem estoque (inclui ativos e inativos; considera <= 0)
       this.prisma.product.count({
         where: {
-          active: true,
           stockQty: {
-            gt: 0,
-            lt: 10,
+            lte: 0,
           },
-        },
-      }),
-      // Produtos sem estoque
-      this.prisma.product.count({
-        where: {
-          active: true,
-          stockQty: 0,
         },
       }),
       // Valor total do estoque
@@ -101,6 +105,8 @@ export class DashboardService {
         },
       }),
     ]);
+
+    const produtosBaixoEstoque = Number((lowStockRows as any)?.[0]?.cnt ?? 0);
 
     // Métricas de agendamentos
     const [
