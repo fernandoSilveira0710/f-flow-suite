@@ -131,8 +131,12 @@ export async function bootstrap(): Promise<void> {
     const databaseUrl = setupDatabase(dataDir);
     logger.log(`Database URL: ${databaseUrl}`);
     
-    // Run migrations
-    await runMigrations();
+    // Run migrations (can be skipped via env)
+    if (process.env.SKIP_MIGRATIONS !== 'true') {
+      await runMigrations();
+    } else {
+      logger.log('Skipping Prisma migrations due to SKIP_MIGRATIONS=true');
+    }
     
     // Initialize application logger
     logger.log('Initializing application logger...');

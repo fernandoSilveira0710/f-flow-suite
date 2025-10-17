@@ -78,18 +78,8 @@ export default function SettingsLayout() {
       path: '/erp/settings/pos',
       requiresPlan: null,
     },
-    {
-      label: 'Agenda',
-      icon: Calendar,
-      path: '/erp/settings/schedule',
-      requiresPlan: null,
-    },
-    {
-      label: 'Banho & Tosa',
-      icon: Scissors,
-      path: '/erp/settings/grooming',
-      requiresPlan: 'pro',
-    },
+    // Agenda removida (não visível para nenhum plano)
+    // Banho & Tosa removido (não visível para nenhum plano)
     {
       label: 'Estoque',
       icon: Package,

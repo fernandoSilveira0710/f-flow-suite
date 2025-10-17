@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getSales } from '@/lib/pos-api';
-import { mockAPI } from '@/lib/mock-data';
-import { startOfMonth, startOfDay, endOfDay, differenceInDays } from 'date-fns';
+import { getDashboardSummary } from '@/lib/dashboard-api';
+import { startOfMonth, startOfDay, endOfDay, differenceInDays, isAfter, isBefore } from 'date-fns';
 
 interface DashboardSummary {
   todaySalesCount: number;
@@ -16,60 +16,42 @@ interface DashboardSummary {
 }
 
 async function fetchDashboardSummary(): Promise<DashboardSummary> {
-  // Simular delay de rede
-  await new Promise(resolve => setTimeout(resolve, 500));
-
   const now = new Date();
   const todayStart = startOfDay(now);
   const todayEnd = endOfDay(now);
   const monthStart = startOfMonth(now);
 
-  // Buscar vendas (await porque retorna Promise)
+  // Buscar resumo real do client-local
+  const summary = await getDashboardSummary();
+
+  // Buscar vendas reais para calcular a série do mês
   const allSales = await getSales();
+  const monthSales = allSales.filter((sale) => new Date(sale.createdAt) >= monthStart);
 
-  // Vendas de hoje
-  const todaySales = allSales.filter(sale => {
-    const saleDate = new Date(sale.data);
-    return saleDate >= todayStart && saleDate <= todayEnd;
-  });
-
-  // Vendas do mês
-  const monthSales = allSales.filter(sale => {
-    const saleDate = new Date(sale.data);
-    return saleDate >= monthStart;
-  });
-
-  // Produtos (usando mockAPI que retorna Product com propriedades em inglês)
-  const products = mockAPI.getProducts();
-  const activeProducts = products.filter(p => p.active !== false).length;
-  
-  // Estoque
-  const lowStockCount = products.filter(p => 
-    p.stock > 0 && p.stock < 10 // threshold mock de 10 unidades
-  ).length;
-  
-  const outOfStockCount = products.filter(p => p.stock === 0).length;
-  
-  // A vencer (mock - considerar produtos com validade próxima)
-  const expiringSoonCount = Math.floor(Math.random() * 5);
-
-  // Série de receita do mês (mock - dados diários)
+  // Série de receita do mês (agregada por dia)
   const daysInMonth = differenceInDays(now, monthStart) + 1;
-  const monthRevenueSeries = Array.from({ length: Math.min(daysInMonth, 30) }, (_, i) => ({
-    day: `${i + 1}`,
-    total: Math.random() * 5000 + 1000
-  }));
+  const totalsByDay = new Array<number>(Math.min(daysInMonth, 31)).fill(0);
+  for (const sale of monthSales) {
+    const saleDate = new Date(sale.createdAt);
+    if ((isAfter(saleDate, monthStart) || saleDate.getTime() === monthStart.getTime()) && isBefore(saleDate, endOfDay(now))) {
+      const dayIndex = saleDate.getDate() - 1;
+      if (dayIndex >= 0 && dayIndex < totalsByDay.length) {
+        totalsByDay[dayIndex] += sale.total || 0;
+      }
+    }
+  }
+  const monthRevenueSeries = totalsByDay.map((total, idx) => ({ day: `${idx + 1}`, total }));
 
   return {
-    todaySalesCount: todaySales.length,
-    todaySalesTotal: todaySales.reduce((sum, sale) => sum + sale.total, 0),
-    monthSalesCount: monthSales.length,
-    monthSalesTotal: monthSales.reduce((sum, sale) => sum + sale.total, 0),
-    activeProducts,
-    lowStockCount,
-    outOfStockCount,
-    expiringSoonCount,
-    monthRevenueSeries
+    todaySalesCount: summary.vendas.quantidadeDia,
+    todaySalesTotal: Number(summary.vendas.totalDia || 0),
+    monthSalesCount: summary.vendas.quantidadeMes,
+    monthSalesTotal: Number(summary.vendas.totalMes || 0),
+    activeProducts: summary.estoque.produtosAtivos,
+    lowStockCount: summary.estoque.produtosBaixoEstoque,
+    outOfStockCount: summary.estoque.produtosSemEstoque,
+    expiringSoonCount: 0, // ainda não disponível no backend
+    monthRevenueSeries,
   };
 }
 
