@@ -284,16 +284,14 @@ export class PlanSyncService {
    */
   private static async updateHubPlan(tenantId: string, planKey: string): Promise<{ success: boolean; message: string }> {
     try {
-      // Este endpoint seria implementado no Hub para atualizar planos
-      const response = await fetch(`${this.HUB_BASE_URL}/plans/update`, {
-        method: 'POST',
+      const response = await fetch(`${this.HUB_BASE_URL}/licenses/${tenantId}/plan`, {
+        method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
         },
         body: JSON.stringify({
-          tenantId,
-          planKey,
-          updatedAt: new Date().toISOString()
+          planKey
         }),
         signal: AbortSignal.timeout(5000)
       });
@@ -307,7 +305,7 @@ export class PlanSyncService {
 
       return {
         success: true,
-        message: 'Hub atualizado com sucesso'
+        message: 'Plano atualizado no Hub com sucesso'
       };
 
     } catch (error) {

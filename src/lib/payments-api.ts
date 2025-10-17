@@ -137,8 +137,14 @@ export const getUsablePaymentMethods = async (
   caixaAberto: boolean = true
 ): Promise<PaymentMethod[]> => {
   const tenantId = getTenantId();
-  const list = await apiClient<any[]>(`${endpointBase(tenantId)}/active`, { method: 'GET' });
-  const mapped = (list || []).map(mapFromHub);
+  let mapped: PaymentMethod[] = [];
+  try {
+    const list = await apiClient<any[]>(`${endpointBase(tenantId)}/active`, { method: 'GET' });
+    mapped = (list || []).map(mapFromHub);
+  } catch (error) {
+    console.warn('[Payments] Falha ao buscar métodos no Hub; usando presets locais para PDV.', error);
+    mapped = await getPresets();
+  }
 
   return mapped
     .filter((m) => m.ativo)
