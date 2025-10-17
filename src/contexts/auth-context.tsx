@@ -725,6 +725,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             planKey,
             expiresAt,
             valid,
+            lastChecked: nowIso,
             updatedAt: nowIso
           })
         });

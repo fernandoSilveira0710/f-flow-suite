@@ -154,11 +154,80 @@ export default function PlanoPage() {
       const timestamp = new Date().getTime();
       // Usar a rota correta de assinatura por tenant
       const url = `${ENDPOINTS.HUB_TENANTS_SUBSCRIPTION(tenantId)}?_t=${timestamp}`;
+
+      const doFallbackFromValidate = async (): Promise<boolean> => {
+        try {
+          const validateUrl = `${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${tenantId}&_t=${Date.now()}`;
+          const validateRes = await fetch(validateUrl, { method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } });
+          if (validateRes.ok) {
+            const data = await validateRes.json().catch(() => null);
+            const planKeyRaw = (data?.license?.planKey || data?.planKey || '').toLowerCase();
+            const hasPlan = ['starter', 'pro', 'max'].includes(planKeyRaw);
+            if (hasPlan) {
+              const mappedPlanInfo: PlanInfo = {
+                plano: planKeyRaw as 'starter' | 'pro' | 'max',
+                seatLimit: data?.license?.maxSeats || data?.maxSeats || 1,
+                recursos: {
+                  products: { enabled: true },
+                  pdv: { enabled: true },
+                  stock: { enabled: true },
+                  agenda: { enabled: planKeyRaw !== 'starter' },
+                  banho_tosa: { enabled: planKeyRaw !== 'starter' },
+                  reports: { enabled: planKeyRaw !== 'starter' },
+                },
+                ciclo: 'MENSAL',
+                proximoCobranca: data?.license?.expiresAt || data?.expiresAt,
+              };
+              console.log('🎯 Plano via validação de licença (fallback):', mappedPlanInfo);
+              setPlanInfo(mappedPlanInfo);
+              return true;
+            }
+          }
+          console.warn('⚠️ Validação não retornou plano; tentando plano local do client-local');
+
+          // Fallback final: usar plano do client-local
+          try {
+            const localPlanRes = await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/plan/current`, { method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } });
+            if (localPlanRes.ok) {
+              const local = await localPlanRes.json().catch(() => null);
+              const planKeyRaw = (local?.planKey || '').toLowerCase();
+              if (['starter', 'pro', 'max'].includes(planKeyRaw)) {
+                const mappedPlanInfo: PlanInfo = {
+                  plano: planKeyRaw as 'starter' | 'pro' | 'max',
+                  seatLimit: 1,
+                  recursos: {
+                    products: { enabled: true },
+                    pdv: { enabled: true },
+                    stock: { enabled: true },
+                    agenda: { enabled: planKeyRaw !== 'starter' },
+                    banho_tosa: { enabled: planKeyRaw !== 'starter' },
+                    reports: { enabled: planKeyRaw !== 'starter' },
+                  },
+                  ciclo: 'MENSAL',
+                  proximoCobranca: local?.expiresAt,
+                };
+                console.log('🎯 Plano via client-local (fallback final):', mappedPlanInfo);
+                setPlanInfo(mappedPlanInfo);
+                return true;
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ Falha ao obter plano do client-local', e);
+          }
+
+          console.warn('⚠️ Nenhuma assinatura ativa/validação de licença válida encontrada para o tenant');
+          return false;
+        } catch (e) {
+          console.warn('⚠️ Falha no fallback via validação de licença', e);
+          return false;
+        }
+      };
       
       const response = await fetch(url, {
         method: 'GET',
+        cache: 'no-store',
         headers: {
-          'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'x-tenant-id': tenantId,
           // Enviar cabeçalhos de licença de forma compatível com o LicenseGuard do Hub
           'X-License-Token': licenseToken,
@@ -166,111 +235,74 @@ export default function PlanoPage() {
         },
       });
 
-      if (response.ok) {
-        const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
-          const text = await response.text();
-          console.warn('⚠️ Hub retornou conteúdo não-JSON ao buscar assinatura do tenant', {
-            url,
-            contentType,
-            preview: text.slice(0, 200)
-          });
-          return;
-        }
-        const subscription = await response.json();
-
-        // Se não houver assinatura ativa para o tenant, tentar usar validação de licença como fallback
-        if (!subscription) {
-          const validateUrl = `${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${tenantId}`;
-          const validateRes = await fetch(validateUrl, { method: 'GET' });
-          if (validateRes.ok) {
-            const data = await validateRes.json();
-            if (data?.licensed && data?.license?.planKey) {
-              const mappedPlanInfo: PlanInfo = {
-                plano: (data.license.planKey || 'starter') as 'starter' | 'pro' | 'max',
-                seatLimit: data.license.maxSeats || 1,
-                recursos: {
-                  products: { enabled: true },
-                  pdv: { enabled: true },
-                  stock: { enabled: true },
-                  agenda: { enabled: data.license.planKey !== 'starter' },
-                  banho_tosa: { enabled: data.license.planKey !== 'starter' },
-                  reports: { enabled: data.license.planKey !== 'starter' },
-                },
-                ciclo: 'MENSAL',
-                proximoCobranca: data.license.expiresAt,
-              };
-              console.log('🎯 Plano via licença (fallback):', mappedPlanInfo);
-              setPlanInfo(mappedPlanInfo);
-              return;
-            }
-          }
-          // Sem assinatura e sem licença válida: não lançar erro
-          console.warn('⚠️ Nenhuma assinatura ativa encontrada para o tenant');
-          return;
-        }
-
-        // Mapear dados da assinatura do Hub
-        const planKeyFromHub = (subscription?.plan?.name || 'starter').toLowerCase();
-        const featuresEnabled = subscription?.plan?.featuresEnabled || {};
-        const cycleRaw = (subscription?.billingCycle || 'MONTHLY').toString().toLowerCase();
-        const mappedCycle: 'MENSAL' | 'ANUAL' = cycleRaw.includes('year') ? 'ANUAL' : 'MENSAL';
-
-        let mappedPlanInfo: PlanInfo = {
-          plano: (['starter', 'pro', 'max'].includes(planKeyFromHub) ? planKeyFromHub : 'starter') as 'starter' | 'pro' | 'max',
-          seatLimit: subscription?.plan?.maxSeats || 1,
-          recursos: {
-            products: { enabled: featuresEnabled.products !== false },
-            pdv: { enabled: featuresEnabled.pdv !== false },
-            stock: { enabled: featuresEnabled.stock !== false },
-            agenda: { enabled: featuresEnabled.agenda !== false },
-            banho_tosa: { enabled: featuresEnabled.banho_tosa !== false },
-            reports: { enabled: featuresEnabled.reports !== false },
-          },
-          ciclo: mappedCycle,
-          proximoCobranca: subscription?.expiresAt,
-        };
-
-        // Reconciliar com licença se houver divergência (plano da licença é o preferido para exibição)
-        try {
-          const validateUrl = `${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${tenantId}`;
-          const validateRes = await fetch(validateUrl, { method: 'GET' });
-          if (validateRes.ok) {
-            const validateContentType = validateRes.headers.get('content-type') || '';
-            if (!validateContentType.includes('application/json')) {
-              const text = await validateRes.text();
-              console.warn('⚠️ Validação de licença retornou conteúdo não-JSON', {
-                url: validateUrl,
-                contentType: validateContentType,
-                preview: text.slice(0, 200)
-              });
-              // Sem dados JSON, não derrubar o fluxo
-              return;
-            }
-            const data = await validateRes.json();
-            const licensePlanKey = (data?.license?.planKey || data?.planKey || '').toLowerCase();
-            const isValidLicense = data?.valid === true || data?.licensed === true;
-            if (isValidLicense && ['starter', 'pro', 'max'].includes(licensePlanKey) && licensePlanKey !== mappedPlanInfo.plano) {
-              mappedPlanInfo = {
-                ...mappedPlanInfo,
-                plano: licensePlanKey as 'starter' | 'pro' | 'max',
-                seatLimit: data?.license?.maxSeats || mappedPlanInfo.seatLimit,
-                proximoCobranca: data?.license?.expiresAt || mappedPlanInfo.proximoCobranca,
-              };
-              console.log('🔁 Plano ajustado via licença válida:', mappedPlanInfo.plano);
-            }
-          }
-        } catch (e) {
-          console.warn('⚠️ Falha ao validar licença para conciliação de plano', e);
-        }
-
-        console.log('🎯 Dados do plano carregados do Hub:', subscription);
-        setPlanInfo(mappedPlanInfo);
-      } else {
-        // Evitar derrubar o modo online por causa de uma falha aqui
+      if (!response.ok) {
         console.warn(`⚠️ Falha ao buscar assinatura (HTTP ${response.status})`);
+        await doFallbackFromValidate();
         return;
       }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (response.status === 304 || response.status === 204 || !contentType.includes('application/json')) {
+        let preview = '';
+        try { preview = await response.text(); } catch {}
+        console.info('ℹ️ Assinatura sem corpo/304 ou não-JSON; usando fallback.', { url, contentType, preview: preview?.slice(0, 200) });
+        await doFallbackFromValidate();
+        return;
+      }
+
+      const subscription = await response.json();
+
+      // Se não houver assinatura ativa para o tenant, tentar usar validação de licença como fallback
+      if (!subscription) {
+        await doFallbackFromValidate();
+        return;
+      }
+
+      // Mapear dados da assinatura do Hub
+      const planKeyFromHub = (subscription?.plan?.name || 'starter').toLowerCase();
+      const featuresEnabled = subscription?.plan?.featuresEnabled || {};
+      const cycleRaw = (subscription?.billingCycle || 'MONTHLY').toString().toLowerCase();
+      const mappedCycle: 'MENSAL' | 'ANUAL' = cycleRaw.includes('year') ? 'ANUAL' : 'MENSAL';
+
+      let mappedPlanInfo: PlanInfo = {
+        plano: (['starter', 'pro', 'max'].includes(planKeyFromHub) ? planKeyFromHub : 'starter') as 'starter' | 'pro' | 'max',
+        seatLimit: subscription?.plan?.maxSeats || 1,
+        recursos: {
+          products: { enabled: featuresEnabled.products !== false },
+          pdv: { enabled: featuresEnabled.pdv !== false },
+          stock: { enabled: featuresEnabled.stock !== false },
+          agenda: { enabled: featuresEnabled.agenda !== false },
+          banho_tosa: { enabled: featuresEnabled.banho_tosa !== false },
+          reports: { enabled: featuresEnabled.reports !== false },
+        },
+        ciclo: mappedCycle,
+        proximoCobranca: subscription?.expiresAt,
+      };
+
+      // Reconciliar com licença se houver divergência (plano da licença é o preferido para exibição)
+      try {
+        const validateUrl = `${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${tenantId}&_t=${Date.now()}`;
+        const validateRes = await fetch(validateUrl, { method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } });
+        if (validateRes.ok) {
+          const data = await validateRes.json().catch(() => null);
+          const licensePlanKey = (data?.license?.planKey || data?.planKey || '').toLowerCase();
+          const isValidLicense = data?.valid === true || data?.licensed === true;
+          if (isValidLicense && ['starter', 'pro', 'max'].includes(licensePlanKey) && licensePlanKey !== mappedPlanInfo.plano) {
+            mappedPlanInfo = {
+              ...mappedPlanInfo,
+              plano: licensePlanKey as 'starter' | 'pro' | 'max',
+              seatLimit: data?.license?.maxSeats || mappedPlanInfo.seatLimit,
+              proximoCobranca: data?.license?.expiresAt || mappedPlanInfo.proximoCobranca,
+            };
+            console.log('🔁 Plano ajustado via licença válida:', mappedPlanInfo.plano);
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Falha ao validar licença para conciliação de plano', e);
+      }
+
+      console.log('🎯 Dados do plano carregados do Hub:', subscription);
+      setPlanInfo(mappedPlanInfo);
     } catch (error) {
       console.error('Erro ao carregar plano do Hub:', error);
       // Não lançar erro para não marcar Hub como offline

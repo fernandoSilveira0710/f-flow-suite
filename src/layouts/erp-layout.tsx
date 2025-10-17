@@ -237,53 +237,61 @@ export default function ErpLayout() {
         {/* Header */}
         <header className="h-16 border-b bg-background flex items-center justify-end px-6">
         <div className="flex items-center gap-3">
-             {!isHubOnline ? (
-        <div className="flex items-center gap-2 pr-2">
-                 <span className="inline-flex items-center gap-2 rounded-md bg-red-50 text-red-700 px-3 py-1 border border-red-200">
-                   <span className="h-2 w-2 rounded-full bg-red-500"></span>
-                   <span className="text-xs font-medium">Hub Offline</span>
-                 </span>
-                {typeof offlineDaysLeft === 'number' && (
-                  <span className="text-xs text-muted-foreground">
-                    Restam {offlineDaysLeft} dias offline
-                  </span>
-                )}
-                {licenseStatus?.expiresAt && (
-                  <span className="text-xs text-muted-foreground">
-                    • Vencimento: {formatDateShort(licenseStatus.expiresAt)}
-                  </span>
-                )}
-                 <Button variant="ghost" size="icon" onClick={handleRefreshHub} title="Atualizar">
-                   <RefreshCw className="h-5 w-5" />
-                 </Button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" title="Ajuda">
-                        <HelpCircle className="h-5 w-5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <div className="space-y-1 text-xs">
-                        <p><strong>Hub Offline</strong>: sistema usa dados em cache.</p>
-                        <p>Última atualização: {formatDate(licenseCacheUpdatedAt || undefined)}</p>
-                        <p>Modo offline permite até 5 dias sem conexão.
-                          {typeof offlineDaysLeft === 'number' ? ` Restam ${offlineDaysLeft} dias.` : ''}
-                        </p>
-                        <p>Conecte ao Hub para renovar sincronização e licença.</p>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                </div>
-               ) : (
-               <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground pr-2">
-                 <span>Atualizado: {formatDate(hubLastCheck || undefined)}</span>
-                 {licenseStatus?.expiresAt && (
-                   <span>• Vencimento: {formatDateShort(licenseStatus.expiresAt)}</span>
-                 )}
-               </div>
-             )}
+            <div className="flex items-center gap-2 pr-2">
+              <span className={`inline-flex items-center gap-2 rounded-md px-3 py-1 border ${isHubOnline ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                <span className={`h-2 w-2 rounded-full ${isHubOnline ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                <span className="text-xs font-medium">{isHubOnline ? 'Hub Online' : 'Hub Offline'}</span>
+              </span>
+
+              {isHubOnline ? (
+                <span className="text-xs text-muted-foreground">Atualizado: {formatDate(hubLastCheck || undefined)}</span>
+              ) : (
+                <>
+                  {typeof offlineDaysLeft === 'number' && (
+                    <span className="text-xs text-muted-foreground">
+                      Restam {offlineDaysLeft} dias offline
+                    </span>
+                  )}
+                </>
+              )}
+
+              {licenseStatus?.expiresAt && (
+                <span className="text-xs text-muted-foreground">
+                  • Vencimento: {formatDateShort(licenseStatus.expiresAt)}
+                </span>
+              )}
+
+              <Button variant="ghost" size="icon" onClick={handleRefreshHub} title="Atualizar">
+                <RefreshCw className="h-5 w-5" />
+              </Button>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" title="Ajuda">
+                      <HelpCircle className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <div className="space-y-1 text-xs">
+                      {isHubOnline ? (
+                        <>
+                          <p><strong>Hub Online</strong>: sincronização ativa.</p>
+                          <p>Atualizado: {formatDate(hubLastCheck || undefined)}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p><strong>Hub Offline</strong>: sistema usa dados em cache.</p>
+                          <p>Última atualização: {formatDate(licenseCacheUpdatedAt || undefined)}</p>
+                          <p>Modo offline permite até 5 dias. {typeof offlineDaysLeft === 'number' ? ` Restam ${offlineDaysLeft} dias.` : ''}</p>
+                          <p>Conecte ao Hub para renovar sincronização e licença.</p>
+                        </>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             {user && (
               <div className="hidden sm:flex items-center gap-2 px-2 text-xs text-muted-foreground">
                 <UserIcon className="h-4 w-4" />
