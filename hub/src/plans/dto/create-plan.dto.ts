@@ -3,7 +3,7 @@ import { Type } from 'class-transformer';
 
 export class CreatePlanDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsOptional()
   @IsString()
@@ -12,7 +12,7 @@ export class CreatePlanDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Type(() => Number)
-  price: number;
+  price!: number;
 
   @IsOptional()
   @IsString()
@@ -29,7 +29,7 @@ export class CreatePlanDto {
   maxDevices: number = 1;
 
   @IsObject()
-  featuresEnabled: Record<string, any>;
+  featuresEnabled!: Record<string, any>;
 
   @IsOptional()
   @IsBoolean()

@@ -1,12 +1,30 @@
 import { Controller, Get } from '@nestjs/common';
 import { exportJWK, importSPKI } from 'jose';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 @Controller('.well-known')
 export class JwksController {
   @Get('jwks.json')
   async getJwks() {
     try {
-      const publicKeyPem = process.env.LICENSE_PUBLIC_KEY_PEM;
+      let publicKeyPem = process.env.LICENSE_PUBLIC_KEY_PEM;
+
+      // Fallback to file if env var not set
+      if (!publicKeyPem) {
+        const keyPathEnv = process.env.LICENSE_PUBLIC_KEY_PATH;
+        const candidatePaths = [
+          keyPathEnv && join(process.cwd(), keyPathEnv),
+          join(process.cwd(), 'license_public.pem'),
+        ].filter(Boolean) as string[];
+
+        for (const path of candidatePaths) {
+          if (existsSync(path)) {
+            publicKeyPem = readFileSync(path, 'utf8');
+            break;
+          }
+        }
+      }
       
       if (!publicKeyPem) {
         throw new Error('LICENSE_PUBLIC_KEY_PEM not configured');

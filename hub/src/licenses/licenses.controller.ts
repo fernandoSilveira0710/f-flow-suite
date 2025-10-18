@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Put, Param, HttpException, HttpStatus, Get, Query } from '@nestjs/common';
+import { Body, Controller, Post, Put, Param, HttpException, HttpStatus, Get, Query, HttpCode } from '@nestjs/common';
 import { LicensesService } from './licenses.service';
 import { CreateLicenseDto, ActivateLicenseDto, ValidateLicenseDto } from './dto/create-license.dto';
 
@@ -32,6 +32,7 @@ export class LicensesController {
   }
 
   @Post('activate')
+  @HttpCode(HttpStatus.CREATED)
   async activate(@Body() dto: ActivateLicenseDto) {
     if (!dto?.tenantId || !dto?.deviceId) {
       throw new HttpException(

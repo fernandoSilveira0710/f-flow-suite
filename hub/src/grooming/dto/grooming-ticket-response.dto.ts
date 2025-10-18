@@ -2,10 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class GroomingItemResponse {
   @ApiProperty()
-  id: string;
+  id!: string;
 
   @ApiProperty()
-  ticketId: string;
+  ticketId!: string;
 
   @ApiProperty({ required: false })
   serviceId?: string | null;
@@ -14,16 +14,16 @@ export class GroomingItemResponse {
   productId?: string | null;
 
   @ApiProperty()
-  name: string;
+  name!: string;
 
   @ApiProperty()
-  price: number;
+  price!: number;
 
   @ApiProperty()
-  qty: number;
+  qty!: number;
 
   @ApiProperty()
-  subtotal: number;
+  subtotal!: number;
 
   @ApiProperty({ required: false })
   service?: {
@@ -42,37 +42,37 @@ export class GroomingItemResponse {
 
 export class GroomingTicketResponse {
   @ApiProperty()
-  id: string;
+  id!: string;
 
   @ApiProperty()
-  tenantId: string;
+  tenantId!: string;
 
   @ApiProperty()
-  petId: string;
+  petId!: string;
 
   @ApiProperty()
-  tutorId: string;
+  tutorId!: string;
 
   @ApiProperty()
-  code: string;
+  code!: string;
 
   @ApiProperty()
-  status: string;
+  status!: string;
 
   @ApiProperty()
-  totalPrice: number;
+  totalPrice!: number;
 
   @ApiProperty({ required: false })
   notes?: string | null;
 
   @ApiProperty()
-  createdAt: string;
+  createdAt!: string;
 
   @ApiProperty()
-  updatedAt: string;
+  updatedAt!: string;
 
   @ApiProperty({ type: [GroomingItemResponse] })
-  items: GroomingItemResponse[];
+  items!: GroomingItemResponse[];
 
   @ApiProperty({ required: false })
   pet?: {

@@ -45,9 +45,7 @@ export class ProfessionalsService {
         name: eventPayload.name,
         email: eventPayload.email,
         phone: eventPayload.phone,
-        document: eventPayload.document,
-        specialty: eventPayload.specialty,
-        services: eventPayload.services,
+        role: eventPayload.specialty,
         active: eventPayload.active,
         createdAt: eventPayload.createdAt,
         updatedAt: eventPayload.updatedAt,
@@ -56,9 +54,7 @@ export class ProfessionalsService {
         name: eventPayload.name,
         email: eventPayload.email,
         phone: eventPayload.phone,
-        document: eventPayload.document,
-        specialty: eventPayload.specialty,
-        services: eventPayload.services,
+        role: eventPayload.specialty,
         active: eventPayload.active,
         updatedAt: eventPayload.updatedAt,
       },
@@ -90,29 +86,13 @@ export class ProfessionalsService {
       throw new ConflictException(`Professional with email '${createProfessionalDto.email}' already exists`);
     }
 
-    // Validate service IDs if provided
-    if (createProfessionalDto.serviceIds && createProfessionalDto.serviceIds.length > 0) {
-      const services = await this.prisma.service.findMany({
-        where: {
-          tenantId,
-          id: { in: createProfessionalDto.serviceIds },
-          active: true,
-        },
-      });
-
-      if (services.length !== createProfessionalDto.serviceIds.length) {
-        throw new NotFoundException('One or more service IDs are invalid');
-      }
-    }
-
     const professional = await this.prisma.professional.create({
       data: {
         tenantId,
         name: createProfessionalDto.name,
         email: createProfessionalDto.email,
-        phone: createProfessionalDto.phone,
-        specialty: createProfessionalDto.specialty,
-        services: createProfessionalDto.serviceIds || [],
+              // ]]]]]]]]]]================        phone: createProfessionalDto.phone,
+        role: createProfessionalDto.specialty ?? 'operator',
         active: createProfessionalDto.active ?? true,
       },
     });
@@ -142,29 +122,17 @@ export class ProfessionalsService {
       }
     }
 
-    // Validate service IDs if provided
-    if (updateProfessionalDto.serviceIds && updateProfessionalDto.serviceIds.length > 0) {
-      const services = await this.prisma.service.findMany({
-        where: {
-          tenantId,
-          id: { in: updateProfessionalDto.serviceIds },
-          active: true,
-        },
-      });
-
-      if (services.length !== updateProfessionalDto.serviceIds.length) {
-        throw new NotFoundException('One or more service IDs are invalid');
-      }
-    }
-
     const professional = await this.prisma.professional.update({
       where: { 
         id: professionalId,
         tenantId 
       },
       data: {
-        ...updateProfessionalDto,
-        services: updateProfessionalDto.serviceIds !== undefined ? updateProfessionalDto.serviceIds : undefined,
+        name: updateProfessionalDto.name ?? undefined,
+        email: updateProfessionalDto.email ?? undefined,
+        phone: updateProfessionalDto.phone ?? undefined,
+        role: updateProfessionalDto.specialty ?? undefined,
+        active: updateProfessionalDto.active ?? undefined,
       },
     });
 
@@ -207,9 +175,9 @@ export class ProfessionalsService {
       name: professional.name,
       email: professional.email,
       phone: professional.phone,
-      document: professional.document,
-      specialty: professional.specialty,
-      services: professional.services,
+      document: undefined,
+      specialty: professional.role,
+      services: [],
       active: professional.active,
       createdAt: professional.createdAt,
       updatedAt: professional.updatedAt,

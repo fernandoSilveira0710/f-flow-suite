@@ -3,31 +3,31 @@ import { Transform, Type } from 'class-transformer';
 
 export class CreateSaleItemDto {
   @IsString()
-  productId: string;
+  productId!: string;
 
   @Transform(({ value }) => parseInt(value))
   @IsInt()
   @Min(1)
-  qty: number;
+  qty!: number;
 
   @Transform(({ value }) => parseFloat(value))
   @IsDecimal({ decimal_digits: '0,2' })
-  unitPrice: number;
+  unitPrice!: number;
 
   @Transform(({ value }) => parseFloat(value))
   @IsDecimal({ decimal_digits: '0,2' })
-  subtotal: number;
+  subtotal!: number;
 }
 
 export class CreateSaleDto {
   @IsString()
-  code: string;
+  code!: string;
 
   @IsString()
-  operator: string;
+  operator!: string;
 
   @IsString()
-  paymentMethod: string;
+  paymentMethod!: string;
 
   @IsOptional()
   @IsString()
@@ -35,7 +35,7 @@ export class CreateSaleDto {
 
   @Transform(({ value }) => parseFloat(value))
   @IsDecimal({ decimal_digits: '0,2' })
-  total: number;
+  total!: number;
 
   @IsOptional()
   @IsString()
@@ -44,5 +44,5 @@ export class CreateSaleDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateSaleItemDto)
-  items: CreateSaleItemDto[];
+  items!: CreateSaleItemDto[];
 }

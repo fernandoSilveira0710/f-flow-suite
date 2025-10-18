@@ -2,13 +2,13 @@ import { IsString, IsEmail, IsBoolean, IsOptional } from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
-  displayName: string;
+  displayName!: string;
 
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString()
-  role: string;
+  role!: string;
 
   @IsBoolean()
   @IsOptional()
