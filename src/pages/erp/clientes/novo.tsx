@@ -59,12 +59,9 @@ export default function NovoCliente() {
       <PageHeader
         title="Novo Cliente"
         description="Adicione um novo cliente ao sistema"
-        action={
-          <Button variant="outline" onClick={() => navigate('/erp/clientes')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button>
-        }
+        actionLabel="Voltar"
+        actionIcon={ArrowLeft}
+        onAction={() => navigate('/erp/clientes')}
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
