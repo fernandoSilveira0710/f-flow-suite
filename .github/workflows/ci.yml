@@ -66,6 +66,7 @@ jobs:
   build-hub:
     name: Build Hub
     runs-on: ubuntu-latest
+    if: ${{ false }}
     needs: lint-and-test
     
     steps:
@@ -101,6 +102,7 @@ jobs:
   build-site:
     name: Build Site
     runs-on: ubuntu-latest
+    if: ${{ false }}
     needs: lint-and-test
     
     steps:
@@ -127,6 +129,34 @@ jobs:
         with:
           name: site-build
           path: site/dist/
+          retention-days: 7
+
+  build-erp:
+    name: Build ERP
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build ERP (Vite)
+        run: npm run build
+
+      - name: Upload ERP build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: erp-build
+          path: dist/
           retention-days: 7
 
   build-client-binaries:
@@ -173,27 +203,15 @@ jobs:
         working-directory: client-local
         run: npm run build
 
-      - name: Create binary with pkg
+      - name: Create binary with pkg (matrix-targeted)
         working-directory: client-local
-        run: npm run build:pkg
-
-      - name: Rename binary
-        shell: bash
-        working-directory: client-local
-        run: |
-          if [ "${{ matrix.platform }}" = "win32" ]; then
-            mv f-flow-client-win.exe f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
-          elif [ "${{ matrix.platform }}" = "darwin" ]; then
-            mv f-flow-client-macos f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}
-          else
-            mv f-flow-client-linux f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}
-          fi
+        run: npx pkg dist/main.js --targets node18-${{ matrix.platform }}-${{ matrix.arch }} --output build/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
         with:
           name: client-binary-${{ matrix.platform }}-${{ matrix.arch }}
-          path: client-local/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
+          path: client-local/build/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
           retention-days: 7
 
   security-scan:
