@@ -68,7 +68,7 @@ export default function GroomingCheckIn() {
   const allPets = getPets().filter((p) => p.ativo);
   const services = getGroomServices().filter((s) => s.ativo);
   const resources = getGroomResources().filter((r) => r.ativo);
-  const professionals = getProfessionals().filter((p) => p.ativo);
+  const professionals = getProfessionals().filter((p) => p.active);
 
   // Mock payment methods
   const paymentMethods = [
@@ -438,7 +438,7 @@ export default function GroomingCheckIn() {
                   <SelectContent>
                     {professionals.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.nome} {p.especialidades && p.especialidades.length > 0 && `• ${p.especialidades.join(', ')}`}
+                        {p.name} {p.role ? `• ${p.role}` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
