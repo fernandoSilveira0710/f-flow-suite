@@ -4,16 +4,15 @@ import { AuthGuard } from '@nestjs/passport';
 @Injectable()
 export class OidcGuard extends AuthGuard('oidc-jwt') {
   private readonly logger = new Logger(OidcGuard.name);
-  private readonly oidcRequired: boolean;
 
   constructor() {
     super();
-    this.oidcRequired = process.env.OIDC_REQUIRED !== 'false';
   }
 
   canActivate(context: ExecutionContext) {
+    const oidcRequired = process.env.OIDC_REQUIRED !== 'false';
     // If OIDC is not required, allow access
-    if (!this.oidcRequired) {
+    if (!oidcRequired) {
       this.logger.debug('OIDC validation disabled (OIDC_REQUIRED=false)');
       return true;
     }
@@ -22,8 +21,9 @@ export class OidcGuard extends AuthGuard('oidc-jwt') {
   }
 
   handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
+    const oidcRequired = process.env.OIDC_REQUIRED !== 'false';
     // If OIDC is not required, allow access
-    if (!this.oidcRequired) {
+    if (!oidcRequired) {
       return user || {};
     }
 

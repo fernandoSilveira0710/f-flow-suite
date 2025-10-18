@@ -12,29 +12,29 @@ export enum AppointmentStatus {
 
 export class CreateAppointmentDto {
   @IsUUID()
-  petId: string;
+  petId!: string;
 
   @IsUUID()
-  customerId: string;
+  customerId!: string;
 
   @IsUUID()
-  serviceId: string;
+  serviceId!: string;
 
   @IsUUID()
-  professionalId: string;
+  professionalId!: string;
 
   @IsOptional()
   @IsUUID()
   resourceId?: string;
 
   @IsDateString()
-  date: string;
+  date!: string;
 
   @IsDateString()
-  startTime: string;
+  startTime!: string;
 
   @IsDateString()
-  endTime: string;
+  endTime!: string;
 
   @IsOptional()
   @IsEnum(AppointmentStatus)

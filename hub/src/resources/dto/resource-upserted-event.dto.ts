@@ -2,26 +2,26 @@ import { IsString, IsBoolean, IsOptional, IsDateString, IsUUID } from 'class-val
 
 export class ResourceUpsertedEventDto {
   @IsUUID()
-  id: string;
+  id!: string;
 
   @IsUUID()
-  tenantId: string;
+  tenantId!: string;
 
   @IsString()
-  name: string;
+  name!: string;
 
   @IsString()
-  type: string;
+  type!: string;
 
   @IsOptional()
   @IsString()
   description?: string;
 
   @IsBoolean()
-  active: boolean;
+  active!: boolean;
 
   @IsDateString()
-  createdAt: string;
+  createdAt!: string;
 
   @IsOptional()
   @IsDateString()

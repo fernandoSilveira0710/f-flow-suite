@@ -1,14 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CustomersService } from './customers.service';
-import { PrismaClient } from '@prisma/client';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
+import { EventsService } from '../common/events.service';
 
 describe('CustomersService', () => {
   let service: CustomersService;
-  let prismaClient: PrismaClient;
+  let prisma: PrismaService;
+  let events: EventsService;
 
-  const mockPrismaClient = {
-    $executeRaw: jest.fn(),
+  const mockPrismaService = {
     customer: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -19,21 +20,27 @@ describe('CustomersService', () => {
       count: jest.fn(),
       delete: jest.fn(),
     },
-  };
+    pet: {
+      findMany: jest.fn(),
+    },
+  } as unknown as PrismaService;
+
+  const mockEventsService = {
+    createEvent: jest.fn(),
+  } as unknown as EventsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CustomersService,
-        {
-          provide: PrismaClient,
-          useValue: mockPrismaClient,
-        },
+        { provide: PrismaService, useValue: mockPrismaService },
+        { provide: EventsService, useValue: mockEventsService },
       ],
     }).compile();
 
     service = module.get<CustomersService>(CustomersService);
-    prismaClient = module.get<PrismaClient>(PrismaClient);
+    prisma = module.get<PrismaService>(PrismaService);
+    events = module.get<EventsService>(EventsService);
   });
 
   afterEach(() => {
@@ -47,15 +54,14 @@ describe('CustomersService', () => {
   describe('findAllByTenant', () => {
     it('should return all customers for a tenant', async () => {
       const tenantId = 'tenant-1';
-      const mockCustomers = [
+      const mockPrismaCustomers = [
         {
           id: '1',
           tenantId,
           name: 'João Silva',
-          documento: '123.456.789-00',
+          document: '123.456.789-00',
           email: 'joao@email.com',
           phone: '(11) 99999-9999',
-          dataNascISO: '1990-01-01',
           tags: ['VIP'],
           notes: 'Cliente especial',
           address: 'Rua A, 123',
@@ -73,25 +79,46 @@ describe('CustomersService', () => {
           ],
         },
       ];
+      const mockExpectedCustomers = [
+        {
+          id: '1',
+          tenantId,
+          name: 'João Silva',
+          documento: '123.456.789-00',
+          email: 'joao@email.com',
+          phone: '(11) 99999-9999',
+          dataNascISO: undefined,
+          tags: ['VIP'],
+          notes: 'Cliente especial',
+          address: 'Rua A, 123',
+          active: true,
+          createdAt: mockPrismaCustomers[0].createdAt,
+          updatedAt: mockPrismaCustomers[0].updatedAt,
+          pets: [
+            {
+              id: 'pet-1',
+              name: 'Rex',
+              species: 'Cão',
+              breed: 'Labrador',
+              active: true,
+            },
+          ],
+        },
+      ];
 
-      mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
-      mockPrismaClient.customer.findMany.mockResolvedValue(mockCustomers);
+      (prisma.customer.findMany as any).mockResolvedValue(mockPrismaCustomers);
 
       const result = await service.findAllByTenant(tenantId);
 
-      expect(mockPrismaClient.$executeRaw).toHaveBeenCalledWith(
-        expect.anything()
-      );
-      expect(mockPrismaClient.customer.findMany).toHaveBeenCalledWith({
+      expect(prisma.customer.findMany).toHaveBeenCalledWith({
         where: { 
           tenantId,
-          deletedAt: null 
+          active: true 
         },
         include: {
           pets: {
             where: { 
-              active: true,
-              deletedAt: null 
+              active: true
             },
             select: {
               id: true,
@@ -104,7 +131,7 @@ describe('CustomersService', () => {
         },
         orderBy: { name: 'asc' },
       });
-      expect(result).toEqual(mockCustomers);
+      expect(result).toEqual(mockExpectedCustomers);
     });
   });
 
@@ -112,14 +139,13 @@ describe('CustomersService', () => {
     it('should return a customer by id and tenant', async () => {
       const tenantId = 'tenant-1';
       const customerId = '1';
-      const mockCustomer = {
+      const mockPrismaCustomer = {
         id: customerId,
         tenantId,
         name: 'João Silva',
-        documento: '123.456.789-00',
+        document: '123.456.789-00',
         email: 'joao@email.com',
         phone: '(11) 99999-9999',
-        dataNascISO: '1990-01-01',
         tags: ['VIP'],
         notes: 'Cliente especial',
         address: 'Rua A, 123',
@@ -128,26 +154,37 @@ describe('CustomersService', () => {
         updatedAt: new Date(),
         pets: [],
       };
+      const mockExpectedCustomer = {
+        id: customerId,
+        tenantId,
+        name: 'João Silva',
+        documento: '123.456.789-00',
+        email: 'joao@email.com',
+        phone: '(11) 99999-9999',
+        dataNascISO: undefined,
+        tags: ['VIP'],
+        notes: 'Cliente especial',
+        address: 'Rua A, 123',
+        active: true,
+        createdAt: mockPrismaCustomer.createdAt,
+        updatedAt: mockPrismaCustomer.updatedAt,
+        pets: [],
+      };
 
-      mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
-      mockPrismaClient.customer.findFirst.mockResolvedValue(mockCustomer);
+      (prisma.customer.findFirst as any).mockResolvedValue(mockPrismaCustomer);
 
       const result = await service.findOneByTenant(tenantId, customerId);
 
-      expect(mockPrismaClient.$executeRaw).toHaveBeenCalledWith(
-        expect.anything()
-      );
-      expect(mockPrismaClient.customer.findFirst).toHaveBeenCalledWith({
+      expect(prisma.customer.findFirst).toHaveBeenCalledWith({
         where: { 
           id: customerId,
           tenantId,
-          deletedAt: null 
+          active: true 
         },
         include: {
           pets: {
             where: { 
-              active: true,
-              deletedAt: null 
+              active: true
             },
             select: {
               id: true,
@@ -159,15 +196,14 @@ describe('CustomersService', () => {
           },
         },
       });
-      expect(result).toEqual(mockCustomer);
+      expect(result).toEqual(mockExpectedCustomer);
     });
 
     it('should throw NotFoundException when customer not found', async () => {
       const tenantId = 'tenant-1';
       const customerId = 'non-existent';
 
-      mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
-      mockPrismaClient.customer.findFirst.mockResolvedValue(null);
+      (prisma.customer.findFirst as any).mockResolvedValue(null);
 
       await expect(service.findOneByTenant(tenantId, customerId)).rejects.toThrow(
         NotFoundException
@@ -184,7 +220,6 @@ describe('CustomersService', () => {
         documento: '123.456.789-00',
         email: 'joao@email.com',
         phone: '(11) 99999-9999',
-        dataNascISO: '1990-01-01',
         tags: ['VIP'],
         notes: 'Cliente especial',
         address: 'Rua A, 123',
@@ -193,21 +228,43 @@ describe('CustomersService', () => {
         updatedAt: new Date(),
       };
 
-      const mockCustomer = {
-        ...eventPayload,
+      const mockPrismaCustomer = {
+        id: eventPayload.id,
         tenantId,
+        name: eventPayload.name,
+        document: eventPayload.documento,
+        email: eventPayload.email,
+        phone: eventPayload.phone,
+        tags: eventPayload.tags,
+        notes: eventPayload.notes,
+        address: eventPayload.address,
+        active: eventPayload.active,
+        createdAt: eventPayload.createdAt,
+        updatedAt: eventPayload.updatedAt,
+        pets: [],
+      };
+      const mockExpectedCustomer = {
+        id: eventPayload.id,
+        tenantId,
+        name: eventPayload.name,
+        documento: eventPayload.documento,
+        email: eventPayload.email,
+        phone: eventPayload.phone,
+        dataNascISO: undefined,
+        tags: eventPayload.tags,
+        notes: eventPayload.notes,
+        address: eventPayload.address,
+        active: eventPayload.active,
+        createdAt: eventPayload.createdAt,
+        updatedAt: eventPayload.updatedAt,
         pets: [],
       };
 
-      mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
-      mockPrismaClient.customer.upsert.mockResolvedValue(mockCustomer);
+      (prisma.customer.upsert as any).mockResolvedValue(mockPrismaCustomer);
 
       const result = await service.upsertFromEvent(tenantId, eventPayload);
 
-      expect(mockPrismaClient.$executeRaw).toHaveBeenCalledWith(
-        expect.anything()
-      );
-      expect(mockPrismaClient.customer.upsert).toHaveBeenCalledWith({
+      expect(prisma.customer.upsert).toHaveBeenCalledWith({
         where: { 
           id: eventPayload.id,
         },
@@ -215,10 +272,9 @@ describe('CustomersService', () => {
           id: eventPayload.id,
           tenantId,
           name: eventPayload.name,
-          documento: eventPayload.documento,
+          document: eventPayload.documento,
           email: eventPayload.email,
           phone: eventPayload.phone,
-          dataNascISO: eventPayload.dataNascISO,
           tags: eventPayload.tags,
           notes: eventPayload.notes,
           address: eventPayload.address,
@@ -228,10 +284,9 @@ describe('CustomersService', () => {
         },
         update: {
           name: eventPayload.name,
-          documento: eventPayload.documento,
+          document: eventPayload.documento,
           email: eventPayload.email,
           phone: eventPayload.phone,
-          dataNascISO: eventPayload.dataNascISO,
           tags: eventPayload.tags,
           notes: eventPayload.notes,
           address: eventPayload.address,
@@ -241,8 +296,7 @@ describe('CustomersService', () => {
         include: {
           pets: {
             where: { 
-              active: true,
-              deletedAt: null 
+              active: true
             },
             select: {
               id: true,
@@ -254,7 +308,7 @@ describe('CustomersService', () => {
           },
         },
       });
-      expect(result).toEqual(mockCustomer);
+      expect(result).toEqual(mockExpectedCustomer);
     });
   });
 
@@ -262,17 +316,12 @@ describe('CustomersService', () => {
     it('should soft delete a customer', async () => {
       const tenantId = 'tenant-1';
       const customerId = '1';
-      const deletedAt = new Date();
 
-      mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
-      mockPrismaClient.customer.update.mockResolvedValue({});
+      (prisma.customer.update as any).mockResolvedValue({});
 
       await service.deleteFromEvent(tenantId, customerId);
 
-      expect(mockPrismaClient.$executeRaw).toHaveBeenCalledWith(
-        expect.anything()
-      );
-      expect(mockPrismaClient.customer.update).toHaveBeenCalledWith({
+      expect(prisma.customer.update).toHaveBeenCalledWith({
         where: { 
           id: customerId,
           tenantId 
@@ -283,6 +332,5 @@ describe('CustomersService', () => {
       });
     });
   });
-
 
 });
