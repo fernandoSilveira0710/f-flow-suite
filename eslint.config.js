@@ -42,5 +42,14 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-require-imports": "warn",
     },
+  },
+  // Node para arquivos de configuração (ex.: vite.config.ts)
+  {
+    files: ["**/vite.config.{ts,js,mts,mjs,cjs}", "**/*.config.{ts,js,mts,mjs,cjs}", "**/*.config.ts"],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.node,
+    },
   }
 );
