@@ -111,6 +111,28 @@ async function runMigrations(): Promise<void> {
   });
 }
 
+function setupPrismaEngineIfPackaged(): void {
+  try {
+    if ((process as any).pkg) {
+      const exeDir = dirname(process.execPath);
+      const candidates = [
+        'libquery_engine-windows.dll.node',
+        'query_engine-windows.dll.node',
+      ];
+      for (const name of candidates) {
+        const fullPath = join(exeDir, name);
+        if (existsSync(fullPath)) {
+          process.env.PRISMA_QUERY_ENGINE_LIBRARY = fullPath;
+          process.env.PRISMA_QUERY_ENGINE_BINARY = fullPath;
+          break;
+        }
+      }
+    }
+  } catch {
+    // silent
+  }
+}
+
 export async function bootstrap(): Promise<void> {
   try {
     const logger = new Logger('Bootstrap');
@@ -126,13 +148,18 @@ export async function bootstrap(): Promise<void> {
     logger.log(`Data directory: ${dataDir}`);
     logger.log(`Log directory: ${logDir}`);
     ensureDirectories(dataDir, logDir);
-    
+
     // Setup database
     const databaseUrl = setupDatabase(dataDir);
     logger.log(`Database URL: ${databaseUrl}`);
-    
+
+    // Ensure Prisma engine path when running as packaged binary
+    setupPrismaEngineIfPackaged();
+
     // Run migrations (can be skipped via env)
-    if (process.env.SKIP_MIGRATIONS !== 'true') {
+    if ((process as any).pkg) {
+      logger.log('Skipping Prisma migrations in packaged binary');
+    } else if (process.env.SKIP_MIGRATIONS !== 'true') {
       await runMigrations();
     } else {
       logger.log('Skipping Prisma migrations due to SKIP_MIGRATIONS=true');

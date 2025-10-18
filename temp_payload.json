@@ -1,0 +1,26 @@
+{
+  "nome": "PIX 2",
+  "tipo": "PIX",
+  "ativo": true,
+  "ordem": 2,
+  "permiteTroco": false,
+  "permiteParcelas": false,
+  "descontoFixoPct": 0,
+  "taxaFixa": 0,
+  "integracao": {
+    "provider": "nenhum",
+    "referenciaExterna": "",
+    "imprimeComprovante": false
+  },
+  "regrasCaixa": {
+    "contabilizaNoCaixa": false,
+    "permiteSangria": false
+  },
+  "restricoes": {
+    "somenteSeCaixaAberto": true
+  },
+  "visibilidade": {
+    "mostrarNoPDV": true,
+    "visivelSomenteParaRoles": null
+  }
+}
