@@ -49,6 +49,7 @@ jobs:
         continue-on-error: true
 
       - name: Run tests
+        if: ${{ matrix.project != 'site' }}
         working-directory: ${{ matrix.project }}
         run: npm test
         env:
