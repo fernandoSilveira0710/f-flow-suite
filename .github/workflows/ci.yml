@@ -29,7 +29,13 @@ jobs:
       - name: Install root dependencies (ESLint config)
         run: npm ci
 
-      - name: Install dependencies
+      - name: Install dependencies (site - install)
+        if: ${{ matrix.project == 'site' }}
+        working-directory: ${{ matrix.project }}
+        run: npm install
+
+      - name: Install dependencies (others - ci)
+        if: ${{ matrix.project != 'site' }}
         working-directory: ${{ matrix.project }}
         run: npm ci
 
@@ -109,7 +115,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: site
-        run: npm ci
+        run: npm install
 
       - name: Build application
         working-directory: site
@@ -209,7 +215,13 @@ jobs:
           cache: 'npm'
           cache-dependency-path: ${{ matrix.project }}/package-lock.json
 
-      - name: Install dependencies
+      - name: Install dependencies (site - install)
+        if: ${{ matrix.project == 'site' }}
+        working-directory: ${{ matrix.project }}
+        run: npm install
+
+      - name: Install dependencies (others - ci)
+        if: ${{ matrix.project != 'site' }}
         working-directory: ${{ matrix.project }}
         run: npm ci
 
