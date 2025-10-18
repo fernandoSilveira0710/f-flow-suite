@@ -3,14 +3,17 @@ import { Request } from 'express';
 import * as jwt from 'jsonwebtoken';
 
 type LicenseJwtPayload = {
-  tenant_id: string;
-  plan_id: string;
-  entitlements: Record<string, unknown>;
-  max_seats: number;
-  device_id?: string;
+  tid: string; // tenant id
+  did?: string; // device id
+  plan: string; // plan name/key
+  planId?: string; // plan UUID
+  ent?: Record<string, unknown>; // entitlements/features
+  maxSeats?: number;
+  maxDevices?: number;
   exp?: number;
+  grace?: number;
+  iat?: number;
   iss?: string;
-  aud?: string;
 };
 
 @Injectable()
@@ -76,7 +79,7 @@ export class LicenseGuard implements CanActivate {
 
     } catch (error) {
       if (error instanceof jwt.JsonWebTokenError) {
-        this.logger.warn('Invalid license token:', error.message);
+        this.logger.warn('Invalid license token:', (error as Error).message);
         throw new ForbiddenException('Missing or invalid license token');
       }
       
