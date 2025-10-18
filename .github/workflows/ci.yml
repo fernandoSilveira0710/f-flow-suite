@@ -26,6 +26,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: ${{ matrix.project }}/package-lock.json
 
+      - name: Install root dependencies (ESLint config)
+        run: npm ci
+
       - name: Install dependencies
         working-directory: ${{ matrix.project }}
         run: npm ci
