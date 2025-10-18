@@ -9,7 +9,7 @@
     "dev:client": "npm --prefix client-local run start:dev",
     "dev:hub": "npm --prefix hub run start:dev",
     "dev:all": "concurrently -k -n ERP,CLIENT,HUB \"npm run dev\" \"npm run dev:client\" \"npm run dev:hub\"",
-    "build": "tsc - b && vite build",
+    "build": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
