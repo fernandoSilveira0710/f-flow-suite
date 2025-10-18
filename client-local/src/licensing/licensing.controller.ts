@@ -238,11 +238,8 @@ export class LicensingController {
         requiresSetup: result.status === 'not_configured',
         canStart: ['active', 'development', 'offline_grace'].includes(result.status),
         // extended fields for frontend offline handling
-        // @ts-ignore
         lastChecked: (result as any).lastChecked,
-        // @ts-ignore
         updatedAt: (result as any).updatedAt,
-        // @ts-ignore
         graceDays: (result as any).graceDays,
       } as any;
     } catch (error: any) {

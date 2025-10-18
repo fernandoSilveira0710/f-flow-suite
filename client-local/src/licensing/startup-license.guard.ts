@@ -89,7 +89,7 @@ export class StartupLicenseGuard {
             requiresSetup: true
           };
           
-        case 'expired':
+        case 'expired': {
           // Se expirou há muito tempo, pode bloquear inicialização
           const gracePeriodExpired = this.isGracePeriodExpired(licenseStatus.expiresAt);
           
@@ -108,6 +108,7 @@ export class StartupLicenseGuard {
             message: 'License expired but still within extended grace period.',
             showWarning: true
           };
+        }
           
         default:
           this.logger.error(`Unknown license status: ${licenseStatus.status}`);
