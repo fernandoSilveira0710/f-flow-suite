@@ -544,7 +544,19 @@ export default function PdvPage() {
         return;
       }
 
-      await closeSession(closeObservacao);
+      const payload = {
+        totalVendas: sessionTotals?.totalVendas || 0,
+        totalDinheiro: sessionTotals?.totalDinheiro || 0,
+        totalCartao: sessionTotals?.totalCartao || 0,
+        totalPix: sessionTotals?.totalPix || 0,
+        totalOutros: sessionTotals?.totalOutros || 0,
+        totalSangria: sessionTotals?.totalSangria || 0,
+        totalSuprimento: sessionTotals?.totalSuprimento || 0,
+        saldoFinalCalculado: sessionTotals?.saldoFinalCalculado || 0,
+        observacao: closeObservacao?.trim() || undefined,
+      };
+
+      await closeSession(payload);
       setSession(null);
       setShowCloseSession(false);
       toast.success('Caixa fechado com sucesso!');
@@ -716,6 +728,7 @@ export default function PdvPage() {
     let totalDinheiro = 0;
     let totalCartao = 0;
     let totalPix = 0;
+    let totalOutros = 0;
     let totalNoCaixa = 0;
 
     const typeFromName = (name: string): 'cash' | 'card' | 'pix' | 'other' => {
@@ -747,6 +760,7 @@ export default function PdvPage() {
           if (t === 'cash') totalDinheiro += amt;
           else if (t === 'pix') totalPix += amt;
           else if (t === 'card') totalCartao += amt;
+          else totalOutros += amt;
 
           if (countsInCash(p.method)) totalNoCaixa += amt;
         }
@@ -755,6 +769,7 @@ export default function PdvPage() {
         if (isCash(s.paymentMethod)) totalDinheiro += amt;
         else if (isPix(s.paymentMethod)) totalPix += amt;
         else if (isCard(s.paymentMethod)) totalCartao += amt;
+        else totalOutros += amt;
 
         if (countsInCash(s.paymentMethod)) totalNoCaixa += amt;
       }
@@ -764,7 +779,7 @@ export default function PdvPage() {
     const totalSuprimento = session.cash.filter(c => c.tipo === 'SUPRIMENTO').reduce((sum, c) => sum + c.valor, 0);
     const saldoFinalCalculado = session.saldoInicial + totalSuprimento - totalSangria + totalNoCaixa;
 
-    return { totalVendas, totalDinheiro, totalCartao, totalPix, totalSangria, totalSuprimento, saldoFinalCalculado, qtdVendas: sessionSales.length };
+    return { totalVendas, totalDinheiro, totalCartao, totalPix, totalOutros, totalSangria, totalSuprimento, saldoFinalCalculado, qtdVendas: sessionSales.length };
   })() : null;
 
   return (
@@ -1521,7 +1536,7 @@ export default function PdvPage() {
             <DialogTitle>Desconto no Item</DialogTitle>
             <DialogDescription>
               {selectedItemIndex >= 0 && cart[selectedItemIndex] 
-                ? `Aplicar desconto em: ${cart[selectedItemIndex].nome}`
+                ? `Aplicar desconto em: ${cart[selectedItemIndex]?.produto?.nome ?? cart[selectedItemIndex]?.produto?.sku ?? cart[selectedItemIndex]?.nome ?? ''}`
                 : 'Selecione um item primeiro'}
             </DialogDescription>
           </DialogHeader>

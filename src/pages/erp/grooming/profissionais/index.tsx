@@ -44,9 +44,10 @@ export default function GroomingProfissionaisIndex() {
     if (!search) return true;
     const lower = search.toLowerCase();
     return (
-      prof.nome.toLowerCase().includes(lower) ||
+      prof.name.toLowerCase().includes(lower) ||
       prof.email?.toLowerCase().includes(lower) ||
-      prof.telefone?.toLowerCase().includes(lower)
+      prof.phone?.toLowerCase().includes(lower) ||
+      prof.role?.toLowerCase().includes(lower)
     );
   });
 
@@ -73,7 +74,7 @@ export default function GroomingProfissionaisIndex() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nome, email ou telefone..."
+            placeholder="Buscar por nome, função, email ou telefone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"
@@ -108,10 +109,10 @@ export default function GroomingProfissionaisIndex() {
             <TableBody>
               {filteredProfessionals.map((prof) => (
                 <TableRow key={prof.id}>
-                  <TableCell className="font-medium">{prof.nome}</TableCell>
+                  <TableCell className="font-medium">{prof.name}</TableCell>
                   <TableCell>
                     <div className="space-y-1 text-sm">
-                      {prof.telefone && <div>{prof.telefone}</div>}
+                      {prof.phone && <div>{prof.phone}</div>}
                       {prof.email && (
                         <div className="text-muted-foreground">{prof.email}</div>
                       )}
@@ -119,16 +120,16 @@ export default function GroomingProfissionaisIndex() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {prof.especialidades?.map((esp) => (
-                        <Badge key={esp} variant="secondary" className="text-xs">
-                          {esp}
+                      {prof.role && (
+                        <Badge variant="secondary" className="text-xs">
+                          {prof.role}
                         </Badge>
-                      ))}
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={prof.ativo ? 'default' : 'secondary'}>
-                      {prof.ativo ? 'Ativo' : 'Inativo'}
+                    <Badge variant={prof.active ? 'default' : 'secondary'}>
+                      {prof.active ? 'Ativo' : 'Inativo'}
                     </Badge>
                   </TableCell>
                   <TableCell>

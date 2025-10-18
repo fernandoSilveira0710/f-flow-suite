@@ -14,6 +14,7 @@ export interface Product {
   estoque: number;
   categoria?: string;
   barcode?: string;
+  imageUrl?: string;
 }
 
 export interface CartItem {
@@ -181,6 +182,7 @@ export const getProducts = async (): Promise<Product[]> => {
         estoque: Number(p.currentStock ?? 0),
         categoria: p.category,
         barcode: p.barcode,
+        imageUrl: p.imageUrl,
       }));
   } catch (error) {
     console.error('Error getting products:', error);
@@ -200,6 +202,7 @@ export const getProductById = async (id: string): Promise<Product | null> => {
       estoque: Number(p.currentStock ?? 0),
       categoria: p.category,
       barcode: p.barcode,
+      imageUrl: p.imageUrl,
     };
   } catch (error) {
     console.error('Error getting product by id:', error);
