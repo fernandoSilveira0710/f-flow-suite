@@ -364,3 +364,31 @@ model LicenseToken {
   @@index([deviceId])
   @@index([expiresAt])
 }
+
+model PaymentMethod {
+  id                       String   @id @default(uuid())
+  tenantId                 String
+  name                     String
+  type                     String
+  active                   Boolean  @default(true)
+  ordem                    Int      @default(0)
+  permiteTroco             Boolean  @default(false)
+  permiteParcelas          Boolean  @default(false)
+  maxParcelas              Int?
+  jurosPorParcelaPct       Float?
+  descontoFixoPct          Float?
+  taxaFixa                 Float?
+  integrationSettings      String?
+  valorMin                 Float?
+  valorMax                 Float?
+  mostrarNoPDV             Boolean  @default(true)
+  somenteSeCaixaAberto     Boolean  @default(true)
+  contabilizaNoCaixa       Boolean  @default(true)
+  permiteSangria           Boolean  @default(false)
+  visivelSomenteParaRoles  String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId, active])
+}

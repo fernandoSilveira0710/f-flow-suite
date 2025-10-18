@@ -67,6 +67,10 @@ export class TokenStore {
 
   private async loadKeytar(): Promise<any> {
     try {
+      // Avoid loading native module in packaged binary
+      if ((process as any).pkg) {
+        return null;
+      }
       return await import('keytar');
     } catch (error) {
       return null;

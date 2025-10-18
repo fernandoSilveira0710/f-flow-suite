@@ -3,7 +3,7 @@
  * Substitui mocks locais por chamadas reais ao 2F License Hub.
  */
 
-import { apiClient, getTenantId } from './api-client';
+import { apiClientLocal, getTenantId } from './api-client';
 
 export type PaymentMethodType = 'CASH' | 'DEBIT' | 'CREDIT' | 'PIX' | 'VOUCHER' | 'OTHER';
 
@@ -122,13 +122,13 @@ function mapToHubPayload(data: Partial<PaymentMethod>): any {
 
 export const getPaymentMethods = async (): Promise<PaymentMethod[]> => {
   const tenantId = getTenantId();
-  const list = await apiClient<any[]>(`${endpointBase(tenantId)}`, { method: 'GET' });
+  const list = await apiClientLocal<any[]>(`${endpointBase(tenantId)}`, { method: 'GET' });
   return (list || []).map(mapFromHub).sort((a, b) => a.ordem - b.ordem);
 };
 
 export const getPaymentMethod = async (id: string): Promise<PaymentMethod | null> => {
   const tenantId = getTenantId();
-  const item = await apiClient<any>(`${endpointBase(tenantId)}/${id}`, { method: 'GET' });
+  const item = await apiClientLocal<any>(`${endpointBase(tenantId)}/${id}`, { method: 'GET' });
   return item ? mapFromHub(item) : null;
 };
 
@@ -139,7 +139,7 @@ export const getUsablePaymentMethods = async (
   const tenantId = getTenantId();
   let mapped: PaymentMethod[] = [];
   try {
-    const list = await apiClient<any[]>(`${endpointBase(tenantId)}/active`, { method: 'GET' });
+    const list = await apiClientLocal<any[]>(`${endpointBase(tenantId)}/active`, { method: 'GET' });
     mapped = (list || []).map(mapFromHub);
   } catch (error) {
     console.warn('[Payments] Falha ao buscar métodos no Hub; usando presets locais para PDV.', error);
@@ -165,7 +165,7 @@ export const createPaymentMethod = async (
 ): Promise<PaymentMethod> => {
   const tenantId = getTenantId();
   const payload = mapToHubPayload(data);
-  const created = await apiClient<any>(`${endpointBase(tenantId)}`, {
+  const created = await apiClientLocal<any>(`${endpointBase(tenantId)}`, {
     method: 'POST',
     body: payload,
   });
@@ -178,7 +178,7 @@ export const updatePaymentMethod = async (
 ): Promise<PaymentMethod> => {
   const tenantId = getTenantId();
   const payload = mapToHubPayload(data);
-  const updated = await apiClient<any>(`${endpointBase(tenantId)}/${id}`, {
+  const updated = await apiClientLocal<any>(`${endpointBase(tenantId)}/${id}`, {
     method: 'PATCH',
     body: payload,
   });
@@ -187,12 +187,12 @@ export const updatePaymentMethod = async (
 
 export const deletePaymentMethod = async (id: string): Promise<void> => {
   const tenantId = getTenantId();
-  await apiClient(`${endpointBase(tenantId)}/${id}`, { method: 'DELETE' });
+  await apiClientLocal(`${endpointBase(tenantId)}/${id}`, { method: 'DELETE' });
 };
 
 export const reorderPaymentMethods = async (ids: string[]): Promise<void> => {
   const tenantId = getTenantId();
-  await apiClient(`${endpointBase(tenantId)}/reorder`, {
+  await apiClientLocal(`${endpointBase(tenantId)}/reorder`, {
     method: 'PUT',
     body: { ids },
   });
