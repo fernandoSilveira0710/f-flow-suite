@@ -16,7 +16,7 @@ export class LicensesService {
     const { name, email, cpf, planKey, paymentId } = createLicenseDto;
 
     // Verificar se já existe um usuário com este email
-    let existingUser = await this.prisma.user.findFirst({
+    const existingUser = await this.prisma.user.findFirst({
       where: { email },
       include: { tenant: true }
     });
