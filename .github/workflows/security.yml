@@ -30,8 +30,14 @@ jobs:
           cache-dependency-path: ${{ matrix.project }}/package-lock.json
 
       - name: Install dependencies
+        if: ${{ matrix.project != 'site' }}
         working-directory: ${{ matrix.project }}
         run: npm ci
+
+      - name: Install dependencies (site)
+        if: ${{ matrix.project == 'site' }}
+        working-directory: ${{ matrix.project }}
+        run: npm install
 
       - name: Run npm audit
         working-directory: ${{ matrix.project }}
@@ -143,8 +149,14 @@ jobs:
           cache-dependency-path: ${{ matrix.project }}/package-lock.json
 
       - name: Install dependencies
+        if: ${{ matrix.project != 'site' }}
         working-directory: ${{ matrix.project }}
         run: npm ci
+
+      - name: Install dependencies (site)
+        if: ${{ matrix.project == 'site' }}
+        working-directory: ${{ matrix.project }}
+        run: npm install
 
       - name: Install license-checker
         run: npm install -g license-checker
