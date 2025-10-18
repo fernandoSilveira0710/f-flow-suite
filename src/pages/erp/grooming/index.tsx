@@ -95,12 +95,14 @@ export default function GroomingIndex() {
     // Text search
     if (filters.q) {
       const lower = filters.q.toLowerCase();
-      result = result.filter(
-        (t) =>
-          t.codigo.toLowerCase().includes(lower) ||
-          t.petNome.toLowerCase().includes(lower) ||
-          t.tutorNome.toLowerCase().includes(lower)
-      );
+      result = result.filter((t) => {
+        const pet = pets.find((p) => p.id === t.petId);
+        const tutor = tutors.find((u) => u.id === t.tutorId);
+        const codeMatch = (t.code || '').toLowerCase().includes(lower);
+        const petMatch = (pet?.nome || '').toLowerCase().includes(lower);
+        const tutorMatch = (tutor?.nome || '').toLowerCase().includes(lower);
+        return codeMatch || petMatch || tutorMatch;
+      });
     }
 
     // Status filter
@@ -117,13 +119,14 @@ export default function GroomingIndex() {
 
     // Porte filter
     if (filters.porte.length > 0) {
-      result = result.filter((t) =>
-        t.items?.some((item) => filters.porte.includes(item.porte || ''))
-      );
+      result = result.filter((t) => {
+        const pet = pets.find((p) => p.id === t.petId);
+        return pet ? filters.porte.includes(pet.porte) : false;
+      });
     }
 
     return result;
-  }, [tickets, filters, dateRange]);
+  }, [tickets, filters, dateRange, pets, tutors]);
 
   // Calculate KPIs
   const kpis = useMemo(() => {
@@ -537,18 +540,13 @@ export default function GroomingIndex() {
                               <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <Clock className="h-3 w-3 flex-shrink-0" />
-                                  <span className="truncate">{ticket.codigo}</span>
+                                  <span className="truncate">{ticket.code}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <div className="flex items-center gap-1 text-green-600 font-medium">
                                     <DollarSign className="h-3 w-3" />
                                     <span>R$ {(ticket.totalPrice || 0).toFixed(2)}</span>
                                   </div>
-                                  {ticket.sinalRecebido && (
-                                    <Badge variant="outline" className="text-xs flex-shrink-0">
-                                      Pago
-                                    </Badge>
-                                  )}
                                 </div>
                               </div>
 
