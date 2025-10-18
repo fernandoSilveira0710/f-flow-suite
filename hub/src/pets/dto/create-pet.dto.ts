@@ -2,13 +2,13 @@ import { IsString, IsOptional, IsBoolean, IsDateString, IsDecimal } from 'class-
 
 export class CreatePetDto {
   @IsString()
-  tutorId: string;
+  tutorId!: string;
 
   @IsString()
-  name: string;
+  name!: string;
 
   @IsString()
-  species: string; // dog, cat, etc.
+  species!: string; // dog, cat, etc.
 
   @IsOptional()
   @IsString()

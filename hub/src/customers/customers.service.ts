@@ -75,10 +75,9 @@ export class CustomersService {
         id: eventPayload.id,
         tenantId,
         name: eventPayload.name,
-        documento: eventPayload.documento,
+        document: eventPayload.documento,
         email: eventPayload.email,
         phone: eventPayload.phone,
-        dataNascISO: eventPayload.dataNascISO,
         tags: eventPayload.tags,
         notes: eventPayload.notes,
         address: eventPayload.address,
@@ -88,10 +87,9 @@ export class CustomersService {
       },
       update: {
         name: eventPayload.name,
-        documento: eventPayload.documento,
+        document: eventPayload.documento,
         email: eventPayload.email,
         phone: eventPayload.phone,
-        dataNascISO: eventPayload.dataNascISO,
         tags: eventPayload.tags,
         notes: eventPayload.notes,
         address: eventPayload.address,
@@ -148,8 +146,14 @@ export class CustomersService {
     const customer = await this.prisma.customer.create({
       data: {
         tenantId,
-        ...createCustomerDto,
-        dataNascISO: createCustomerDto.dataNascISO ? new Date(createCustomerDto.dataNascISO) : null,
+        name: createCustomerDto.name,
+        document: createCustomerDto.documento,
+        email: createCustomerDto.email,
+        phone: createCustomerDto.phone,
+        tags: createCustomerDto.tags,
+        notes: createCustomerDto.notes,
+        address: createCustomerDto.address,
+        active: createCustomerDto.active ?? undefined,
       },
       include: {
         pets: {
@@ -196,8 +200,14 @@ export class CustomersService {
         tenantId 
       },
       data: {
-        ...updateCustomerDto,
-        dataNascISO: updateCustomerDto.dataNascISO ? new Date(updateCustomerDto.dataNascISO) : undefined,
+        name: updateCustomerDto.name ?? undefined,
+        document: updateCustomerDto.documento ?? undefined,
+        email: updateCustomerDto.email ?? undefined,
+        phone: updateCustomerDto.phone ?? undefined,
+        tags: updateCustomerDto.tags ?? undefined,
+        notes: updateCustomerDto.notes ?? undefined,
+        address: updateCustomerDto.address ?? undefined,
+        active: updateCustomerDto.active ?? undefined,
       },
       include: {
         pets: {
@@ -250,7 +260,7 @@ export class CustomersService {
       id: customer.id,
       tenantId: customer.tenantId,
       name: customer.name,
-      documento: customer.documento,
+      documento: customer.document,
       email: customer.email,
       phone: customer.phone,
       dataNascISO: customer.dataNascISO,

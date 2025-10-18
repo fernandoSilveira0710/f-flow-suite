@@ -8,16 +8,16 @@ export enum PlanType {
 
 export class CreateLicenseDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString()
-  cpf: string;
+  cpf!: string;
 
   @IsEnum(PlanType)
-  planKey: PlanType;
+  planKey!: PlanType;
 
   @IsOptional()
   @IsString()
@@ -30,10 +30,10 @@ export class CreateLicenseDto {
 
 export class ActivateLicenseDto {
   @IsString()
-  tenantId: string;
+  tenantId!: string;
 
   @IsString()
-  deviceId: string;
+  deviceId!: string;
 
   @IsOptional()
   @IsString()

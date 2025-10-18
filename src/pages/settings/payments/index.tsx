@@ -74,7 +74,7 @@ export default function PaymentsIndex() {
           <h1 className="text-3xl font-bold">Métodos de Pagamento</h1>
           <p className="text-muted-foreground mt-1">Gerencie as formas de pagamento disponíveis no PDV</p>
         </div>
-        <Button onClick={() => navigate('/settings/payments/new')}>
+        <Button onClick={() => navigate('/erp/settings/payments/new')}>
           <Plus className="h-4 w-4 mr-2" />
           Novo método
         </Button>
@@ -86,7 +86,7 @@ export default function PaymentsIndex() {
         ) : methods.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-muted-foreground mb-4">Nenhum método de pagamento cadastrado</p>
-            <Button onClick={() => navigate('/settings/payments/new')}>
+            <Button onClick={() => navigate('/erp/settings/payments/new')}>
               <Plus className="h-4 w-4 mr-2" />
               Adicionar primeiro método
             </Button>
@@ -139,7 +139,7 @@ export default function PaymentsIndex() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => navigate(`/settings/payments/${method.id}/edit`)}
+                        onClick={() => navigate(`/erp/settings/payments/${method.id}/edit`)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>

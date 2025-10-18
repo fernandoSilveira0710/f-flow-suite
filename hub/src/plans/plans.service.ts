@@ -26,7 +26,18 @@ export class PlansService {
     }
 
     const plan = await this.prisma.plan.create({
-      data: createPlanDto,
+      data: {
+        name: createPlanDto.name,
+        description: createPlanDto.description ?? undefined,
+        price: createPlanDto.price,
+        currency: createPlanDto.currency ?? 'BRL',
+        maxSeats: createPlanDto.maxSeats ?? 1,
+        maxDevices: createPlanDto.maxDevices ?? 1,
+        featuresEnabled: typeof (createPlanDto as any).featuresEnabled === 'string'
+          ? (createPlanDto as any).featuresEnabled
+          : JSON.stringify((createPlanDto as any).featuresEnabled),
+        active: createPlanDto.active ?? true,
+      },
     });
 
     return plan;
@@ -71,9 +82,16 @@ export class PlansService {
       }
     }
 
+    const data: any = { ...updatePlanDto };
+    if (updatePlanDto.featuresEnabled !== undefined) {
+      data.featuresEnabled = typeof updatePlanDto.featuresEnabled === 'string'
+        ? updatePlanDto.featuresEnabled
+        : JSON.stringify(updatePlanDto.featuresEnabled);
+    }
+
     const plan = await this.prisma.plan.update({
       where: { id },
-      data: updatePlanDto,
+      data,
     });
 
     return plan;
@@ -129,9 +147,18 @@ export class PlansService {
 
     const subscription = await this.prisma.subscription.create({
       data: {
-        ...createSubscriptionDto,
+        tenantId: createSubscriptionDto.tenantId,
+        planId: createSubscriptionDto.planId,
+        status: createSubscriptionDto.status ?? 'ACTIVE',
         startAt: createSubscriptionDto.startAt ? new Date(createSubscriptionDto.startAt) : new Date(),
         expiresAt: createSubscriptionDto.expiresAt ? new Date(createSubscriptionDto.expiresAt) : undefined,
+        paymentData: createSubscriptionDto.paymentData
+          ? (typeof createSubscriptionDto.paymentData === 'string' 
+              ? createSubscriptionDto.paymentData 
+              : JSON.stringify(createSubscriptionDto.paymentData))
+          : undefined,
+        billingCycle: createSubscriptionDto.billingCycle ?? 'MONTHLY',
+        autoRenew: createSubscriptionDto.autoRenew ?? true,
       },
       include: {
         plan: true,
@@ -200,6 +227,14 @@ export class PlansService {
 
     if (updateSubscriptionDto.expiresAt) {
       updateData.expiresAt = new Date(updateSubscriptionDto.expiresAt);
+    }
+
+    if (updateSubscriptionDto.paymentData !== undefined) {
+      updateData.paymentData = updateSubscriptionDto.paymentData
+        ? (typeof updateSubscriptionDto.paymentData === 'string'
+            ? updateSubscriptionDto.paymentData
+            : JSON.stringify(updateSubscriptionDto.paymentData))
+        : null;
     }
 
     const subscription = await this.prisma.subscription.update({

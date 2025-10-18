@@ -1,49 +1,49 @@
 import { Decimal } from '@prisma/client/runtime/library';
 
 export class AppointmentResponseDto {
-  id: string;
-  tenantId: string;
-  petId: string;
-  customerId: string;
-  serviceId: string;
-  professionalId: string;
-  resourceId?: string;
+  id!: string;
+  tenantId!: string;
+  petId!: string;
+  customerId!: string;
+  serviceId!: string;
+  professionalId!: string;
+  resourceId?: string | null;
   resource?: {
     id: string;
     name: string;
     type: string;
-  };
-  date: Date;
-  startTime: Date;
-  endTime: Date;
-  status: string;
-  notes?: string;
-  price?: Decimal;
-  createdAt: Date;
-  updatedAt: Date;
+  } | null;
+  date!: Date;
+  startTime!: Date;
+  endTime!: Date;
+  status!: string;
+  notes?: string | null;
+  price?: Decimal | null;
+  createdAt!: Date;
+  updatedAt!: Date;
 
   // Relations
   pet?: {
     id: string;
     name: string;
     species: string;
-    breed?: string;
-  };
+    breed?: string | null;
+  } | null;
   customer?: {
     id: string;
     name: string;
-    email?: string;
-    phone?: string;
-  };
+    email?: string | null;
+    phone?: string | null;
+  } | null;
   service?: {
     id: string;
     name: string;
-    price: Decimal;
-    duration: number;
-  };
+    price: number;
+    duration?: number | null;
+  } | null;
   professional?: {
     id: string;
     name: string;
     role: string;
-  };
+  } | null;
 }

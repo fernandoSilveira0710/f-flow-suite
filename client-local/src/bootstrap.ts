@@ -111,6 +111,28 @@ async function runMigrations(): Promise<void> {
   });
 }
 
+function setupPrismaEngineIfPackaged(): void {
+  try {
+    if ((process as any).pkg) {
+      const exeDir = dirname(process.execPath);
+      const candidates = [
+        'libquery_engine-windows.dll.node',
+        'query_engine-windows.dll.node',
+      ];
+      for (const name of candidates) {
+        const fullPath = join(exeDir, name);
+        if (existsSync(fullPath)) {
+          process.env.PRISMA_QUERY_ENGINE_LIBRARY = fullPath;
+          process.env.PRISMA_QUERY_ENGINE_BINARY = fullPath;
+          break;
+        }
+      }
+    }
+  } catch {
+    // silent
+  }
+}
+
 export async function bootstrap(): Promise<void> {
   try {
     const logger = new Logger('Bootstrap');
@@ -126,13 +148,22 @@ export async function bootstrap(): Promise<void> {
     logger.log(`Data directory: ${dataDir}`);
     logger.log(`Log directory: ${logDir}`);
     ensureDirectories(dataDir, logDir);
-    
+
     // Setup database
     const databaseUrl = setupDatabase(dataDir);
     logger.log(`Database URL: ${databaseUrl}`);
-    
-    // Run migrations
-    await runMigrations();
+
+    // Ensure Prisma engine path when running as packaged binary
+    setupPrismaEngineIfPackaged();
+
+    // Run migrations (can be skipped via env)
+    if ((process as any).pkg) {
+      logger.log('Skipping Prisma migrations in packaged binary');
+    } else if (process.env.SKIP_MIGRATIONS !== 'true') {
+      await runMigrations();
+    } else {
+      logger.log('Skipping Prisma migrations due to SKIP_MIGRATIONS=true');
+    }
     
     // Initialize application logger
     logger.log('Initializing application logger...');
@@ -158,8 +189,29 @@ export async function bootstrap(): Promise<void> {
       (process.env.SITE_URL || 'http://localhost:5173').replace('localhost', '127.0.0.1'),
     ];
 
+    // Permite qualquer porta de localhost/127.0.0.1 em desenvolvimento
+    const isDevLocalOrigin = (origin: string): boolean => {
+      try {
+        const url = new URL(origin);
+        return (
+          (url.hostname === 'localhost' || url.hostname === '127.0.0.1') &&
+          (url.protocol === 'http:' || url.protocol === 'https:')
+        );
+      } catch {
+        return false;
+      }
+    };
+
     app.enableCors({
-      origin: allowedOrigins,
+      origin: (origin, callback) => {
+        // Allow non-browser requests (e.g., curl, server-to-server)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.includes(origin) || isDevLocalOrigin(origin)) {
+          return callback(null, true);
+        }
+        return callback(null, false);
+      },
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: [
         'Content-Type', 
@@ -210,7 +262,9 @@ export async function bootstrap(): Promise<void> {
     }
     
     // Start server
-    const port = process.env.PORT ? Number(process.env.PORT) : 3001;
+    const port = process.env.CLIENT_HTTP_PORT
+      ? Number(process.env.CLIENT_HTTP_PORT)
+      : (process.env.PORT ? Number(process.env.PORT) : 8081);
     const host = '127.0.0.1';
     
     await app.listen(port, host);

@@ -38,6 +38,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useUrlFilters } from '@/hooks/use-url-filters';
 import { fetchSales, exportSalesToCSV, refundSale, type SaleDetail } from '@/lib/sales-api';
+import { getProductById } from '@/lib/products-api';
 import { format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -80,6 +81,7 @@ export default function SalesPage() {
   const [selectedSale, setSelectedSale] = useState<SaleDetail | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
+  const [productNameCache, setProductNameCache] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   // Load sales
@@ -96,6 +98,38 @@ export default function SalesPage() {
       .then(setSales)
       .finally(() => setIsLoading(false));
   }, [filters]);
+
+  // Quando abrir a modal de detalhes, busca nomes dos produtos que ainda não estão em cache
+  useEffect(() => {
+    const loadNames = async () => {
+      if (!showDetailDialog || !selectedSale) return;
+      const ids = Array.from(
+        new Set((selectedSale.items || []).filter((i) => !i.productName).map((i) => i.productId))
+      );
+      const missing = ids.filter((id) => !productNameCache[id]);
+      if (missing.length === 0) return;
+      try {
+        const entries = await Promise.all(
+          missing.map(async (id) => {
+            try {
+              const p = await getProductById(id);
+              return [id, p.name] as const;
+            } catch {
+              return [id, `Produto ${id.slice(0, 8)}`] as const;
+            }
+          })
+        );
+        setProductNameCache((prev) => {
+          const next = { ...prev } as Record<string, string>;
+          for (const [id, name] of entries) next[id] = name;
+          return next;
+        });
+      } catch {
+        // silencioso: se falhar, mantemos fallback por ID
+      }
+    };
+    loadNames();
+  }, [showDetailDialog, selectedSale]);
 
   const handleExport = () => {
     const csv = exportSalesToCSV(sales);
@@ -396,7 +430,7 @@ export default function SalesPage() {
                         </Tooltip>
                       </TooltipProvider>
 
-                      {sale.status === 'Pago' && (
+                      {(sale.status === 'completed' || sale.status === 'Pago') && (
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -463,7 +497,7 @@ export default function SalesPage() {
                   {selectedSale.items?.map((item, i) => (
                     <div key={i} className="flex justify-between text-sm">
                       <span>
-                        {item.qty}x Produto {item.productId}
+                        {item.qty}x {item.productName || productNameCache[item.productId] || `Produto ${item.productId.slice(0, 8)}`}
                       </span>
                       <span className="font-medium tabular-nums">{formatCurrency(item.unitPrice * item.qty)}</span>
                     </div>

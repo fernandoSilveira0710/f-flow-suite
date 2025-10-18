@@ -1,6 +1,7 @@
 export class SaleItemResponseDto {
   id: string;
   productId: string;
+  productName?: string;
   qty: number;
   unitPrice: number;
   subtotal: number;

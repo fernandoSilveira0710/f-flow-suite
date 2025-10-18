@@ -15,7 +15,7 @@ async function testLicenseVerification() {
       features: ['basic_features']
     };
     
-    const hubResponse = await axios.post('http://localhost:8081/licenses/activate', activationData);
+    const hubResponse = await axios.post('http://localhost:3001/licenses/activate', activationData);
     
     if (hubResponse.status === 201) {
       console.log('✅ Licença ativada com sucesso no Hub!');
@@ -27,7 +27,7 @@ async function testLicenseVerification() {
       
       try {
         // Primeiro, vamos ativar a licença no client-local
-        const clientActivationResponse = await axios.post('http://localhost:3001/licensing/activate', {
+        const clientActivationResponse = await axios.post('http://localhost:8081/licensing/activate', {
           tenantId: 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b',
           deviceId: 'test-device-123'
         });
@@ -36,7 +36,7 @@ async function testLicenseVerification() {
         
         // Agora vamos verificar a licença no client-local
         console.log('🔍 Verificando licença no client-local...');
-        const verifyResponse = await axios.get('http://localhost:3001/licensing/current');
+        const verifyResponse = await axios.get('http://localhost:8081/licensing/current');
         console.log('✅ Resposta do client-local:', verifyResponse.data);
         
         // Testar funcionamento offline - simular desconexão do Hub
@@ -49,7 +49,7 @@ async function testLicenseVerification() {
         // Vamos tentar persistir a licença manualmente
         console.log('🔧 Tentando persistir licença manualmente...');
         try {
-          const persistResponse = await axios.post('http://localhost:3001/licensing/persist', {
+          const persistResponse = await axios.post('http://localhost:8081/licensing/persist', {
             tenantId: 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b',
             userId: 'test-user',
             licenseData: hubResponse.data

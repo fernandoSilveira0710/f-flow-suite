@@ -8,7 +8,7 @@ async function configureLicense() {
     
     // 1. Ativar licença no Hub
     console.log('📝 Ativando licença no Hub...');
-    const hubResponse = await axios.post('http://localhost:8081/licenses/activate', {
+    const hubResponse = await axios.post('http://localhost:3001/licenses/activate', {
       tenantId: 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b',
       deviceId: 'test-device-123',
       plan: 'Básico',
@@ -36,14 +36,14 @@ async function configureLicense() {
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     try {
-      const currentResponse = await axios.get('http://localhost:3001/licensing/current');
+      const currentResponse = await axios.get('http://localhost:8081/licensing/current');
       console.log('✅ Licença atual no client-local:', currentResponse.data);
     } catch (error) {
       console.log('⚠️ Client-local ainda não reconheceu a licença');
       
       // Tentar forçar atualização do cache
       try {
-        const cacheResponse = await axios.post('http://localhost:3001/licensing/persist', {
+        const cacheResponse = await axios.post('http://localhost:8081/licensing/persist', {
           tenantId: 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b',
           userId: 'test-user',
           licenseData: hubResponse.data
@@ -51,7 +51,7 @@ async function configureLicense() {
         console.log('✅ Cache atualizado:', cacheResponse.data);
         
         // Verificar novamente
-        const retryResponse = await axios.get('http://localhost:3001/licensing/current');
+        const retryResponse = await axios.get('http://localhost:8081/licensing/current');
         console.log('✅ Licença após cache:', retryResponse.data);
         
       } catch (cacheError) {
@@ -64,7 +64,7 @@ async function configureLicense() {
     
     // Simular verificação offline usando o cache
     try {
-      const offlineResponse = await axios.get('http://localhost:3001/licensing/status', {
+      const offlineResponse = await axios.get('http://localhost:8081/licensing/status', {
         params: { tenantId: 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b' }
       });
       console.log('✅ Status offline:', offlineResponse.data);

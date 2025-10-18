@@ -13,12 +13,12 @@
   "variable": [
     {
       "key": "hub_url",
-      "value": "http://localhost:3000",
+      "value": "http://localhost:3001",
       "type": "string"
     },
     {
       "key": "client_url",
-      "value": "http://localhost:3001",
+      "value": "http://localhost:8081",
       "type": "string"
     },
     {

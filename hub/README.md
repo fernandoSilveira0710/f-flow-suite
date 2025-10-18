@@ -4,10 +4,10 @@ Hub central do F-Flow Suite responsável por gerenciar licenças, tenants e sinc
 
 ## 🚀 Acesso Rápido
 
-- **API Hub**: http://localhost:8081
+- **API Hub**: http://localhost:3001
 - **Prisma Studio**: http://localhost:5555
-- **Health Check**: http://localhost:8081/health
-- **JWKS Endpoint**: http://localhost:8081/.well-known/jwks.json
+- **Health Check**: http://localhost:3001/health
+- **JWKS Endpoint**: http://localhost:3001/.well-known/jwks.json
 
 ## 👥 Usuários de Teste
 
@@ -116,10 +116,10 @@ As políticas são aplicadas via SQL em `sql/002-rls-policies.sql`:
 
 ```bash
 # Sem header x-tenant-id (deve retornar 403)
-curl http://localhost:3000/tenants
+curl http://localhost:3001/tenants
 
 # Com header válido (deve retornar 200)
-curl -H "x-tenant-id: test-tenant" http://localhost:3000/tenants
+curl -H "x-tenant-id: test-tenant" http://localhost:3001/tenants
 ```
 
 ## JWKS Endpoint
@@ -251,7 +251,7 @@ Os testes de integração verificam:
 Certifique-se de incluir o header `x-tenant-id` nas requisições:
 
 ```bash
-curl -H "x-tenant-id: your-tenant-id" http://localhost:3000/api-endpoint
+curl -H "x-tenant-id: your-tenant-id" http://localhost:3001/api-endpoint
 ```
 
 ### Erro 500 no JWKS
@@ -268,12 +268,12 @@ Verifique se `LICENSE_PUBLIC_KEY_PEM` está configurado corretamente no `.env`.
 
 #### Client-Local não consegue validar licenças offline
 
-1. Verifique se o endpoint JWKS está acessível: `curl http://localhost:8081/.well-known/jwks.json`
+1. Verifique se o endpoint JWKS está acessível: `curl http://localhost:3001/.well-known/jwks.json`
 2. Confirme se `LICENSE_PUBLIC_KEY_PEM` está configurado no Hub
 3. Verifique se o Client-Local baixou a chave pública corretamente
 
 #### Usuários não sincronizados para cache local
 
-1. Teste o endpoint de usuários: `curl -H "x-tenant-id: your-tenant" http://localhost:8081/users`
+1. Teste o endpoint de usuários: `curl -H "x-tenant-id: your-tenant" http://localhost:3001/users`
 2. Verifique se o Client-Local está executando a sincronização
 3. Confirme se há usuários cadastrados no tenant específico

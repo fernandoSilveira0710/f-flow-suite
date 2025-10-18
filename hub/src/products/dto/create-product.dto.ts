@@ -3,7 +3,7 @@ import { Transform } from 'class-transformer';
 
 export class CreateProductDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsOptional()
   @IsString()
@@ -19,7 +19,7 @@ export class CreateProductDto {
 
   @Transform(({ value }) => parseFloat(value))
   @IsDecimal({ decimal_digits: '0,2' })
-  salePrice: number;
+  salePrice!: number;
 
   @IsOptional()
   @Transform(({ value }) => parseFloat(value))

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { PlanSyncService } from '@/services/plan-sync.service';
+import { API_URLS, ENDPOINTS } from '../lib/env';
 
 interface User {
   id: string;
@@ -26,6 +27,14 @@ interface AuthContextType {
   refreshLicenseStatus: (forceUpdate?: boolean) => Promise<void>;
   isFirstInstallation: () => Promise<boolean>;
   hasLocalUsers: () => Promise<boolean>;
+  isHubOnline: boolean;
+  hubLastCheck: string | null;
+  checkHubConnectivity: () => Promise<boolean>;
+  syncLicenseWithHub: () => Promise<void>;
+  // Novos campos expostos para UI
+  licenseCacheUpdatedAt: string | null;
+  licenseCacheLastChecked: string | null;
+  offlineDaysLeft: number | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,7 +43,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Novos estados para timestamps e dias offline restantes
+  const [licenseCacheUpdatedAt, setLicenseCacheUpdatedAt] = useState<string | null>(null);
+  const [licenseCacheLastChecked, setLicenseCacheLastChecked] = useState<string | null>(null);
+  const [offlineDaysLeft, setOfflineDaysLeft] = useState<number | null>(null);
   const navigate = useNavigate();
+
+  // Pequena utilidade para fetch com timeout explícito
+  const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 6000) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      return response;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
 
   // Verificar se há usuário logado no localStorage ao inicializar
   useEffect(() => {
@@ -45,8 +70,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(JSON.parse(storedUser));
         }
         
-        // Sempre verificar status da licença
-        await checkLicenseStatus();
+        // Iniciar verificação de licença sem bloquear indefinidamente o loading.
+        const licenseCheck = checkLicenseStatus();
+        // Espera no máximo 1.5s antes de liberar UI; licença continua em background.
+        await Promise.race([
+          licenseCheck,
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ]);
       } catch (error) {
         console.error('Erro ao verificar status de autenticação:', error);
         localStorage.removeItem('auth_user');
@@ -69,27 +99,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLicenseStatus(null);
       
       // Consulta DIRETA ao client-local - SEM CACHE
-      const statusResponse = await fetch(`http://localhost:3001/licensing/status?t=${Date.now()}`, {
-        method: 'GET',
-        cache: 'no-cache',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          ...(tenantId && { 'x-tenant-id': tenantId })
+      let statusResponse: Response;
+      try {
+        statusResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
+          method: 'GET',
+          cache: 'no-cache',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            ...(tenantId && { 'x-tenant-id': tenantId })
+          }
+        }, 6000);
+      } catch (e) {
+        if ((e as any)?.name === 'AbortError') {
+          console.warn('⏱️ Timeout em /licensing/status, tentando novamente com 8000ms');
+          statusResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
+            method: 'GET',
+            cache: 'no-cache',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+              ...(tenantId && { 'x-tenant-id': tenantId })
+            }
+          }, 8000);
+        } else {
+          throw e;
         }
-      });
+      }
       
       if (!statusResponse.ok) {
         throw new Error(`Status request failed: ${statusResponse.status}`);
       }
       
-      const statusData = await statusResponse.json();
+      const statusData = await parseJsonSafe(statusResponse, '/licensing/status');
       console.log('📊 Status data from client-local:', statusData);
+
+      // Atualizar timestamps e calcular dias offline restantes
+      try {
+        const updatedAt = statusData.updatedAt || null;
+        const lastChecked = statusData.lastChecked || null;
+        setLicenseCacheUpdatedAt(updatedAt);
+        setLicenseCacheLastChecked(lastChecked);
+        const ts = updatedAt || lastChecked;
+        if (ts) {
+          const last = new Date(ts).getTime();
+          const days = Math.floor((Date.now() - last) / (24 * 60 * 60 * 1000));
+          const LIMIT = 5;
+          setOfflineDaysLeft(Math.max(0, LIMIT - days));
+        } else {
+          setOfflineDaysLeft(null);
+        }
+      } catch (e) {
+        console.warn('⚠️ Falha ao calcular dias offline restantes', e);
+      }
       
-      const installResponse = await fetch(`http://localhost:3001/licensing/install-status?t=${Date.now()}`, {
+      const installResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/install-status?t=${Date.now()}`, {
         method: 'GET',
         cache: 'no-cache',
         headers: {
@@ -100,13 +170,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           'Expires': '0',
           ...(tenantId && { 'x-tenant-id': tenantId })
         }
-      });
+      }, 3000);
       
       if (!installResponse.ok) {
         throw new Error(`Install status request failed: ${installResponse.status}`);
       }
       
-      const installData = await installResponse.json();
+      const installData = await parseJsonSafe(installResponse, '/licensing/install-status');
       console.log('🔧 Install data from client-local:', installData);
       
       const newLicenseStatus = {
@@ -151,8 +221,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let hubAvailable = true;
       
       try {
-        console.log('🌐 Fazendo requisição para Hub: http://localhost:8081/public/login');
-        hubResponse = await fetch('http://localhost:8081/public/login', {
+        console.log('🌐 Fazendo requisição para Hub:', ENDPOINTS.HUB_LOGIN);
+        hubResponse = await fetch(ENDPOINTS.HUB_LOGIN, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -193,7 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Sincronizar dados com client-local
         console.log('🔄 Sincronizando dados com client-local...');
         try {
-          const syncResponse = await fetch('http://localhost:3001/users/sync', {
+          const syncResponse = await fetch(ENDPOINTS.CLIENT_USERS_SYNC, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -214,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Verificar licenças no Hub
         console.log('🎫 Verificando licenças no Hub...');
         try {
-          const licenseUrl = `http://localhost:8081/licenses/validate?tenantId=${result.user.tenant.id}`;
+          const licenseUrl = `${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${result.user.tenant.id}`;
           console.log('🎫 URL de validação de licença:', licenseUrl);
           const licenseResponse = await fetch(licenseUrl);
           console.log('🎫 Resposta da licença - Status:', licenseResponse.status, 'OK:', licenseResponse.ok);
@@ -238,7 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // Ativar licença no client-local para gerar e persistir JWT token
                 try {
                   console.log('🔑 Ativando licença no client-local...');
-                  const activateResponse = await fetch('http://localhost:3001/licensing/activate', {
+                  const activateResponse = await fetch(ENDPOINTS.CLIENT_LICENSING_ACTIVATE, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -262,7 +332,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // Persistir licença no client-local para uso offline futuro
                 try {
                   console.log('💾 Persistindo licença no client-local...');
-                  await fetch('http://localhost:3001/licensing/persist', {
+                  await fetch(ENDPOINTS.CLIENT_LICENSING_PERSIST, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -347,9 +417,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ETAPA 3: Hub offline ou com problema - verificar client-local
       console.log('🔄 ETAPA 3: Hub offline ou com problema - verificando client-local...');
       if (!hubAvailable || !hubResponse?.ok) {
+        console.log('💻 Verificando restrição de login offline (máximo 5 dias sem Hub)...');
+
+        // Buscar timestamps do cache para calcular dias sem Hub
+        let offlineDaysExceeded = false;
+        let offlineDaysLeft: number | null = null;
+        try {
+          const tenantId = localStorage.getItem('tenant_id') || localStorage.getItem('2f.tenantId') || '';
+          const statusRes = await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              ...(tenantId && { 'x-tenant-id': tenantId })
+            }
+          });
+          if (statusRes.ok) {
+            const statusJson = await statusRes.json();
+            const ts = statusJson.updatedAt || statusJson.lastChecked;
+            if (ts) {
+              const last = new Date(ts).getTime();
+              const now = Date.now();
+              const days = Math.floor((now - last) / (24 * 60 * 60 * 1000));
+              const LIMIT = 5;
+              offlineDaysExceeded = days >= LIMIT;
+              offlineDaysLeft = Math.max(0, LIMIT - days);
+              console.log(`📉 Dias sem Hub desde última atualização: ${days}d (restam ${offlineDaysLeft}d)`);
+            } else {
+              console.warn('⚠️ Não há timestamps no status da licença (updatedAt/lastChecked)');
+            }
+          } else {
+            console.warn('⚠️ Falha ao obter /licensing/status para cálculo offline', statusRes.status);
+          }
+        } catch (e) {
+          console.warn('⚠️ Erro ao calcular dias offline permitidos', e);
+        }
+
+        if (offlineDaysExceeded) {
+          toast({
+            title: 'Modo offline bloqueado',
+            description: 'Sem comunicação com o Hub por mais de 5 dias. Conecte-se ao Hub para continuar.',
+            variant: 'destructive',
+          });
+          console.log('⛔ Bloqueando login offline - limite de 5 dias excedido');
+          return false;
+        }
+
         console.log('💻 Tentando login offline no client-local...');
         try {
-          const offlineResponse = await fetch('http://localhost:3001/auth/offline-login', {
+          const offlineResponse = await fetch(`${API_URLS.CLIENT_LOCAL}/auth/offline-login`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -382,9 +498,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               });
               
               toast({
-                title: "Login offline realizado",
-                description: "Conectado usando dados em cache. Funcionalidade limitada.",
-                variant: "default",
+                title: 'Login offline realizado',
+                description: offlineDaysLeft != null ? `Conectado usando cache. Restam ${offlineDaysLeft} dias sem Hub.` : 'Conectado usando dados em cache. Funcionalidade limitada.',
+                variant: 'default',
               });
               
               // Forçar atualização do status da licença após login offline
@@ -395,24 +511,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
               // Mostrar mensagem específica do serviço offline
               toast({
-                title: "Login offline falhou",
-                description: offlineResult.message || "Não foi possível fazer login offline.",
-                variant: "destructive",
+                title: 'Login offline falhou',
+                description: offlineResult.message || 'Não foi possível fazer login offline.',
+                variant: 'destructive',
               });
             }
           } else {
             // Tratar diferentes códigos de status HTTP
             if (offlineResponse.status === 404) {
               toast({
-                title: "Serviço offline não encontrado",
-                description: "O endpoint de login offline não está disponível. Verifique se o client-local está atualizado.",
-                variant: "destructive",
+                title: 'Serviço offline não encontrado',
+                description: 'O endpoint de login offline não está disponível. Verifique se o client-local está atualizado.',
+                variant: 'destructive',
               });
             } else {
               toast({
-                title: "Erro no serviço offline",
+                title: 'Erro no serviço offline',
                 description: `Falha na comunicação com o serviço local (${offlineResponse.status}).`,
-                variant: "destructive",
+                variant: 'destructive',
               });
             }
           }
@@ -422,15 +538,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Mostrar mensagem específica baseada no tipo de erro
           if (offlineError instanceof TypeError && offlineError.message.includes('fetch')) {
             toast({
-              title: "Serviço offline indisponível",
-              description: "O serviço local não está funcionando. Verifique se o client-local está rodando.",
-              variant: "destructive",
+              title: 'Serviço offline indisponível',
+              description: 'O serviço local não está funcionando. Verifique se o client-local está rodando.',
+              variant: 'destructive',
             });
           } else {
             toast({
-              title: "Erro no login offline",
-              description: "Não foi possível fazer login offline. Tente conectar-se à internet.",
-              variant: "destructive",
+              title: 'Erro no login offline',
+              description: 'Não foi possível fazer login offline. Tente conectar-se à internet.',
+              variant: 'destructive',
             });
           }
         }
@@ -513,13 +629,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, 100);
   };
 
+  const parseJsonSafe = async (res: Response, endpointDesc: string) => {
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      const text = await res.text();
+      throw new Error(`Non-JSON response from ${endpointDesc}: ${ct} - ${text.slice(0, 60)}`);
+    }
+    return res.json();
+  };
+
   const isFirstInstallation = async (): Promise<boolean> => {
     try {
-      const response = await fetch('http://localhost:3001/users/has-users');
-      if (response.ok) {
+      const response = await fetch(`${ENDPOINTS.CLIENT_USERS_HAS_USERS}?t=${Date.now()}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        }
+      });
+      const ct = response.headers.get('content-type') || '';
+      if (response.ok && ct.includes('application/json')) {
         const data = await response.json();
         return !data.hasUsers;
       }
+      console.warn('isFirstInstallation: resposta não-JSON ou não-OK para /users/has-users', ct, response.status);
       return true; // Se não conseguir verificar, assume primeira instalação
     } catch (error) {
       console.error('Erro ao verificar primeira instalação:', error);
@@ -529,7 +661,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasLocalUsers = async (): Promise<boolean> => {
     try {
-      const response = await fetch('http://localhost:3001/users/has-users');
+      const response = await fetch(ENDPOINTS.CLIENT_USERS_HAS_USERS);
       if (response.ok) {
         const data = await response.json();
         return data.hasUsers;
@@ -540,6 +672,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     }
   };
+
+  // Hub connectivity + license sync
+  const [isHubOnline, setIsHubOnline] = useState<boolean>(false);
+  const [hubLastCheck, setHubLastCheck] = useState<string | null>(null);
+
+  const checkHubConnectivity = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetchWithTimeout(`${ENDPOINTS.HUB_HEALTH}?t=${Date.now()}`, { method: 'GET' }, 3000);
+      const ok = res.ok;
+      setIsHubOnline(ok);
+      if (ok) setHubLastCheck(new Date().toISOString());
+      return ok;
+    } catch (e) {
+      setIsHubOnline(false);
+      return false;
+    }
+  }, [fetchWithTimeout]);
+
+  const syncLicenseWithHub = useCallback(async (): Promise<void> => {
+    const tenantId = localStorage.getItem('tenant_id') || localStorage.getItem('2f.tenantId') || '';
+    try {
+      const res = await fetchWithTimeout(`${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${tenantId}&t=${Date.now()}`, { method: 'GET' }, 5000);
+      if (!res.ok) {
+        setIsHubOnline(false);
+        return;
+      }
+      const data = await res.json();
+      const planKey = (data?.license?.planKey || data?.planKey || 'starter').toLowerCase();
+      const expiresAt = data?.license?.expiresAt || data?.expiresAt || undefined;
+      const valid = Boolean(data?.valid || data?.licensed);
+
+      setLicenseStatus({
+        isValid: valid,
+        isInstalled: true,
+        plan: planKey,
+        expiresAt
+      });
+
+      setIsHubOnline(true);
+      const nowIso = new Date().toISOString();
+      setHubLastCheck(nowIso);
+      setLicenseCacheUpdatedAt(nowIso);
+      setOfflineDaysLeft(5);
+
+      try {
+        await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/update-cache`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantId,
+            planKey,
+            expiresAt,
+            valid,
+            lastChecked: nowIso,
+            updatedAt: nowIso
+          })
+        });
+      } catch (e) {
+        console.warn('Falha ao atualizar cache de licença no client-local', e);
+      }
+    } catch (error) {
+      console.warn('Erro ao sincronizar licença com Hub', error);
+      setIsHubOnline(false);
+    }
+  }, [fetchWithTimeout]);
 
   const value: AuthContextType = {
     user,
@@ -562,7 +759,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       checkLicenseStatus,
       refreshLicenseStatus,
       isFirstInstallation,
-      hasLocalUsers
+      hasLocalUsers,
+      isHubOnline,
+      hubLastCheck,
+      checkHubConnectivity,
+      syncLicenseWithHub,
+      licenseCacheUpdatedAt,
+      licenseCacheLastChecked,
+      offlineDaysLeft,
     }}>
       {children}
     </AuthContext.Provider>

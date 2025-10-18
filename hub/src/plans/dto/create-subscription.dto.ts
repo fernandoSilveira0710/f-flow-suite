@@ -2,10 +2,10 @@ import { IsString, IsOptional, IsDateString, IsObject, IsBoolean } from 'class-v
 
 export class CreateSubscriptionDto {
   @IsString()
-  tenantId: string;
+  tenantId!: string;
 
   @IsString()
-  planId: string;
+  planId!: string;
 
   @IsOptional()
   @IsString()

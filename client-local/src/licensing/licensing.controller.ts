@@ -236,8 +236,12 @@ export class LicensingController {
         tenantId: tenantId,
         showWarning: ['not_registered', 'not_licensed', 'offline_grace', 'expired'].includes(result.status),
         requiresSetup: result.status === 'not_configured',
-        canStart: ['active', 'development', 'offline_grace'].includes(result.status)
-      };
+        canStart: ['active', 'development', 'offline_grace'].includes(result.status),
+        // extended fields for frontend offline handling
+        lastChecked: (result as any).lastChecked,
+        updatedAt: (result as any).updatedAt,
+        graceDays: (result as any).graceDays,
+      } as any;
     } catch (error: any) {
       this.logger.error('Failed to get license status', error);
       return {
@@ -248,7 +252,7 @@ export class LicensingController {
         showWarning: true,
         requiresSetup: false,
         canStart: false
-      };
+      } as any;
     }
   }
 

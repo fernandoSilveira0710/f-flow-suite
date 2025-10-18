@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { FileDown, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/erp/page-header';
 import { Input } from '@/components/ui/input';
@@ -29,14 +29,14 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { getMovements, getProducts, createMovement, type StockMovement, type Product } from '@/lib/stock-api';
+import { getStockMovements, getProducts, adjustStock, getStockByProductId, type StockMovement, type Product } from '@/lib/stock-api';
 import { useToast } from '@/hooks/use-toast';
 import { useEntitlements } from '@/hooks/use-entitlements';
 
 type MovementType = 'ENTRADA' | 'SAIDA' | 'AJUSTE';
 
 export default function StockMovementsPage() {
-  const [movements, setMovements] = useState<StockMovement[]>(getMovements());
+  const [movements, setMovements] = useState<StockMovement[]>([]);
   const products = getProducts();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | MovementType>('all');
@@ -54,6 +54,14 @@ export default function StockMovementsPage() {
   const { toast } = useToast();
   const { entitlements } = useEntitlements();
 
+  useEffect(() => {
+    const load = async () => {
+      const data = await getStockMovements();
+      setMovements(data);
+    };
+    load();
+  }, []);
+
   const filteredMovements = useMemo(() => {
     let result = movements;
 
@@ -61,7 +69,7 @@ export default function StockMovementsPage() {
       const lower = search.toLowerCase();
       result = result.filter(
         (m) =>
-          m.nomeProduto.toLowerCase().includes(lower) ||
+          m.produtoNome.toLowerCase().includes(lower) ||
           m.sku.toLowerCase().includes(lower) ||
           m.documento?.toLowerCase().includes(lower)
       );
@@ -73,6 +81,38 @@ export default function StockMovementsPage() {
 
     return result;
   }, [movements, search, typeFilter]);
+
+  // Sanitização e formatação de custo com 2 casas decimais
+  const sanitizeCurrencyInput = (input: string) => {
+    if (input === '') return '';
+    let v = input.replace(',', '.');
+    v = v.replace(/[^\d.]/g, '');
+    const parts = v.split('.');
+    if (parts.length > 2) {
+      v = parts[0] + '.' + parts.slice(1).join('').replace(/\./g, '');
+    }
+    const [intPart, decPart] = v.split('.');
+    if (decPart !== undefined) {
+      return `${intPart}${decPart ? '.' + decPart.slice(0, 2) : ''}`;
+    }
+    return intPart;
+  };
+
+  const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const sanitized = sanitizeCurrencyInput(raw);
+    setCost(sanitized);
+  };
+
+  const handleCostBlur = () => {
+    if (!cost) return;
+    const num = parseFloat(cost);
+    if (!isNaN(num) && num >= 0) {
+      setCost(num.toFixed(2));
+    } else {
+      setCost('');
+    }
+  };
 
   const openDialog = (type: MovementType) => {
     setDialogType(type);
@@ -89,7 +129,7 @@ export default function StockMovementsPage() {
     setMotivo('');
   };
 
-  const handleCreateMovement = () => {
+  const handleCreateMovement = async () => {
     if (!selectedProductId) {
       toast({ title: 'Erro', description: 'Selecione um produto', variant: 'destructive' });
       return;
@@ -105,19 +145,28 @@ export default function StockMovementsPage() {
     if (!product) return;
 
     try {
-      createMovement({
-        tipo: dialogType,
-        produtoId: product.id,
-        sku: product.sku,
-        quantidade: qtd,
-        custoUnit: cost ? parseFloat(cost) : undefined,
-        origem: dialogType === 'ENTRADA' ? 'COMPRA' : dialogType === 'SAIDA' ? 'VENDA' : 'INVENTARIO',
-        motivo: motivo || undefined,
-        documento: document || undefined,
-        observacao: notes || undefined,
+      let delta = qtd;
+      if (dialogType === 'SAIDA') delta = -qtd;
+      if (dialogType === 'AJUSTE') {
+        try {
+          const current = await getStockByProductId(product.id);
+          if (current) {
+            delta = qtd - (current.currentStock ?? 0);
+          }
+        } catch {}
+      }
+
+      await adjustStock({
+        productId: product.id,
+        delta,
+        reason: dialogType === 'ENTRADA' ? 'COMPRA' : dialogType === 'SAIDA' ? (motivo || 'SAIDA') : 'AJUSTE',
+        notes: notes || undefined,
+        document: document || undefined,
+        unitCost: cost ? parseFloat(cost) : undefined,
       });
 
-      setMovements(getMovements());
+      const updated = await getStockMovements();
+      setMovements(updated);
       setDialogOpen(false);
       toast({
         title: 'Sucesso',
@@ -213,7 +262,7 @@ export default function StockMovementsPage() {
                     })}
                   </TableCell>
                   <TableCell>{getTypeBadge(movement.tipo)}</TableCell>
-                  <TableCell className="font-medium">{movement.nomeProduto}</TableCell>
+                  <TableCell className="font-medium">{movement.produtoNome}</TableCell>
                   <TableCell>{movement.sku}</TableCell>
                   <TableCell>
                     {movement.tipo === 'ENTRADA' && '+'}
@@ -281,8 +330,10 @@ export default function StockMovementsPage() {
                   id="cost"
                   type="number"
                   step="0.01"
+                  min={0}
                   value={cost}
-                  onChange={(e) => setCost(e.target.value)}
+                  onChange={handleCostChange}
+                  onBlur={handleCostBlur}
                   placeholder="0.00"
                 />
               </div>

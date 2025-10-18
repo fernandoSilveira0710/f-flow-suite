@@ -21,10 +21,15 @@ import {
   Search,
   Package2,
   LogOut,
+  RefreshCw,
+  HelpCircle,
+  User as UserIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { ENDPOINTS } from '@/lib/env';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function ErpLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -33,7 +38,8 @@ export default function ErpLayout() {
   const [requiredPlan, setRequiredPlan] = useState('');
   const location = useLocation();
   const { entitlements, currentPlan } = useEntitlements();
-  const { logout } = useAuth();
+  const { logout, licenseStatus, isHubOnline, hubLastCheck, checkHubConnectivity, syncLicenseWithHub, user, offlineDaysLeft, licenseCacheUpdatedAt } = useAuth();
+  const queryClient = useQueryClient();
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
@@ -41,6 +47,33 @@ export default function ErpLayout() {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
     document.documentElement.classList.toggle('dark');
+  };
+
+  const formatDate = (iso?: string) => {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+    } catch {
+      return iso;
+    }
+  };
+
+  const formatDateShort = (iso?: string) => {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    } catch {
+      return iso;
+    }
+  };
+
+  const handleRefreshHub = async () => {
+    const online = await checkHubConnectivity();
+    if (online) {
+      await syncLicenseWithHub();
+    }
   };
 
   const menuItems = [
@@ -80,22 +113,8 @@ export default function ErpLayout() {
       feature: 'Controle de Estoque',
       plan: 'Starter',
     },
-    {
-      label: 'Agenda',
-      icon: Calendar,
-      path: '/erp/agenda',
-      enabled: entitlements.agenda,
-      feature: 'Agenda',
-      plan: 'Pro',
-    },
-    {
-      label: 'Banho & Tosa',
-      icon: Scissors,
-      path: '/erp/banho-tosa',
-      enabled: entitlements.banho_tosa,
-      feature: 'Banho & Tosa',
-      plan: 'Pro',
-    },
+    // Banho & Tosa removido (não visível para nenhum plano)
+    // Agenda removida (não visível para nenhum plano)
     {
       label: 'Relatórios',
       icon: BarChart3,
@@ -126,7 +145,9 @@ export default function ErpLayout() {
         {/* Logo */}
         <div className="flex h-16 items-center justify-between px-4 border-b">
           {!collapsed && (
-            <Link to="/erp/dashboard" className="flex items-center gap-2 font-bold">
+            <Link to="/erp/dashboard" className="flex items-center gap-2 font-bold" onClick={() => {
+              queryClient.refetchQueries({ queryKey: ['dashboard', 'summary'], type: 'active' });
+            }}>
               <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
                 <Package2 className="h-5 w-5 text-sidebar-primary-foreground" />
               </div>
@@ -161,6 +182,10 @@ export default function ErpLayout() {
                   if (!item.enabled) {
                     e.preventDefault();
                     handleMenuClick(item);
+                    return;
+                  }
+                  if (item.path === '/erp/dashboard') {
+                    queryClient.refetchQueries({ queryKey: ['dashboard', 'summary'], type: 'active' });
                   }
                 }}
                 className={cn(
@@ -218,29 +243,82 @@ export default function ErpLayout() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="h-16 border-b bg-background flex items-center justify-between px-6">
-          <div className="flex items-center gap-4 flex-1 max-w-md">
-            <Search className="h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Buscar..."
-              className="border-0 shadow-none focus-visible:ring-0"
-            />
-          </div>
+        <header className="h-16 border-b bg-background flex items-center justify-end px-6">
+        <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 pr-2">
+              <span className={`inline-flex items-center gap-2 rounded-md px-3 py-1 border ${isHubOnline ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                <span className={`h-2 w-2 rounded-full ${isHubOnline ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                <span className="text-xs font-medium">{isHubOnline ? 'Hub Online' : 'Hub Offline'}</span>
+              </span>
 
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={toggleTheme}>
-              {theme === 'light' ? (
-                <Moon className="h-5 w-5" />
+              {isHubOnline ? (
+                <span className="text-xs text-muted-foreground">Atualizado: {formatDate(hubLastCheck || undefined)}</span>
               ) : (
-                <Sun className="h-5 w-5" />
+                <>
+                  {typeof offlineDaysLeft === 'number' && (
+                    <span className="text-xs text-muted-foreground">
+                      Restam {offlineDaysLeft} dias offline
+                    </span>
+                  )}
+                </>
               )}
-            </Button>
-            
-            <Button variant="ghost" size="icon" onClick={logout} title="Sair">
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
-        </header>
+
+              {licenseStatus?.expiresAt && (
+                <span className="text-xs text-muted-foreground">
+                  • Vencimento: {formatDateShort(licenseStatus.expiresAt)}
+                </span>
+              )}
+
+              <Button variant="ghost" size="icon" onClick={handleRefreshHub} title="Atualizar">
+                <RefreshCw className="h-5 w-5" />
+              </Button>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" title="Ajuda">
+                      <HelpCircle className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <div className="space-y-1 text-xs">
+                      {isHubOnline ? (
+                        <>
+                          <p><strong>Hub Online</strong>: sincronização ativa.</p>
+                          <p>Atualizado: {formatDate(hubLastCheck || undefined)}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p><strong>Hub Offline</strong>: sistema usa dados em cache.</p>
+                          <p>Última atualização: {formatDate(licenseCacheUpdatedAt || undefined)}</p>
+                          <p>Modo offline permite até 5 dias. {typeof offlineDaysLeft === 'number' ? ` Restam ${offlineDaysLeft} dias.` : ''}</p>
+                          <p>Conecte ao Hub para renovar sincronização e licença.</p>
+                        </>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            {user && (
+              <div className="hidden sm:flex items-center gap-2 px-2 text-xs text-muted-foreground">
+                <UserIcon className="h-4 w-4" />
+                <span>Usuário: {user.name || user.email}</span>
+              </div>
+            )}
+             <Button variant="ghost" size="icon" onClick={toggleTheme}>
+                               {theme === 'light' ? (
+                                 <Moon className="h-5 w-5" />
+                               ) : (
+                                 <Sun className="h-5 w-5" />
+                               )}
+                             </Button>
+                             
+                             <Button variant="ghost" size="icon" onClick={logout} title="Sair">
+                               <LogOut className="h-5 w-5" />
+                             </Button>
+                           </div>
+                         </header>
 
         {/* Page Content */}
         <main className="flex-1 p-6 overflow-auto">

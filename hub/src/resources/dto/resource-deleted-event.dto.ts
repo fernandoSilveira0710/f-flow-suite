@@ -2,8 +2,8 @@ import { IsString, IsUUID } from 'class-validator';
 
 export class ResourceDeletedEventDto {
   @IsUUID()
-  id: string;
+  id!: string;
 
   @IsUUID()
-  tenantId: string;
+  tenantId!: string;
 }

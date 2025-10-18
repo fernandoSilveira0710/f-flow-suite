@@ -79,14 +79,22 @@ jobs:
         id: should-merge
         if: steps.pr-info.outputs.pr_number
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
+          PR_AUTHOR: ${{ steps.pr-info.outputs.pr_author }}
+          PR_TITLE: ${{ steps.pr-info.outputs.pr_title }}
+          PR_DRAFT: ${{ steps.pr-info.outputs.pr_draft }}
+          PR_MERGEABLE: ${{ steps.pr-info.outputs.pr_mergeable }}
+          PR_STATE: ${{ steps.pr-info.outputs.pr_state }}
         with:
           script: |
-            const prNumber = ${{ steps.pr-info.outputs.pr_number }};
-            const prAuthor = '${{ steps.pr-info.outputs.pr_author }}';
-            const prTitle = '${{ steps.pr-info.outputs.pr_title }}';
-            const isDraft = ${{ steps.pr-info.outputs.pr_draft }};
-            const isMergeable = ${{ steps.pr-info.outputs.pr_mergeable }};
-            const prState = '${{ steps.pr-info.outputs.pr_state }}';
+            const prNumber = Number(process.env.PR_NUMBER);
+            const prAuthor = process.env.PR_AUTHOR || '';
+            const prTitle = process.env.PR_TITLE || '';
+            const isDraft = (process.env.PR_DRAFT || '').toString() === 'true';
+            const mergeableRaw = (process.env.PR_MERGEABLE || '').toString();
+            const isMergeable = mergeableRaw === 'true' ? true : (mergeableRaw === 'false' ? false : null);
+            const prState = process.env.PR_STATE || '';
 
             console.log(`PR #${prNumber}: ${prTitle} by ${prAuthor}`);
             console.log(`Draft: ${isDraft}, Mergeable: ${isMergeable}, State: ${prState}`);
@@ -113,12 +121,12 @@ jobs:
             const isDependabot = prAuthor === 'dependabot[bot]' || 
                                 prAuthor === 'renovate[bot]' ||
                                 prTitle.toLowerCase().includes('bump') ||
-                                prTitle.toLowerCase().includes('update') && prTitle.toLowerCase().includes('dependencies');
+                                (prTitle.toLowerCase().includes('update') && prTitle.toLowerCase().includes('dependencies'));
 
             // Check if it's a minor version update
-            const isMinorUpdate = prTitle.match(/bump .* from .* to .*/) && 
+            const isMinorUpdate = /bump .* from .* to .*/.test(prTitle) && 
                                 !prTitle.includes('major') &&
-                                !prTitle.match(/\d+\.0\.0/);
+                                !/\d+\.0\.0/.test(prTitle);
 
             const shouldAutoMerge = hasAutoMergeLabel || (isDependabot && isMinorUpdate);
 
@@ -133,9 +141,11 @@ jobs:
         id: pr-status
         if: steps.should-merge.outputs.should_merge == 'true'
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
         with:
           script: |
-            const prNumber = ${{ steps.pr-info.outputs.pr_number }};
+            const prNumber = Number(process.env.PR_NUMBER);
 
             // Get PR reviews
             const { data: reviews } = await github.rest.pulls.listReviews({
@@ -194,9 +204,13 @@ jobs:
           steps.should-merge.outputs.should_merge == 'true' && 
           steps.pr-status.outputs.can_merge == 'true'
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
+          PR_TITLE: ${{ steps.pr-info.outputs.pr_title }}
         with:
           script: |
-            const prNumber = ${{ steps.pr-info.outputs.pr_number }};
+            const prNumber = Number(process.env.PR_NUMBER);
+            const prTitle = process.env.PR_TITLE || '';
 
             try {
               // Enable auto-merge
@@ -204,7 +218,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: prNumber,
-                commit_title: `Auto-merge: ${{ steps.pr-info.outputs.pr_title }}`,
+                commit_title: `Auto-merge: ${prTitle}`,
                 commit_message: 'Automatically merged by GitHub Actions',
                 merge_method: 'squash'
               });

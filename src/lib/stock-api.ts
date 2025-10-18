@@ -1,5 +1,7 @@
 // Import mockAPI to use the same products data
 import { mockAPI, type Product as MockProduct } from './mock-data';
+import { API_URLS } from './env';
+import { apiClient, getTenantId } from './api-client';
 
 /**
  * Stock/Inventory API - Real API Integration
@@ -20,6 +22,7 @@ export interface StockMovement {
   documento?: string;
   data: string;
   usuario: string;
+  observacao?: string;
 }
 
 export interface CreateMovementDto {
@@ -59,20 +62,22 @@ export interface StockAdjustment {
   createdBy: string;
 }
 
-export interface CreateStockAdjustmentDto {
+// Ajuste de estoque (shape compatível com client-local)
+export interface AdjustInventoryItemDto {
   productId: string;
-  type: 'IN' | 'OUT' | 'ADJUSTMENT';
-  quantity: number;
+  delta: number; // positivo para entrada, negativo para saída
   reason: string;
   notes?: string;
+  document?: string;
+  unitCost?: number;
 }
 
-export interface BulkStockAdjustmentDto {
-  adjustments: CreateStockAdjustmentDto[];
+export interface BulkAdjustInventoryDto {
+  adjustments: AdjustInventoryItemDto[];
 }
 
 // API Configuration
-const API_BASE_URL = 'http://127.0.0.1:3001';
+const API_BASE_URL = API_URLS.CLIENT_LOCAL;
 
 // API Helper function
 const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
@@ -134,7 +139,7 @@ export const getStockByProductId = async (productId: string): Promise<StockItem 
   }
 };
 
-export const adjustStock = async (adjustment: CreateStockAdjustmentDto): Promise<StockAdjustment> => {
+export const adjustStock = async (adjustment: AdjustInventoryItemDto): Promise<StockAdjustment> => {
   try {
     const result = await apiCall<any>('/inventory/adjust', {
       method: 'POST',
@@ -149,8 +154,8 @@ export const adjustStock = async (adjustment: CreateStockAdjustmentDto): Promise
     return {
       id: adjustmentResult.id,
       productId: adjustmentResult.productId,
-      type: adjustmentResult.type,
-      quantity: adjustmentResult.quantity,
+      type: adjustmentResult.delta >= 0 ? 'IN' : 'OUT',
+      quantity: Math.abs(adjustmentResult.delta),
       reason: adjustmentResult.reason,
       notes: adjustmentResult.notes,
       createdAt: adjustmentResult.createdAt,
@@ -162,7 +167,7 @@ export const adjustStock = async (adjustment: CreateStockAdjustmentDto): Promise
   }
 };
 
-export const bulkAdjustStock = async (bulkAdjustment: BulkStockAdjustmentDto): Promise<StockAdjustment[]> => {
+export const bulkAdjustStock = async (bulkAdjustment: BulkAdjustInventoryDto): Promise<StockAdjustment[]> => {
   try {
     const result = await apiCall<any>('/inventory/adjust', {
       method: 'POST',
@@ -172,8 +177,8 @@ export const bulkAdjustStock = async (bulkAdjustment: BulkStockAdjustmentDto): P
     return result.adjustments.map((adj: any) => ({
       id: adj.id,
       productId: adj.productId,
-      type: adj.type,
-      quantity: adj.quantity,
+      type: adj.delta >= 0 ? 'IN' : 'OUT',
+      quantity: Math.abs(adj.delta),
       reason: adj.reason,
       notes: adj.notes,
       createdAt: adj.createdAt,
@@ -198,14 +203,61 @@ export const getLowStockItems = async (): Promise<StockItem[]> => {
   }
 };
 
-export const getStockMovements = async (productId?: string): Promise<StockAdjustment[]> => {
+export const getStockMovements = async (productId?: string): Promise<StockMovement[]> => {
   try {
-    // Note: This would require a new endpoint in client-local to get stock movements/adjustments history
-    // For now, we'll return an empty array as this functionality needs to be implemented in client-local
-    console.warn('Stock movements endpoint not yet implemented in client-local');
-    return [];
+    const tenantId = getTenantId();
+    const endpoint = productId
+      ? `/tenants/${tenantId}/inventory/adjustments/product/${productId}`
+      : `/tenants/${tenantId}/inventory/adjustments`;
+
+    type HubAdjustment = {
+      id: string;
+      tenantId: string;
+      productId: string;
+      productName: string;
+      productSku: string | null;
+      delta: number;
+      reason: string | null;
+      previousStock: number | null;
+      newStock: number | null;
+      adjustedAt: string;
+      createdAt: string;
+      updatedAt: string;
+    };
+
+    const adjustments = await apiClient<HubAdjustment[]>(endpoint, { method: 'GET' });
+
+    return adjustments.map((adj) => {
+      // Determine UI movement type
+      let tipo: 'ENTRADA' | 'SAIDA' | 'AJUSTE';
+      const reasonUpper = (adj.reason || '').toUpperCase();
+      if (['AJUSTE', 'ADJUSTMENT', 'INVENTARIO', 'INVENTORY'].includes(reasonUpper)) {
+        tipo = 'AJUSTE';
+      } else if (adj.delta > 0) {
+        tipo = 'ENTRADA';
+      } else {
+        tipo = 'SAIDA';
+      }
+
+      const quantidade = Math.abs(adj.delta || 0);
+
+      return {
+        id: adj.id,
+        tipo,
+        produtoId: adj.productId,
+        produtoNome: adj.productName,
+        sku: adj.productSku || '',
+        quantidade,
+        origem: tipo === 'ENTRADA' ? 'COMPRA' : tipo === 'SAIDA' ? 'VENDA' : 'INVENTARIO',
+        motivo: adj.reason || undefined,
+        documento: undefined,
+        observacao: adj.reason || undefined,
+        data: adj.adjustedAt,
+        usuario: 'Sistema',
+      } as StockMovement;
+    });
   } catch (error) {
-    console.error('Error fetching stock movements:', error);
+    console.error('Error fetching stock movements from Hub:', error);
     return [];
   }
 };

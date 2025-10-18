@@ -2,6 +2,7 @@
  * Schedule (Agenda) Mock API
  * Persistência via localStorage
  */
+import { API_URLS } from './env';
 
 // Types
 export interface Customer {
@@ -141,7 +142,7 @@ function uuid(): string {
 
 // API Helper
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const baseUrl = 'http://localhost:3001';
+  const baseUrl = API_URLS.CLIENT_LOCAL;
   const response = await fetch(`${baseUrl}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',

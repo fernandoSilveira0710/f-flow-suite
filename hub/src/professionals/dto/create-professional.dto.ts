@@ -2,10 +2,10 @@ import { IsString, IsEmail, IsOptional, IsBoolean, IsArray } from 'class-validat
 
 export class CreateProfessionalDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsOptional()
   @IsString()

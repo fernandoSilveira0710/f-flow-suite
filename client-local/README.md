@@ -7,7 +7,7 @@ O **F-Flow Client Local** é um executável multiplataforma que fornece uma API 
 - **Executável Multiplataforma**: Binários para Windows, macOS e Linux
 - **Banco SQLite Embutido**: Database local com migrations automáticas
 - **Paths por SO**: Resolve automaticamente diretórios de dados e logs conforme o sistema operacional
-- **Servidor NestJS**: API REST em `127.0.0.1:3001`
+- **Servidor NestJS**: API REST em `127.0.0.1:8081`
 - **Instalação como Serviço**: Pode ser instalado como serviço do sistema operacional
 - **Logs Estruturados**: Logs em JSON com rotação diária
 - **Configuração Flexível**: Suporte a variáveis de ambiente e configuração automática
@@ -87,7 +87,7 @@ Copie `.env.example` para `.env` e configure:
 ```bash
 # Servidor Local
 LOCAL_SERVER_ENABLED=true
-PORT=3001
+CLIENT_HTTP_PORT=8081
 
 # Paths Customizados (opcional)
 LOCAL_DATA_DIR=/custom/data/path
@@ -97,7 +97,7 @@ LOCAL_LOG_DIR=/custom/logs/path
 DATABASE_URL="file:./local.db"
 
 # Hub Integration
-HUB_BASE_URL=http://localhost:3000
+HUB_BASE_URL=http://localhost:3001
 
 # Licenciamento
 LICENSE_FILE=./license.jwt
@@ -218,7 +218,7 @@ Os logs são estruturados em formato JSON e incluem:
   "time": "2024-01-01T12:00:00.000Z",
   "service": "f-flow-client-local",
   "context": "Bootstrap",
-  "message": "Server started on http://127.0.0.1:3001",
+  "message": "Server started on http://127.0.0.1:8081",
   "requestId": "abc123"
 }
 ```
@@ -332,7 +332,7 @@ LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----..."  # Chave pública para va
 
 #### Cenário 2: Teste Direto da API
 ```bash
-curl -X POST http://127.0.0.1:3001/auth/offline-login \
+curl -X POST http://127.0.0.1:8081/auth/offline-login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "fernando@2fsolutions.com.br",
@@ -343,7 +343,7 @@ curl -X POST http://127.0.0.1:3001/auth/offline-login \
 #### Cenário 3: Verificação de Licença
 ```bash
 # Verificar status da licença local
-curl http://127.0.0.1:3001/health/license
+curl http://127.0.0.1:8081/health/license
 ```
 
 ### 📊 Monitoramento
@@ -373,7 +373,7 @@ curl http://127.0.0.1:3001/health/license
 ### Health Check
 
 ```bash
-GET http://127.0.0.1:3001/health
+GET http://127.0.0.1:8081/health
 ```
 
 Resposta:
@@ -388,7 +388,7 @@ Resposta:
 ### Health Dependencies
 
 ```bash
-GET http://127.0.0.1:3001/health/deps
+GET http://127.0.0.1:8081/health/deps
 ```
 
 Resposta:
@@ -408,7 +408,7 @@ Resposta:
 ### Dashboard
 
 ```bash
-GET http://127.0.0.1:3001/dashboard/summary
+GET http://127.0.0.1:8081/dashboard/summary
 ```
 
 Resposta:
@@ -441,15 +441,15 @@ Resposta:
 
 ```bash
 # Obter todas as feature flags
-GET http://127.0.0.1:3001/feature-flags
+GET http://127.0.0.1:8081/feature-flags
 
 # Verificar feature específica
-GET http://127.0.0.1:3001/feature-flags/pos
-GET http://127.0.0.1:3001/feature-flags/grooming
-GET http://127.0.0.1:3001/feature-flags/appointments
-GET http://127.0.0.1:3001/feature-flags/inventory
-GET http://127.0.0.1:3001/feature-flags/customers
-GET http://127.0.0.1:3001/feature-flags/reports
+GET http://127.0.0.1:8081/feature-flags/pos
+GET http://127.0.0.1:8081/feature-flags/grooming
+GET http://127.0.0.1:8081/feature-flags/appointments
+GET http://127.0.0.1:8081/feature-flags/inventory
+GET http://127.0.0.1:8081/feature-flags/customers
+GET http://127.0.0.1:8081/feature-flags/reports
 ```
 
 Resposta (todas as flags):
@@ -697,13 +697,13 @@ npm run start:dev
 ### 3. Testar Endpoints (PowerShell)
 ```powershell
 # Verificar status da instalação
-Invoke-RestMethod -Uri "http://localhost:3001/licensing/install/status" -Method GET
+Invoke-RestMethod -Uri "http://localhost:8081/licensing/install/status" -Method GET
 
 # Ativar licença (simulação)
-Invoke-RestMethod -Uri "http://localhost:3001/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "test-tenant", "deviceId": "test-device"}'
+Invoke-RestMethod -Uri "http://localhost:8081/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "test-tenant", "deviceId": "test-device"}'
 
 # Verificar licença atual
-Invoke-RestMethod -Uri "http://localhost:3001/licensing/license" -Method GET
+Invoke-RestMethod -Uri "http://localhost:8081/licensing/license" -Method GET
 ```
 
 ### 4. Modo Produção (com enforcement)

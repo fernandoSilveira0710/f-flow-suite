@@ -50,7 +50,7 @@ describe('AutoUpdateController', () => {
   describe('checkForUpdates', () => {
     it('should return update info when successful', async () => {
       const mockUpdateInfo: UpdateInfo = {
-        hasUpdate: true,
+        available: true,
         currentVersion: '1.0.0',
         latestVersion: '2.0.0',
         releaseNotes: 'New features',
@@ -73,7 +73,7 @@ describe('AutoUpdateController', () => {
       
       try {
         await controller.checkForUpdates();
-      } catch (e) {
+      } catch (e: any) {
         expect(e.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
         expect(e.getResponse()).toEqual({
           message: 'Failed to check for updates',
@@ -86,9 +86,9 @@ describe('AutoUpdateController', () => {
   describe('getUpdateProgress', () => {
     it('should return update progress', () => {
       const mockProgress: UpdateProgress = {
-        isUpdating: false,
+        stage: 'checking',
         progress: 0,
-        status: 'idle',
+        message: 'Idle',
       };
 
       mockAutoUpdateService.getUpdateProgress.mockReturnValue(mockProgress);

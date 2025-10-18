@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { getSales } from '@/lib/pos-api';
-import { mockAPI } from '@/lib/mock-data';
-import { startOfMonth, startOfDay, endOfDay, differenceInDays } from 'date-fns';
+import { getDashboardSummary } from '@/lib/dashboard-api';
+import { getProducts as getProductsApi } from '@/lib/products-api';
+import { getProducts as getMockProducts } from '@/lib/stock-api';
+import { startOfMonth, startOfDay, endOfDay, differenceInDays, isAfter, isBefore } from 'date-fns';
 
 interface DashboardSummary {
   todaySalesCount: number;
@@ -16,60 +18,69 @@ interface DashboardSummary {
 }
 
 async function fetchDashboardSummary(): Promise<DashboardSummary> {
-  // Simular delay de rede
-  await new Promise(resolve => setTimeout(resolve, 500));
-
   const now = new Date();
   const todayStart = startOfDay(now);
   const todayEnd = endOfDay(now);
   const monthStart = startOfMonth(now);
 
-  // Buscar vendas (await porque retorna Promise)
+  // Buscar resumo real do client-local
+  const summary = await getDashboardSummary();
+
+  // Buscar vendas reais para calcular a série do mês
   const allSales = await getSales();
+  const monthSales = allSales.filter((sale) => new Date(sale.createdAt) >= monthStart && sale.status !== 'refunded');
 
-  // Vendas de hoje
-  const todaySales = allSales.filter(sale => {
-    const saleDate = new Date(sale.data);
-    return saleDate >= todayStart && saleDate <= todayEnd;
-  });
-
-  // Vendas do mês
-  const monthSales = allSales.filter(sale => {
-    const saleDate = new Date(sale.data);
-    return saleDate >= monthStart;
-  });
-
-  // Produtos (usando mockAPI que retorna Product com propriedades em inglês)
-  const products = mockAPI.getProducts();
-  const activeProducts = products.filter(p => p.active !== false).length;
-  
-  // Estoque
-  const lowStockCount = products.filter(p => 
-    p.stock > 0 && p.stock < 10 // threshold mock de 10 unidades
-  ).length;
-  
-  const outOfStockCount = products.filter(p => p.stock === 0).length;
-  
-  // A vencer (mock - considerar produtos com validade próxima)
-  const expiringSoonCount = Math.floor(Math.random() * 5);
-
-  // Série de receita do mês (mock - dados diários)
+  // Série de receita do mês (agregada por dia)
   const daysInMonth = differenceInDays(now, monthStart) + 1;
-  const monthRevenueSeries = Array.from({ length: Math.min(daysInMonth, 30) }, (_, i) => ({
-    day: `${i + 1}`,
-    total: Math.random() * 5000 + 1000
-  }));
+  const totalsByDay = new Array<number>(Math.min(daysInMonth, 31)).fill(0);
+  for (const sale of monthSales) {
+    const saleDate = new Date(sale.createdAt);
+    if ((isAfter(saleDate, monthStart) || saleDate.getTime() === monthStart.getTime()) && isBefore(saleDate, endOfDay(now))) {
+      const dayIndex = saleDate.getDate() - 1;
+      if (dayIndex >= 0 && dayIndex < totalsByDay.length) {
+        totalsByDay[dayIndex] += sale.total || 0;
+      }
+    }
+  }
+  const monthRevenueSeries = totalsByDay.map((total, idx) => ({ day: `${idx + 1}`, total }));
+
+  // Calcular produtos a vencer (30 dias) a partir dos produtos.
+  // Usa API real e faz fallback para mock se necessário.
+  let expiringSoonCount = 0;
+  try {
+    const products = await getProductsApi();
+    const nowTs = now.getTime();
+    expiringSoonCount = products.filter((p) => {
+      if (!p.expiryDate) return false;
+      const d = new Date(p.expiryDate);
+      const diffDays = Math.ceil((d.getTime() - nowTs) / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays <= 30;
+    }).length;
+  } catch {
+    try {
+      const products = getMockProducts().map((p) => ({ expiryDate: p.validade }));
+      const nowTs = now.getTime();
+      expiringSoonCount = products.filter((p) => {
+        if (!p.expiryDate) return false;
+        const d = new Date(p.expiryDate);
+        const diffDays = Math.ceil((d.getTime() - nowTs) / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= 30;
+      }).length;
+    } catch {
+      expiringSoonCount = 0;
+    }
+  }
 
   return {
-    todaySalesCount: todaySales.length,
-    todaySalesTotal: todaySales.reduce((sum, sale) => sum + sale.total, 0),
-    monthSalesCount: monthSales.length,
-    monthSalesTotal: monthSales.reduce((sum, sale) => sum + sale.total, 0),
-    activeProducts,
-    lowStockCount,
-    outOfStockCount,
+    todaySalesCount: summary.vendas.quantidadeDia,
+    todaySalesTotal: Number(summary.vendas.totalDia || 0),
+    monthSalesCount: summary.vendas.quantidadeMes,
+    monthSalesTotal: Number(summary.vendas.totalMes || 0),
+    activeProducts: summary.estoque.produtosAtivos,
+    lowStockCount: summary.estoque.produtosBaixoEstoque,
+    outOfStockCount: summary.estoque.produtosSemEstoque,
     expiringSoonCount,
-    monthRevenueSeries
+    monthRevenueSeries,
   };
 }
 
@@ -78,6 +89,7 @@ export function useDashboard() {
     queryKey: ['dashboard', 'summary'],
     queryFn: fetchDashboardSummary,
     staleTime: 1000 * 60, // 1 minuto
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    refetchOnMount: 'always',
   });
 }

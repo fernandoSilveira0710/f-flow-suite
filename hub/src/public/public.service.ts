@@ -111,7 +111,7 @@ export class PublicService {
         tenantId: user.tenantId,
         tenant: {
           id: user.tenant.id,
-          name: user.tenant.name,
+          name: user.tenant.slug,
           slug: user.tenant.slug,
         },
       },

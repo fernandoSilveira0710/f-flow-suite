@@ -16,7 +16,7 @@ export class LicensesService {
     const { name, email, cpf, planKey, paymentId } = createLicenseDto;
 
     // Verificar se já existe um usuário com este email
-    let existingUser = await this.prisma.user.findFirst({
+    const existingUser = await this.prisma.user.findFirst({
       where: { email },
       include: { tenant: true }
     });
@@ -119,12 +119,44 @@ export class LicensesService {
   }
 
   async issue(tenantId: string, deviceId: string) {
-    const license = await this.prisma.license.findFirst({
+    // Ensure license exists; if not, create minimal tenant and license for activation
+    let license = await this.prisma.license.findFirst({
       where: { tenantId },
     });
 
     if (!license) {
-      throw new Error('LICENSE_NOT_FOUND');
+      // Ensure default org
+      let org = await this.prisma.org.findFirst({ where: { name: 'Default Organization' } });
+      if (!org) {
+        org = await this.prisma.org.create({ data: { name: 'Default Organization' } });
+      }
+
+      // Ensure tenant
+      let tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) {
+        tenant = await this.prisma.tenant.create({
+          data: {
+            id: tenantId,
+            orgId: org.id,
+            slug: tenantId,
+            planId: 'starter',
+          },
+        });
+      }
+
+      const expiryDate = new Date();
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+      license = await this.prisma.license.create({
+        data: {
+          tenantId: tenant.id,
+          planKey: 'starter',
+          status: 'active',
+          maxSeats: 1,
+          expiry: expiryDate,
+          graceDays: 7,
+        },
+      });
     }
 
     // Get active subscription with plan details
@@ -163,17 +195,16 @@ export class LicensesService {
     };
 
     const privateKeyPem = process.env.LICENSE_PRIVATE_KEY_PEM;
-    if (!privateKeyPem) {
-      throw new Error('MISSING_LICENSE_PRIVATE_KEY_PEM');
+    let privateKey;
+    if (privateKeyPem) {
+      privateKey = await jose.importPKCS8(privateKeyPem, 'RS256');
+    } else {
+      const fs = require('fs');
+      const path = require('path');
+      const keyPath = path.join(process.cwd(), 'license_private.pem');
+      const privateKeyFromFile = fs.readFileSync(keyPath, 'utf8');
+      privateKey = await jose.importPKCS8(privateKeyFromFile, 'RS256');
     }
-
-    // Ler a chave privada do arquivo diretamente
-    const fs = require('fs');
-    const path = require('path');
-    const keyPath = path.join(process.cwd(), 'license_private.pem');
-    const privateKeyFromFile = fs.readFileSync(keyPath, 'utf8');
-
-    const privateKey = await jose.importPKCS8(privateKeyFromFile, 'RS256');
 
     const token = await new jose.SignJWT(payload)
       .setProtectedHeader({ alg: 'RS256', kid: 'license-key' })

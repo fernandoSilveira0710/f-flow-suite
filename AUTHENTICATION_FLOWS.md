@@ -188,15 +188,15 @@ LICENSE_PUBLIC_KEY_PEM=-----BEGIN PUBLIC KEY-----...
 
 #### Client-Local (.env)
 ```bash
-HUB_API_URL=http://localhost:8081
+HUB_API_URL=http://localhost:3001
 LOCAL_SERVER_ENABLED=true
 OFFLINE_MODE_ENABLED=true
 ```
 
 #### Frontend (.env)
 ```bash
-VITE_HUB_API_URL=http://localhost:8081
-VITE_CLIENT_LOCAL_API_URL=http://localhost:3001
+VITE_HUB_API_URL=http://localhost:3001
+VITE_CLIENT_LOCAL_API_URL=http://localhost:8081
 ```
 
 ## 🧪 Testes
@@ -204,10 +204,10 @@ VITE_CLIENT_LOCAL_API_URL=http://localhost:3001
 ### Testar Modo Online
 ```bash
 # 1. Verificar Hub
-curl http://localhost:8081/health
+curl http://localhost:3001/health
 
 # 2. Testar login
-curl -X POST http://localhost:8081/public/login \
+curl -X POST http://localhost:3001/public/login \
   -H "Content-Type: application/json" \
   -d '{"email": "teste@exemplo.com", "password": "123456"}'
 ```
@@ -216,7 +216,7 @@ curl -X POST http://localhost:8081/public/login \
 ```bash
 # 1. Parar o Hub
 # 2. Testar login offline
-curl -X POST http://localhost:3001/auth/offline-login \
+curl -X POST http://localhost:8081/auth/offline-login \
   -H "Content-Type: application/json" \
   -d '{"email": "teste@exemplo.com", "password": "123456"}'
 ```

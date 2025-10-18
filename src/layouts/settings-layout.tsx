@@ -12,7 +12,7 @@ import {
   Calendar,
   Scissors,
   Package,
-  Bell,
+  
   Upload,
   Wallet,
   LucideIcon,
@@ -72,34 +72,18 @@ export default function SettingsLayout() {
       type: 'separator' as const,
       label: 'Módulos',
     },
-    {
-      label: 'PDV',
-      icon: ShoppingCart,
-      path: '/erp/settings/pos',
-      requiresPlan: null,
-    },
-    {
-      label: 'Agenda',
-      icon: Calendar,
-      path: '/erp/settings/schedule',
-      requiresPlan: null,
-    },
-    {
-      label: 'Banho & Tosa',
-      icon: Scissors,
-      path: '/erp/settings/grooming',
-      requiresPlan: 'pro',
-    },
-    {
-      label: 'Estoque',
-      icon: Package,
-      path: '/erp/settings/inventory',
-      requiresPlan: null,
-    },
+    // Agenda removida (não visível para nenhum plano)
+    // Banho & Tosa removido (não visível para nenhum plano)
     {
       label: 'Unidades de Medida',
       icon: Package,
       path: '/erp/settings/units',
+      requiresPlan: null,
+    },
+    {
+      label: 'Produtos',
+      icon: Package,
+      path: '/erp/settings/products',
       requiresPlan: null,
     },
     {
@@ -110,12 +94,6 @@ export default function SettingsLayout() {
       label: 'Métodos de Pagamento',
       icon: Wallet,
       path: '/erp/settings/payments',
-      requiresPlan: null,
-    },
-    {
-      label: 'Notificações',
-      icon: Bell,
-      path: '/erp/settings/notifications',
       requiresPlan: null,
     },
     {

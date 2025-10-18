@@ -1,6 +1,7 @@
 /**
  * Serviço para sincronização de planos entre Hub, client-local e cache local
  */
+import { API_URLS } from '@/lib/env';
 
 interface SyncPlanData {
   tenantId: string;
@@ -19,8 +20,9 @@ interface SyncResult {
 }
 
 export class PlanSyncService {
-  private static readonly HUB_BASE_URL = 'http://localhost:8081';
-  private static readonly CLIENT_LOCAL_BASE_URL = 'http://localhost:3001';
+  // Centralizar URLs via env.ts
+  private static readonly HUB_BASE_URL = API_URLS.HUB;
+  private static readonly CLIENT_LOCAL_BASE_URL = API_URLS.CLIENT_LOCAL;
 
   /**
    * Sincroniza planos em todas as fontes após login ou alteração de plano
@@ -282,16 +284,14 @@ export class PlanSyncService {
    */
   private static async updateHubPlan(tenantId: string, planKey: string): Promise<{ success: boolean; message: string }> {
     try {
-      // Este endpoint seria implementado no Hub para atualizar planos
-      const response = await fetch(`${this.HUB_BASE_URL}/plans/update`, {
-        method: 'POST',
+      const response = await fetch(`${this.HUB_BASE_URL}/licenses/${tenantId}/plan`, {
+        method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
         },
         body: JSON.stringify({
-          tenantId,
-          planKey,
-          updatedAt: new Date().toISOString()
+          planKey
         }),
         signal: AbortSignal.timeout(5000)
       });
@@ -305,7 +305,7 @@ export class PlanSyncService {
 
       return {
         success: true,
-        message: 'Hub atualizado com sucesso'
+        message: 'Plano atualizado no Hub com sucesso'
       };
 
     } catch (error) {

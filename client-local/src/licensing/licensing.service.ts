@@ -31,7 +31,7 @@ export class LicensingService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService
   ) {
-    this.hubBaseUrl = this.configService.get<string>('HUB_BASE_URL', process.env.HUB_API_URL || 'http://localhost:8081');
+    this.hubBaseUrl = this.configService.get<string>('HUB_BASE_URL', process.env.HUB_API_URL || 'http://localhost:3001');
     this.licensingEnforced = this.configService.get<string>('LICENSING_ENFORCED', 'false') === 'true';
     this.deviceId = this.configService.get<string>('DEVICE_ID', 'dev-device');
     
@@ -574,8 +574,26 @@ export class LicensingService implements OnModuleInit {
     cached?: boolean;
     planKey?: string;
     expiresAt?: Date;
+    lastChecked?: Date;
+    updatedAt?: Date;
+    graceDays?: number;
   }> {
     try {
+      // Em modo desenvolvimento, considerar licença válida para não bloquear fluxo offline
+      if (!this.licensingEnforced) {
+        const cachedLicense = await this.getLicenseFromCache(tenantId);
+        return {
+          valid: true,
+          status: 'development',
+          cached: !!cachedLicense,
+          planKey: cachedLicense?.planKey || 'starter',
+          expiresAt: cachedLicense?.expiresAt,
+          lastChecked: cachedLicense?.lastChecked,
+          updatedAt: cachedLicense?.updatedAt,
+          graceDays: cachedLicense?.graceDays,
+        };
+      }
+
       // Primeiro tenta obter do cache
       const cachedLicense = await this.getLicenseFromCache(tenantId);
 
@@ -586,18 +604,36 @@ export class LicensingService implements OnModuleInit {
           // Obtém novamente do cache após atualização
           const updatedCache = await this.getLicenseFromCache(tenantId);
           if (updatedCache) {
-            return this.evaluateLicenseStatus(updatedCache, false);
+            const evalResult = this.evaluateLicenseStatus(updatedCache, false);
+            return {
+              ...evalResult,
+              lastChecked: updatedCache.lastChecked,
+              updatedAt: updatedCache.updatedAt,
+              graceDays: updatedCache.graceDays,
+            };
           }
         } catch (error) {
           this.logger.warn(`Não foi possível atualizar cache do Hub, usando cache local se disponível`);
           // Se falhou ao atualizar do Hub, usa cache local se disponível
           if (cachedLicense) {
-            return this.evaluateLicenseStatus(cachedLicense, true);
+            const evalResult = this.evaluateLicenseStatus(cachedLicense, true);
+            return {
+              ...evalResult,
+              lastChecked: cachedLicense.lastChecked,
+              updatedAt: cachedLicense.updatedAt,
+              graceDays: cachedLicense.graceDays,
+            };
           }
         }
       } else {
         // Cache está atualizado, usa ele
-        return this.evaluateLicenseStatus(cachedLicense, true);
+        const evalResult = this.evaluateLicenseStatus(cachedLicense, true);
+        return {
+          ...evalResult,
+          lastChecked: cachedLicense.lastChecked,
+          updatedAt: cachedLicense.updatedAt,
+          graceDays: cachedLicense.graceDays,
+        };
       }
 
       // Se chegou aqui, não há cache e não conseguiu conectar ao Hub

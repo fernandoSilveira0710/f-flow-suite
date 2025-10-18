@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   ValidationPipe,
+  Query,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto, UpdateCategoryDto, CategoryResponseDto } from './dto';
@@ -26,8 +27,8 @@ export class CategoriesController {
   }
 
   @Get()
-  async findAll(): Promise<CategoryResponseDto[]> {
-    return this.categoriesService.findAll();
+  async findAll(@Query('active') active?: string): Promise<CategoryResponseDto[]> {
+    return this.categoriesService.findAll(active);
   }
 
   @Get(':id')

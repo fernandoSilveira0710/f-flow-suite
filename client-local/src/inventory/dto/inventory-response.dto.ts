@@ -11,6 +11,8 @@ export class InventoryAdjustmentResponseDto {
   delta: number;
   reason: string;
   notes?: string;
+  document?: string;
+  unitCost?: number;
   createdAt: Date;
 }
 

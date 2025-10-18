@@ -5,7 +5,7 @@ import axios from 'axios';
 @Injectable()
 export class PlansService {
   private readonly logger = new Logger(PlansService.name);
-  private readonly hubBaseUrl = process.env.HUB_BASE_URL || process.env.HUB_API_URL || 'http://localhost:8081';
+  private readonly hubBaseUrl = process.env.HUB_BASE_URL || process.env.HUB_API_URL || 'http://localhost:3001';
 
   constructor(private readonly licensingService: LicensingService) {}
 

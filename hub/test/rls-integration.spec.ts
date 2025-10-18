@@ -2,19 +2,21 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { PrismaClient } from '@prisma/client';
 
 describe('RLS Integration Tests', () => {
   let app: INestApplication;
-  let prisma: PrismaClient;
 
   beforeAll(async () => {
+    // Ensure environment matches RLS expectations for these tests
+    process.env.RLS_ENFORCED = 'true';
+    process.env.OIDC_REQUIRED = 'false';
+    process.env.LICENSING_ENFORCED = 'false';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaClient>(PrismaClient);
     await app.init();
   });
 

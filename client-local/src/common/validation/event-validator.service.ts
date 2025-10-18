@@ -32,6 +32,10 @@ import {
   resourceDeletedEventSchema,
   groomingTicketCreatedV1Schema,
   groomingTicketUpdatedV1Schema,
+  PaymentMethodUpsertedEventPayload,
+  PaymentMethodDeletedEventPayload,
+  paymentMethodUpsertedEventSchema,
+  paymentMethodDeletedEventSchema,
 } from './schemas';
 
 export interface ValidationResult {
@@ -134,6 +138,16 @@ export class EventValidatorService {
       this.ajv.compile(groomingTicketUpdatedV1Schema)
     );
 
+    // PaymentMethod event schemas
+    this.validators.set(
+      'paymentmethod.upserted.v1',
+      this.ajv.compile(paymentMethodUpsertedEventSchema)
+    );
+    this.validators.set(
+      'paymentmethod.deleted.v1',
+      this.ajv.compile(paymentMethodDeletedEventSchema)
+    );
+
     this.logger.log('Event validation schemas initialized');
   }
 
@@ -192,5 +206,13 @@ export class EventValidatorService {
 
   validatePetDeletedEvent(payload: unknown): payload is PetDeletedEventPayload {
     return this.validateEvent('pet.deleted.v1', payload).valid;
+  }
+
+  validatePaymentMethodUpsertedEvent(payload: unknown): payload is PaymentMethodUpsertedEventPayload {
+    return this.validateEvent('paymentmethod.upserted.v1', payload).valid;
+  }
+
+  validatePaymentMethodDeletedEvent(payload: unknown): payload is PaymentMethodDeletedEventPayload {
+    return this.validateEvent('paymentmethod.deleted.v1', payload).valid;
   }
 }

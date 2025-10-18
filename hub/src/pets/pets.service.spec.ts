@@ -1,35 +1,43 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PetsService } from './pets.service';
-import { PrismaClient } from '@prisma/client';
 import { NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
+import { EventsService } from '../common/events.service';
 
 describe('PetsService', () => {
   let service: PetsService;
-  let prismaClient: PrismaClient;
+  let prisma: PrismaService;
+  let events: EventsService;
 
-  const mockPrismaClient = {
-    $executeRaw: jest.fn(),
+  const mockPrismaService = {
     pet: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
       upsert: jest.fn(),
       update: jest.fn(),
+      create: jest.fn(),
     },
-  };
+    customer: {
+      findFirst: jest.fn(),
+    },
+  } as unknown as PrismaService;
+
+  const mockEventsService = {
+    createEvent: jest.fn(),
+  } as unknown as EventsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PetsService,
-        {
-          provide: PrismaClient,
-          useValue: mockPrismaClient,
-        },
+        { provide: PrismaService, useValue: mockPrismaService },
+        { provide: EventsService, useValue: mockEventsService },
       ],
     }).compile();
 
     service = module.get<PetsService>(PetsService);
-    prismaClient = module.get<PrismaClient>(PrismaClient);
+    prisma = module.get<PrismaService>(PrismaService);
+    events = module.get<EventsService>(EventsService);
   });
 
   afterEach(() => {
@@ -62,15 +70,11 @@ describe('PetsService', () => {
         },
       ];
 
-      mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
-      mockPrismaClient.pet.findMany.mockResolvedValue(mockPets);
+      (prisma.pet.findMany as any).mockResolvedValue(mockPets);
 
       const result = await service.findAllByTenant(tenantId);
 
-      expect(mockPrismaClient.$executeRaw).toHaveBeenCalledWith(
-        expect.anything()
-      );
-      expect(mockPrismaClient.pet.findMany).toHaveBeenCalledWith({
+      expect(prisma.pet.findMany).toHaveBeenCalledWith({
         where: { 
           tenantId,
           active: true
@@ -118,15 +122,11 @@ describe('PetsService', () => {
         },
       ];
 
-      mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
-      mockPrismaClient.pet.findMany.mockResolvedValue(mockPets);
+      (prisma.pet.findMany as any).mockResolvedValue(mockPets);
 
       const result = await service.findByTutor(tenantId, tutorId);
 
-      expect(mockPrismaClient.$executeRaw).toHaveBeenCalledWith(
-        expect.anything()
-      );
-      expect(mockPrismaClient.pet.findMany).toHaveBeenCalledWith({
+      expect(prisma.pet.findMany).toHaveBeenCalledWith({
         where: { 
           tenantId,
           tutorId,
@@ -173,15 +173,11 @@ describe('PetsService', () => {
         },
       };
 
-      mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
-      mockPrismaClient.pet.findFirst.mockResolvedValue(mockPet);
+      (prisma.pet.findFirst as any).mockResolvedValue(mockPet);
 
       const result = await service.findOneByTenant(tenantId, petId);
 
-      expect(mockPrismaClient.$executeRaw).toHaveBeenCalledWith(
-        expect.anything()
-      );
-      expect(mockPrismaClient.pet.findFirst).toHaveBeenCalledWith({
+      expect(prisma.pet.findFirst).toHaveBeenCalledWith({
         where: { 
           id: petId,
           tenantId,
@@ -205,8 +201,7 @@ describe('PetsService', () => {
       const tenantId = 'tenant-1';
       const petId = 'non-existent';
 
-      mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
-      mockPrismaClient.pet.findFirst.mockResolvedValue(null);
+      (prisma.pet.findFirst as any).mockResolvedValue(null);
 
       await expect(service.findOneByTenant(tenantId, petId)).rejects.toThrow(
         NotFoundException
@@ -242,15 +237,11 @@ describe('PetsService', () => {
         },
       };
 
-      mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
-      mockPrismaClient.pet.upsert.mockResolvedValue(mockPet);
+      (prisma.pet.upsert as any).mockResolvedValue(mockPet);
 
       const result = await service.upsertFromEvent(tenantId, eventPayload);
 
-      expect(mockPrismaClient.$executeRaw).toHaveBeenCalledWith(
-        expect.anything()
-      );
-      expect(mockPrismaClient.pet.upsert).toHaveBeenCalledWith({
+      expect(prisma.pet.upsert).toHaveBeenCalledWith({
         where: { 
           id: eventPayload.id,
         },
@@ -299,15 +290,11 @@ describe('PetsService', () => {
       const tenantId = 'tenant-1';
       const petId = 'pet-1';
 
-      mockPrismaClient.$executeRaw.mockResolvedValue(undefined);
-      mockPrismaClient.pet.update.mockResolvedValue({});
+      (prisma.pet.update as any).mockResolvedValue({});
 
       await service.deleteFromEvent(tenantId, petId);
 
-      expect(mockPrismaClient.$executeRaw).toHaveBeenCalledWith(
-        expect.anything()
-      );
-      expect(mockPrismaClient.pet.update).toHaveBeenCalledWith({
+      expect(prisma.pet.update).toHaveBeenCalledWith({
         where: { 
           id: petId,
           tenantId 

@@ -58,10 +58,12 @@ export class RolesService {
   }
 
   async create(tenantId: string, createRoleDto: CreateRoleDto) {
+    const { permissions, ...rest } = createRoleDto;
     const role = await this.prisma.role.create({
       data: {
-        ...createRoleDto,
+        ...rest,
         tenantId,
+        permissions: JSON.stringify(permissions ?? []),
       },
     });
 
@@ -77,9 +79,15 @@ export class RolesService {
   async update(tenantId: string, id: string, updateRoleDto: UpdateRoleDto) {
     const existingRole = await this.findOne(tenantId, id);
 
+    const { permissions, ...rest } = updateRoleDto as Partial<CreateRoleDto>;
+    const data: any = { ...rest };
+    if (permissions !== undefined) {
+      data.permissions = JSON.stringify(permissions);
+    }
+
     const role = await this.prisma.role.update({
       where: { id: existingRole.id },
-      data: updateRoleDto,
+      data,
     });
 
     // Generate event for synchronization

@@ -28,7 +28,7 @@ O F-Flow Suite utiliza uma arquitetura híbrida com dois componentes principais:
 ```
 🔐 INÍCIO DO LOGIN - Email: fernando@2fsolutions.com.br
 📡 ETAPA 1: Tentando autenticação no Hub...
-🌐 Fazendo requisição para Hub: http://localhost:8081/public/login
+🌐 Fazendo requisição para Hub: http://localhost:3001/public/login
 📡 Resposta do Hub - Status: 201 OK: true
 ✅ Hub disponível e resposta OK - processando...
 ```
@@ -60,7 +60,7 @@ O F-Flow Suite utiliza uma arquitetura híbrida com dois componentes principais:
 **Logs correspondentes:**
 ```
 🎫 Verificando licenças no Hub...
-🎫 URL de validação de licença: http://localhost:8081/licenses/validate?tenantId=...
+🎫 URL de validação de licença: http://localhost:3001/licenses/validate?tenantId=...
 🎫 Resposta da licença - Status: 200 OK: true
 🎫 Dados da licença: {valid: false, licensed: false, planKey: 'pro', expiresAt: '...'}
 ```
@@ -223,7 +223,7 @@ JWT_SECRET=...
 #### **Client-Local (.env)**
 ```env
 # Conexão com Hub
-HUB_URL=http://localhost:8081
+HUB_URL=http://localhost:3001
 
 # Licenciamento local
 LICENSING_ENFORCED=false  # Para desenvolvimento
@@ -256,8 +256,8 @@ DATABASE_URL=...
 ## 📊 Monitoramento
 
 ### **Endpoints de Health Check:**
-- **Hub**: `http://localhost:8081/health`
-- **Client-Local**: `http://localhost:3000/health`
+- **Hub**: `http://localhost:3001/health`
+- **Client-Local**: `http://localhost:8081/health`
 - **Frontend**: `http://localhost:8080`
 
 ### **Logs Importantes:**

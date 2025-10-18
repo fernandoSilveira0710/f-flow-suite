@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Package2, CreditCard, Check, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useHubPlans, HubPlan } from '@/hooks/use-hub-plans';
+import { ENDPOINTS } from '@/lib/env';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function Cadastro() {
@@ -51,7 +52,7 @@ export default function Cadastro() {
 
     try {
       // Chamar endpoint do HUB para cadastro
-      const response = await fetch('http://localhost:8081/public/register', {
+      const response = await fetch(ENDPOINTS.HUB_REGISTER, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

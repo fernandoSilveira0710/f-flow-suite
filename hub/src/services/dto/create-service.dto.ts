@@ -2,7 +2,7 @@ import { IsString, IsNumber, IsOptional, IsBoolean, Min } from 'class-validator'
 
 export class CreateServiceDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsOptional()
   @IsString()
@@ -10,7 +10,7 @@ export class CreateServiceDto {
 
   @IsNumber()
   @Min(0)
-  price: number;
+  price!: number;
 
   @IsOptional()
   @IsNumber()

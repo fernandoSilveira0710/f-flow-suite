@@ -1,17 +1,29 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EventValidatorService } from '../common/validation';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { SaleResponseDto, SaleItemResponseDto } from './dto/sale-response.dto';
 import { v4 as uuidv4 } from 'uuid';
+import { InventoryService } from '../inventory/inventory.service';
 
 @Injectable()
 export class SalesService {
   private readonly logger = new Logger(SalesService.name);
 
+  // Safe ISO conversion for Date/string/unknown values
+  private toIsoSafe(val: any): string {
+    try {
+      const d = val instanceof Date ? val : new Date(val);
+      return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+    } catch {
+      return new Date().toISOString();
+    }
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventValidator: EventValidatorService,
+    private readonly inventoryService: InventoryService,
   ) {}
 
   async createSale(createSaleDto: CreateSaleDto): Promise<SaleResponseDto> {
@@ -66,7 +78,7 @@ export class SalesService {
           paymentMethod: sale.paymentMethod,
           total: parseFloat(sale.total.toString()),
           customerId: sale.customerId,
-          createdAt: sale.createdAt.toISOString(),
+          createdAt: this.toIsoSafe(sale.createdAt),
           items: saleItems.map((item: any) => ({
             id: item.id,
             productId: item.productId,
@@ -101,24 +113,53 @@ export class SalesService {
         };
       });
 
-      // Return formatted response
+      // After committing the sale transaction, adjust inventory (decrease)
+      try {
+        const adjustments = result.items.map((item: any) => ({
+          productId: item.productId,
+          delta: -Number(item.qty),
+          reason: 'sale.pdv',
+          notes: `PDV sale ${result.sale.code}`,
+          document: result.sale.code,
+        }));
+
+        if (adjustments.length > 0) {
+          await this.inventoryService.adjustInventory({ adjustments });
+        }
+      } catch (invErr) {
+        this.logger.error('Failed to adjust inventory after sale creation', invErr as any);
+        // Propagate to let caller know inventory did not update
+        // Note: sale is already created at this point
+        throw invErr;
+      }
+
+      // Fetch with product relation to enrich items with productName
+      const saleWithItems = await this.prisma.sale.findUnique({
+        where: { id: result.sale.id },
+        include: { items: { include: { product: { select: { name: true } } } } },
+      });
+      if (!saleWithItems) {
+        throw new NotFoundException(`Sale with ID ${result.sale.id} not found after creation`);
+      }
+
       return {
-        id: result.sale.id,
-        code: result.sale.code,
-        operator: result.sale.operator,
-        paymentMethod: result.sale.paymentMethod,
-        status: result.sale.status,
-        total: Number(result.sale.total),
-        customerId: result.sale.customerId || undefined,
-        createdAt: result.sale.createdAt.toISOString(),
-        updatedAt: result.sale.updatedAt.toISOString(),
-        items: result.items.map((item: any) => ({
+        id: saleWithItems.id,
+        code: saleWithItems.code,
+        operator: saleWithItems.operator,
+        paymentMethod: saleWithItems.paymentMethod,
+        status: saleWithItems.status,
+        total: Number(saleWithItems.total),
+        customerId: saleWithItems.customerId || undefined,
+        createdAt: this.toIsoSafe(saleWithItems.createdAt),
+        updatedAt: this.toIsoSafe(saleWithItems.updatedAt),
+        items: (saleWithItems.items || []).map((item: any) => ({
           id: item.id,
           productId: item.productId,
+          productName: item.product?.name,
           qty: item.qty,
           unitPrice: Number(item.unitPrice),
           subtotal: Number(item.subtotal),
-          createdAt: item.createdAt.toISOString(),
+          createdAt: this.toIsoSafe(item.createdAt),
         })),
       };
     } catch (error) {
@@ -132,7 +173,7 @@ export class SalesService {
 
     const sales = await this.prisma.sale.findMany({
       include: {
-        items: true,
+        items: { include: { product: { select: { name: true } } } },
       },
       orderBy: {
         createdAt: 'desc',
@@ -147,15 +188,16 @@ export class SalesService {
       status: sale.status,
       total: Number(sale.total),
       customerId: sale.customerId || undefined,
-      createdAt: sale.createdAt.toISOString(),
-      updatedAt: sale.updatedAt.toISOString(),
-      items: sale.items.map((item: any) => ({
+      createdAt: this.toIsoSafe(sale.createdAt),
+      updatedAt: this.toIsoSafe(sale.updatedAt),
+      items: (sale.items || []).map((item: any) => ({
         id: item.id,
         productId: item.productId,
+        productName: item.product?.name,
         qty: item.qty,
         unitPrice: Number(item.unitPrice),
         subtotal: Number(item.subtotal),
-        createdAt: item.createdAt.toISOString(),
+        createdAt: this.toIsoSafe(item.createdAt),
       })),
     }));
   }
@@ -166,7 +208,7 @@ export class SalesService {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
       include: {
-        items: true,
+        items: { include: { product: { select: { name: true } } } },
       },
     });
 
@@ -182,15 +224,80 @@ export class SalesService {
       status: sale.status,
       total: Number(sale.total),
       customerId: sale.customerId || undefined,
-      createdAt: sale.createdAt.toISOString(),
-      updatedAt: sale.updatedAt.toISOString(),
-      items: sale.items.map((item: any) => ({
+      createdAt: this.toIsoSafe(sale.createdAt),
+      updatedAt: this.toIsoSafe(sale.updatedAt),
+      items: (sale.items || []).map((item: any) => ({
         id: item.id,
         productId: item.productId,
+        productName: item.product?.name,
         qty: item.qty,
         unitPrice: Number(item.unitPrice),
         subtotal: Number(item.subtotal),
-        createdAt: item.createdAt.toISOString(),
+        createdAt: this.toIsoSafe(item.createdAt),
+      })),
+    };
+  }
+
+  async refundSale(id: string): Promise<SaleResponseDto> {
+    this.logger.log(`Refunding sale: ${id}`);
+
+    // Fetch sale with items
+    const sale = await this.prisma.sale.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+
+    if (!sale) {
+      throw new NotFoundException(`Sale with ID ${id} not found`);
+    }
+
+    if (sale.status === 'refunded') {
+      throw new BadRequestException('Sale already refunded');
+    }
+
+    // Update sale status first
+    const updated = await this.prisma.sale.update({
+      where: { id: sale.id },
+      data: { status: 'refunded' },
+      include: { items: { include: { product: { select: { name: true } } } } },
+    });
+
+    // Adjust inventory (increase quantities back)
+    try {
+      const adjustments = (updated.items || []).map((item: any) => ({
+        productId: item.productId,
+        delta: Number(item.qty),
+        reason: 'sale.refund',
+        notes: `Refund of sale ${updated.code}`,
+        document: updated.code,
+      }));
+      if (adjustments.length > 0) {
+        await this.inventoryService.adjustInventory({ adjustments });
+      }
+    } catch (invErr) {
+      this.logger.error('Failed to adjust inventory for refund', invErr as any);
+      // We choose to propagate error so caller is aware; sale status is already updated
+      throw invErr;
+    }
+
+    return {
+      id: updated.id,
+      code: updated.code,
+      operator: updated.operator,
+      paymentMethod: updated.paymentMethod,
+      status: updated.status,
+      total: Number(updated.total),
+      customerId: updated.customerId || undefined,
+      createdAt: this.toIsoSafe(updated.createdAt),
+      updatedAt: this.toIsoSafe(updated.updatedAt),
+      items: (updated.items || []).map((item: any) => ({
+        id: item.id,
+        productId: item.productId,
+        productName: item.product?.name,
+        qty: item.qty,
+        unitPrice: Number(item.unitPrice),
+        subtotal: Number(item.subtotal),
+        createdAt: this.toIsoSafe(item.createdAt),
       })),
     };
   }
