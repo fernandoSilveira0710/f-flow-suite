@@ -72,20 +72,8 @@ export default function SettingsLayout() {
       type: 'separator' as const,
       label: 'Módulos',
     },
-    {
-      label: 'PDV',
-      icon: ShoppingCart,
-      path: '/erp/settings/pos',
-      requiresPlan: null,
-    },
     // Agenda removida (não visível para nenhum plano)
     // Banho & Tosa removido (não visível para nenhum plano)
-    {
-      label: 'Estoque',
-      icon: Package,
-      path: '/erp/settings/inventory',
-      requiresPlan: null,
-    },
     {
       label: 'Unidades de Medida',
       icon: Package,
