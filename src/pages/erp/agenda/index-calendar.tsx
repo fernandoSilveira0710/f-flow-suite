@@ -14,23 +14,21 @@ import { cn } from '@/lib/utils';
 type ViewMode = 'day' | 'week' | 'month';
 
 const statusColors = {
-  AGENDADO: 'bg-blue-500',
-  CONFIRMADO: 'bg-green-500',
-  CHECKIN: 'bg-yellow-500',
-  ANDAMENTO: 'bg-orange-500',
-  CONCLUIDO: 'bg-gray-500',
-  CANCELADO: 'bg-red-500',
-  FALTA: 'bg-purple-500',
+  SCHEDULED: 'bg-blue-500',
+  CONFIRMED: 'bg-green-500',
+  CHECKED_IN: 'bg-yellow-500',
+  COMPLETED: 'bg-gray-500',
+  CANCELLED: 'bg-red-500',
+  NO_SHOW: 'bg-purple-500',
 };
 
 const statusLabels = {
-  AGENDADO: 'Agendado',
-  CONFIRMADO: 'Confirmado',
-  CHECKIN: 'Check-in',
-  ANDAMENTO: 'Em Andamento',
-  CONCLUIDO: 'Concluído',
-  CANCELADO: 'Cancelado',
-  FALTA: 'Falta',
+  SCHEDULED: 'Agendado',
+  CONFIRMED: 'Confirmado',
+  CHECKED_IN: 'Check-in',
+  COMPLETED: 'Concluído',
+  CANCELLED: 'Cancelado',
+  NO_SHOW: 'Falta',
 };
 
 export default function AgendaIndex() {
@@ -72,10 +70,10 @@ export default function AgendaIndex() {
   const filteredAppointments = useMemo(() => {
     return appointments.filter((apt) => {
       const matchSearch = !search || 
-        apt.customerNome.toLowerCase().includes(search.toLowerCase()) ||
-        apt.serviceNome.toLowerCase().includes(search.toLowerCase());
+        (apt.customerName?.toLowerCase().includes(search.toLowerCase())) ||
+        (apt.serviceName?.toLowerCase().includes(search.toLowerCase()));
       
-      const matchStaff = selectedStaff === 'all' || apt.staffIds.includes(selectedStaff);
+      const matchStaff = selectedStaff === 'all' || apt.professionalId === selectedStaff;
       const matchService = selectedService === 'all' || apt.serviceId === selectedService;
       const matchStatus = selectedStatus === 'all' || apt.status === selectedStatus;
 
@@ -125,10 +123,10 @@ export default function AgendaIndex() {
                     <span className="text-muted-foreground">-</span>
                     <span className="font-medium">{apt.endTime ? format(parseISO(apt.endTime), 'HH:mm', { locale: ptBR }) : 'N/A'}</span>
                   </div>
-                  <div className="font-semibold">{apt.customerNome}</div>
-                  <div className="text-sm text-muted-foreground">{apt.serviceNome}</div>
-                  {apt.customerContato && (
-                    <div className="text-xs text-muted-foreground mt-1">{apt.customerContato}</div>
+                  <div className="font-semibold">{apt.customerName}</div>
+                  <div className="text-sm text-muted-foreground">{apt.serviceName}</div>
+                  {apt.customerContact && (
+                    <div className="text-xs text-muted-foreground mt-1">{apt.customerContact}</div>
                   )}
                 </div>
                 <Badge variant="secondary">{statusLabels[apt.status]}</Badge>
@@ -171,8 +169,8 @@ export default function AgendaIndex() {
                       <span className={cn('w-1.5 h-1.5 rounded-full', statusColors[apt.status])} />
                       <span className="font-medium">{apt.startTime ? format(parseISO(apt.startTime), 'HH:mm') : 'N/A'}</span>
                     </div>
-                    <div className="font-medium truncate">{apt.customerNome}</div>
-                    <div className="text-muted-foreground truncate">{apt.serviceNome}</div>
+                    <div className="font-medium truncate">{apt.customerName}</div>
+                    <div className="text-muted-foreground truncate">{apt.serviceName}</div>
                   </div>
                 ))}
               </div>
@@ -229,7 +227,7 @@ export default function AgendaIndex() {
                     onClick={() => navigate(`/erp/agenda/${apt.id}`)}
                   >
                     <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1', statusColors[apt.status])} />
-                    {apt.customerNome}
+                    {apt.customerName}
                   </div>
                 ))}
                 {dayAppointments.length > 3 && (
