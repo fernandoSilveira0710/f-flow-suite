@@ -22,20 +22,20 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const statusColors = {
-  AGENDADO: 'bg-blue-500',
-  CONFIRMADO: 'bg-green-500',
-  CHECKIN: 'bg-purple-500',
-  CONCLUIDO: 'bg-gray-500',
-  CANCELADO: 'bg-red-500',
+  SCHEDULED: 'bg-blue-500',
+  CONFIRMED: 'bg-green-500',
+  CHECKED_IN: 'bg-purple-500',
+  COMPLETED: 'bg-gray-500',
+  CANCELLED: 'bg-red-500',
   NO_SHOW: 'bg-orange-500',
 };
 
 const statusLabels = {
-  AGENDADO: 'Agendado',
-  CONFIRMADO: 'Confirmado',
-  CHECKIN: 'Check-in Realizado',
-  CONCLUIDO: 'Concluído',
-  CANCELADO: 'Cancelado',
+  SCHEDULED: 'Agendado',
+  CONFIRMED: 'Confirmado',
+  CHECKED_IN: 'Check-in Realizado',
+  COMPLETED: 'Concluído',
+  CANCELLED: 'Cancelado',
   NO_SHOW: 'Não Compareceu',
 };
 
@@ -75,8 +75,8 @@ export default function AgendamentoDetalhe() {
   const handleCheckin = async () => {
     if (!id) return;
     try {
-      await updateAppointment(id, { status: 'CHECKIN' });
-      setAppointment({ ...appointment, status: 'CHECKIN' });
+      await updateAppointment(id, { status: 'CHECKED_IN' });
+      setAppointment({ ...appointment, status: 'CHECKED_IN' });
       toast.success('Check-in realizado');
     } catch (error) {
       console.error('Erro ao realizar check-in:', error);
@@ -87,7 +87,7 @@ export default function AgendamentoDetalhe() {
   const handleComplete = async () => {
     if (!id) return;
     try {
-      await updateAppointment(id, { status: 'CONCLUIDO' });
+      await updateAppointment(id, { status: 'COMPLETED' });
       toast.success('Agendamento concluído');
       navigate('/erp/pdv');
     } catch (error) {
@@ -99,7 +99,7 @@ export default function AgendamentoDetalhe() {
   const handleCancel = async () => {
     if (!id) return;
     try {
-      await updateAppointment(id, { status: 'CANCELADO' });
+      await updateAppointment(id, { status: 'CANCELLED' });
       toast.success('Agendamento cancelado');
       navigate('/erp/agenda');
     } catch (error) {
@@ -124,9 +124,9 @@ export default function AgendamentoDetalhe() {
   const allStaff = getStaff();
   const appointmentStaff = allStaff.filter(s => s.id === appointment.professionalId);
 
-  const canCheckin = appointment.status === 'AGENDADO' || appointment.status === 'CONFIRMADO';
-  const canComplete = appointment.status === 'CHECKIN';
-  const canCancel = appointment.status !== 'CONCLUIDO' && appointment.status !== 'CANCELADO';
+  const canCheckin = appointment.status === 'SCHEDULED' || appointment.status === 'CONFIRMED';
+  const canComplete = appointment.status === 'CHECKED_IN';
+  const canCancel = appointment.status !== 'COMPLETED' && appointment.status !== 'CANCELLED';
 
   return (
     <div className="space-y-6">
@@ -276,7 +276,7 @@ export default function AgendamentoDetalhe() {
               </>
             )}
 
-            {appointment.notas && (
+            {appointment.notes && (
               <>
                 <Separator />
                 <div className="space-y-4">
@@ -285,7 +285,7 @@ export default function AgendamentoDetalhe() {
                     <h3 className="font-semibold">Observações</h3>
                   </div>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {appointment.notas}
+                    {appointment.notes}
                   </p>
                 </div>
               </>
