@@ -119,21 +119,16 @@ export default function NovoAgendamento() {
 
       const newAppointment = {
         customerId,
-        customerNome: customer.nome,
-        customerContato: customer.telefone || customer.email,
+        customerName: customer.nome,
+        customerContact: customer.telefone || customer.email,
         petId: petId || undefined,
         serviceId,
-        serviceNome: service.nome,
-        staffIds,
-        startISO: startDate.toISOString(),
-        endISO: endDate.toISOString(),
-        status: (prefs.confirmarAuto ? 'CONFIRMADO' : 'AGENDADO') as 'CONFIRMADO' | 'AGENDADO',
-        origem: 'INTERNO' as const,
-        notas: notas.trim() || undefined,
-        pagamento: (sinal || metodoPagamento) ? {
-          metodo: metodoPagamento as any,
-          sinal: sinal ? parseFloat(sinal) : undefined,
-        } : undefined,
+        serviceName: service.nome,
+        professionalId: staffIds[0],
+        startTime: startDate.toISOString(),
+        endTime: endDate.toISOString(),
+        status: (prefs.confirmarAuto ? 'CONFIRMED' : 'SCHEDULED') as 'CONFIRMED' | 'SCHEDULED',
+        notes: notas.trim() || undefined,
       };
 
       createAppointment(newAppointment);
