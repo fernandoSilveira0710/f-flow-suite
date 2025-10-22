@@ -359,14 +359,15 @@ export const getSeats = async (): Promise<Seat[]> => {
   return getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
 };
 
-export const createSeat = async (seat: Omit<Seat, 'id' | 'criadoEm'>): Promise<Seat> => {
+export const createSeat = async (seat: Omit<Seat, 'id' | 'criadoEm' | 'tipo' | 'email'>): Promise<Seat> => {
   await delay(500);
   const seats = getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
   const newSeat: Seat = { 
     ...seat, 
     id: Date.now().toString(),
     criadoEm: new Date().toISOString(),
-    tipo: 'ASSENTO'
+    tipo: 'ASSENTO',
+    email: (seat as any).email ?? `${String(seat.nome).replace(/\s+/g, '').toLowerCase()}@seat.local`
   };
   const updated = [...seats, newSeat];
   setInStorage(STORAGE_KEYS.seats, updated);
