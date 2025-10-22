@@ -116,21 +116,9 @@ export default function EditarCliente() {
       <PageHeader
         title={`Editar Cliente: ${customer.name}`}
         description="Atualize as informações do cliente"
-        action={
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => navigate(`/erp/clientes/${id}/pets`)}
-            >
-              <Heart className="h-4 w-4 mr-2" />
-              Gerenciar Pets
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/erp/clientes')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Button>
-          </div>
-        }
+        actionLabel="Voltar"
+        actionIcon={ArrowLeft}
+        onAction={() => navigate('/erp/clientes')}
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
