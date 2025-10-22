@@ -17,9 +17,9 @@ import { getStockAlerts } from '@/lib/stock-api';
 export default function StockAlertsPage() {
   const alerts = useMemo(() => getStockAlerts(), []);
 
-  const rupturaAlerts = alerts.filter((a) => a.tipo === 'RUPTURA');
-  const minimoAlerts = alerts.filter((a) => a.tipo === 'ABAIXO_MINIMO');
-  const validadeAlerts = alerts.filter((a) => a.tipo === 'VALIDADE_PROXIMA');
+  const rupturaAlerts = alerts.filter((a) => a.alertType === 'OUT_OF_STOCK');
+  const minimoAlerts = alerts.filter((a) => a.alertType === 'LOW_STOCK');
+  const validadeAlerts = [] as typeof alerts;
 
   return (
     <div className="space-y-6">
@@ -105,13 +105,13 @@ export default function StockAlertsPage() {
                       </TableRow>
                     ) : (
                       rupturaAlerts.map((alert) => (
-                        <TableRow key={alert.produto.id}>
-                          <TableCell className="font-medium">{alert.produto.nome}</TableCell>
-                          <TableCell>{alert.produto.sku}</TableCell>
-                          <TableCell>{alert.produto.categoria || '-'}</TableCell>
-                          <TableCell>{alert.produto.estoqueAtual}</TableCell>
+                        <TableRow key={alert.productId}>
+                          <TableCell className="font-medium">{alert.productName}</TableCell>
+                          <TableCell>{alert.sku}</TableCell>
+                          <TableCell>{'-'}</TableCell>
+                          <TableCell>{alert.currentStock}</TableCell>
                           <TableCell>
-                            <Badge variant="destructive">{alert.mensagem}</Badge>
+                            <Badge variant="destructive">{'Sem estoque'}</Badge>
                           </TableCell>
                         </TableRow>
                       ))
@@ -151,14 +151,14 @@ export default function StockAlertsPage() {
                       </TableRow>
                     ) : (
                       minimoAlerts.map((alert) => (
-                        <TableRow key={alert.produto.id}>
-                          <TableCell className="font-medium">{alert.produto.nome}</TableCell>
-                          <TableCell>{alert.produto.sku}</TableCell>
-                          <TableCell>{alert.produto.categoria || '-'}</TableCell>
-                          <TableCell>{alert.produto.estoqueAtual}</TableCell>
-                          <TableCell>{alert.produto.estoqueMinimo}</TableCell>
+                        <TableRow key={alert.productId}>
+                          <TableCell className="font-medium">{alert.productName}</TableCell>
+                          <TableCell>{alert.sku}</TableCell>
+                          <TableCell>{'-'}</TableCell>
+                          <TableCell>{alert.currentStock}</TableCell>
+                          <TableCell>{alert.minStock}</TableCell>
                           <TableCell>
-                            <Badge className="bg-amber-500">{alert.mensagem}</Badge>
+                            <Badge className="bg-amber-500">{'Abaixo do mínimo'}</Badge>
                           </TableCell>
                         </TableRow>
                       ))
@@ -198,18 +198,14 @@ export default function StockAlertsPage() {
                       </TableRow>
                     ) : (
                       validadeAlerts.map((alert) => (
-                        <TableRow key={alert.produto.id}>
-                          <TableCell className="font-medium">{alert.produto.nome}</TableCell>
-                          <TableCell>{alert.produto.sku}</TableCell>
-                          <TableCell>{alert.produto.categoria || '-'}</TableCell>
+                        <TableRow key={alert.productId}>
+                          <TableCell className="font-medium">{alert.productName}</TableCell>
+                          <TableCell>{alert.sku}</TableCell>
+                          <TableCell>{'-'}</TableCell>
+                          <TableCell>{'-'}</TableCell>
+                          <TableCell>{alert.currentStock}</TableCell>
                           <TableCell>
-                            {alert.produto.validade
-                              ? new Date(alert.produto.validade).toLocaleDateString('pt-BR')
-                              : '-'}
-                          </TableCell>
-                          <TableCell>{alert.produto.estoqueAtual}</TableCell>
-                          <TableCell>
-                            <Badge className="bg-blue-500">{alert.mensagem}</Badge>
+                            <Badge className="bg-blue-500">{'Validade próxima'}</Badge>
                           </TableCell>
                         </TableRow>
                       ))
