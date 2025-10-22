@@ -57,7 +57,7 @@ export default function UnitsSettings() {
         mockAPI.updateUnitOfMeasure(editingUnit.id, data);
         toast.success('Unidade de medida atualizada com sucesso');
       } else {
-        mockAPI.createUnitOfMeasure(data);
+        mockAPI.createUnitOfMeasure(data as Omit<UnitOfMeasure, 'id'>);
         toast.success('Unidade de medida criada com sucesso');
       }
       

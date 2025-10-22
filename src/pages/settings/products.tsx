@@ -90,8 +90,10 @@ export default function ProductsSettings() {
       <SettingsSection
         title="Categorias"
         description="Crie e gerencie categorias de produtos"
-        actions={<Button onClick={handleNewCategory}><Plus className="mr-2 h-4 w-4" /> Nova Categoria</Button>}
       >
+        <div className="flex justify-end mb-2">
+          <Button onClick={handleNewCategory}><Plus className="mr-2 h-4 w-4" /> Nova Categoria</Button>
+        </div>
         <div className="rounded-md border">
           <Table>
             <TableHeader>
