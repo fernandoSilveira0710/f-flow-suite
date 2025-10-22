@@ -41,10 +41,10 @@ Name: "desktopicon"; Description: "Criar atalho na área de trabalho"; Flags: ch
 [Icons]
 Name: "{group}\\Abrir ERP"; Filename: "{cmd}"; Parameters: "/c start {#ERPUrl}"; WorkingDir: "{app}"; Comment: "Abrir ERP"
 Name: "{userdesktop}\\F-Flow ERP"; Filename: "{cmd}"; Parameters: "/c start {#ERPUrl}"; Tasks: desktopicon; WorkingDir: "{app}"
-Name: "{group}\\Desinstalar Client Local"; Filename: "{sys}\\WindowsPowerShell\\v1.0\\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File \"{app}\\installers\\uninstall-windows.ps1\""; Comment: "Desinstalar serviço"
+Name: "{group}\\Desinstalar Client Local"; Filename: "{sys}\\WindowsPowerShell\\v1.0\\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\\installers\\uninstall-windows.ps1"""; Comment: "Desinstalar serviço"
 
 [Run]
-Filename: "{sys}\\WindowsPowerShell\\v1.0\\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File \"{app}\\installers\\install-windows.ps1\" -BinaryPath \"{app}\\f-flow-client.exe\""; Flags: runhidden; StatusMsg: "Instalando serviço..."; Description: "Instalar serviço do Client Local"
+Filename: "{sys}\\WindowsPowerShell\\v1.0\\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\\installers\\install-windows.ps1"" -BinaryPath ""{app}\\f-flow-client.exe"""; Flags: runhidden; StatusMsg: "Instalando serviço..."; Description: "Instalar serviço do Client Local"
 
 [Code]
 procedure WriteEnvFile();
