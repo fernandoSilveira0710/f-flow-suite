@@ -122,7 +122,7 @@ export function ProtectedRoute({
             if (isFirst) {
               console.log('🆕 PROTECTED ROUTE - Primeira instalação detectada');
               console.log('⚠️ PROTECTED ROUTE - BLOQUEANDO redirecionamento para manter logs do console');
-              // TEMPORARIAMENTE BLOQUEADO: window.location.href = 'http://localhost:5173';
+              // TEMPORARIAMENTE BLOQUEADO: window.location.href = [SITE_URL from env]
               toast({
                 title: "Sistema não instalado",
                 description: "Primeira instalação detectada. Redirecionamento bloqueado para debug.",
@@ -131,7 +131,7 @@ export function ProtectedRoute({
             } else {
               console.log('👤 PROTECTED ROUTE - Usuário existente sem instalação detectado');
               console.log('⚠️ PROTECTED ROUTE - BLOQUEANDO redirecionamento para manter logs do console');
-              // TEMPORARIAMENTE BLOQUEADO: window.location.href = 'http://localhost:5173/cadastro';
+              // TEMPORARIAMENTE BLOQUEADO: window.location.href = [SITE_URL from env]/cadastro
               toast({
                 title: "Licença inválida",
                 description: "Sistema sem licença válida. Redirecionamento bloqueado para debug.",
@@ -141,7 +141,7 @@ export function ProtectedRoute({
           } catch (error) {
             console.error('💥 PROTECTED ROUTE - Erro ao verificar instalação:', error);
             console.log('⚠️ PROTECTED ROUTE - BLOQUEANDO redirecionamento para manter logs do console');
-            // TEMPORARIAMENTE BLOQUEADO: window.location.href = 'http://localhost:5173';
+            // TEMPORARIAMENTE BLOQUEADO: window.location.href = [SITE_URL from env]
             toast({
               title: "Erro de verificação",
               description: "Erro ao verificar instalação. Redirecionamento bloqueado para debug.",

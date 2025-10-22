@@ -14,9 +14,11 @@ import { useToast } from '@/hooks/use-toast';
 
 const prefsSchema = z.object({
   estoqueMinimoPadrao: z.number().min(0, 'Valor deve ser maior ou igual a zero').optional(),
-  bloquearVendaSemEstoque: z.boolean(),
-  habilitarCodigoBarras: z.boolean(),
-  considerarValidade: z.boolean(),
+  bloquearVendaSemEstoque: z.boolean().optional(),
+  alertaEstoqueBaixo: z.boolean(),
+  limiteMinimo: z.number().min(0, 'Valor deve ser maior ou igual a zero'),
+  controlarLotes: z.boolean(),
+  controlarValidade: z.boolean(),
 });
 
 type PrefsFormData = z.infer<typeof prefsSchema>;
@@ -28,17 +30,19 @@ export default function StockSettingsPage() {
   const form = useForm<PrefsFormData>({
     resolver: zodResolver(prefsSchema),
     defaultValues: {
-      estoqueMinimoPadrao: prefs.estoqueMinimoPadrao || 10,
+      estoqueMinimoPadrao: prefs.estoqueMinimoPadrao ?? 10,
       bloquearVendaSemEstoque: prefs.bloquearVendaSemEstoque ?? true,
-      habilitarCodigoBarras: prefs.habilitarCodigoBarras ?? true,
-      considerarValidade: prefs.considerarValidade ?? true,
+      alertaEstoqueBaixo: prefs.alertaEstoqueBaixo,
+      limiteMinimo: prefs.limiteMinimo,
+      controlarLotes: prefs.controlarLotes,
+      controlarValidade: prefs.controlarValidade,
     },
   });
 
   const onSubmit = (data: PrefsFormData) => {
     try {
       saveStockPrefs(data);
-      setPrefs(data);
+      setPrefs((prev) => ({ ...prev, ...data } as StockPrefs));
       toast({ title: 'Preferências salvas com sucesso' });
     } catch (error) {
       toast({
@@ -86,6 +90,26 @@ export default function StockSettingsPage() {
 
               <FormField
                 control={form.control}
+                name="limiteMinimo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Limite Mínimo para Alerta</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Quando estoque atual estiver abaixo deste limite, será gerado alerta
+                    </FormDescription>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="bloquearVendaSemEstoque"
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between space-y-0 rounded-lg border p-4">
@@ -96,7 +120,7 @@ export default function StockSettingsPage() {
                       </FormDescription>
                     </div>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      <Switch checked={!!field.value} onCheckedChange={field.onChange} />
                     </FormControl>
                   </FormItem>
                 )}
@@ -104,13 +128,13 @@ export default function StockSettingsPage() {
 
               <FormField
                 control={form.control}
-                name="habilitarCodigoBarras"
+                name="alertaEstoqueBaixo"
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between space-y-0 rounded-lg border p-4">
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base">Habilitar Código de Barras</FormLabel>
+                      <FormLabel className="text-base">Alertar Estoque Baixo</FormLabel>
                       <FormDescription>
-                        Permite buscar produtos por código de barras (EAN/UPC)
+                        Ativa alertas quando estoque estiver abaixo do mínimo
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -122,7 +146,25 @@ export default function StockSettingsPage() {
 
               <FormField
                 control={form.control}
-                name="considerarValidade"
+                name="controlarLotes"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between space-y-0 rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Controlar Lotes</FormLabel>
+                      <FormDescription>
+                        Habilita controle de lotes para produtos com rastreabilidade
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="controlarValidade"
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between space-y-0 rounded-lg border p-4">
                     <div className="space-y-0.5">

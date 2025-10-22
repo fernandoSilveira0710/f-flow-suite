@@ -4,6 +4,7 @@
  */
 
 export type PlanType = 'starter' | 'pro' | 'max';
+import { API_URLS } from './env';
 
 export interface Entitlements {
   products: boolean;
@@ -107,7 +108,7 @@ const STORAGE_KEY = '2f.plan';
 async function fetchCurrentPlanFromHub(): Promise<PlanType | null> {
   try {
     const tenantId = localStorage.getItem('2f.tenantId') || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
-    const response = await fetch(`http://localhost:3001/plans/tenants/${tenantId}/subscription`, {
+    const response = await fetch(`${API_URLS.HUB}/plans/tenants/${tenantId}/subscription`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -133,7 +134,7 @@ async function fetchCurrentPlanFromHub(): Promise<PlanType | null> {
 // Função para buscar plano do client-local
 async function fetchCurrentPlanFromClientLocal(): Promise<PlanType | null> {
   try {
-    const response = await fetch('http://localhost:3001/licensing/plan/current', {
+    const response = await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/plan/current`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

@@ -170,12 +170,9 @@ export default function ClientesIndex() {
       <PageHeader
         title="Clientes"
         description="Gerencie seus clientes e seus pets"
-        action={
-          <Button onClick={() => navigate('/erp/clientes/novo')}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Cliente
-          </Button>
-        }
+        actionLabel="Novo Cliente"
+        actionIcon={Plus}
+        onAction={() => navigate('/erp/clientes/novo')}
       />
 
       {/* Filters */}
@@ -218,12 +215,8 @@ export default function ClientesIndex() {
               ? "Nenhum cliente corresponde aos filtros aplicados."
               : "Comece adicionando seu primeiro cliente."
           }
-          action={
-            <Button onClick={() => navigate('/erp/clientes/novo')}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Cliente
-            </Button>
-          }
+          actionLabel="Novo Cliente"
+          onAction={() => navigate('/erp/clientes/novo')}
         />
       ) : (
         <div className="border rounded-lg">

@@ -120,15 +120,14 @@ jobs:
       # Windows Installer
       - name: Create Windows Installer
         if: matrix.platform == 'win32'
+        shell: pwsh
         run: |
-          # Install WiX Toolset
-          choco install wixtoolset -y
-          
-          # Create installer using WiX (simplified example)
-          echo "Creating Windows installer..."
-          # This would typically use a proper WiX configuration
-          # For now, we'll just copy the binary as a placeholder
-          cp client-local/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }} f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
+          # Install Inno Setup
+          choco install innosetup -y
+
+          # Compile installer with Inno Setup
+          $iscc = 'C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe'
+          & $iscc 'client-local\\installers\\windows\\f-flow-client-installer.iss' /DClientBinary="client-local\\f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}" /DERPUrl="https://erp.f-flow.com" /DHubUrl="https://hub.f-flow.com"
 
       # macOS Installer
       - name: Create macOS Installer
@@ -160,7 +159,19 @@ jobs:
           asset_name: f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
           asset_content_type: application/octet-stream
 
-      - name: Upload Installer Asset
+      - name: Upload Windows Installer Asset
+        if: matrix.platform == 'win32'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: client-local/installers/windows/build/installer/f-flow-client-win-installer.exe
+          asset_name: f-flow-client-win-installer.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload Installer Asset (non-Windows)
+        if: matrix.platform != 'win32'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

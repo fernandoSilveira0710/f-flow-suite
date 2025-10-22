@@ -19,7 +19,7 @@ import { UnitOfMeasure } from '@/lib/mock-data';
 const unitSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   abbreviation: z.string().min(1, 'Abreviação é obrigatória'),
-  type: z.enum(['weight', 'volume', 'length', 'area', 'unit']),
+  type: z.enum(['weight', 'volume', 'length', 'unit']),
   active: z.boolean(),
 });
 
@@ -57,7 +57,7 @@ export default function UnitsSettings() {
         mockAPI.updateUnitOfMeasure(editingUnit.id, data);
         toast.success('Unidade de medida atualizada com sucesso');
       } else {
-        mockAPI.createUnitOfMeasure(data);
+        mockAPI.createUnitOfMeasure(data as Omit<UnitOfMeasure, 'id'>);
         toast.success('Unidade de medida criada com sucesso');
       }
       
@@ -107,7 +107,6 @@ export default function UnitsSettings() {
       weight: 'Peso',
       volume: 'Volume',
       length: 'Comprimento',
-      area: 'Área',
       unit: 'Unidade',
     };
     return types[type as keyof typeof types] || type;
@@ -191,7 +190,6 @@ export default function UnitsSettings() {
                               <SelectItem value="weight">Peso</SelectItem>
                               <SelectItem value="volume">Volume</SelectItem>
                               <SelectItem value="length">Comprimento</SelectItem>
-                              <SelectItem value="area">Área</SelectItem>
                               <SelectItem value="unit">Unidade</SelectItem>
                             </SelectContent>
                           </Select>

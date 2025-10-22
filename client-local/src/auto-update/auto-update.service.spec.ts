@@ -53,74 +53,62 @@ describe('AutoUpdateService', () => {
 
   describe('getCurrentVersion', () => {
     it('should return current version from package.json', () => {
-      const mockPackageJson = { version: '1.0.0' };
-      (fs.readJsonSync as jest.Mock).mockReturnValue(mockPackageJson);
-
+      const pkgVersion: string = require('../../package.json').version;
       const version = service.getCurrentVersion();
-
-      expect(version).toBe('1.0.0');
-      expect(fs.readJsonSync).toHaveBeenCalledWith(
-        expect.stringContaining('package.json')
-      );
+      expect(version).toBe(pkgVersion);
     });
 
-    it('should return 0.0.0 if package.json cannot be read', () => {
-      (fs.readJsonSync as jest.Mock).mockImplementation(() => {
-        throw new Error('File not found');
-      });
-
+    it('should return a semantic version string', () => {
       const version = service.getCurrentVersion();
-
-      expect(version).toBe('0.0.0');
+      expect(version).toMatch(/^\d+\.\d+\.\d+$/);
     });
   });
 
   describe('checkForUpdates', () => {
     it('should return update info when newer version is available', async () => {
+      const current = service.getCurrentVersion();
       const mockRelease = {
         tag_name: 'v2.0.0',
         name: 'Version 2.0.0',
         body: 'Release notes',
         assets: [
           {
-            name: 'app-win32-x64.exe',
-            browser_download_url: 'https://github.com/owner/repo/releases/download/v2.0.0/app-win32-x64.exe',
+            name: 'f-flow-client-win-x64.exe',
+            browser_download_url: 'https://github.com/owner/repo/releases/download/v2.0.0/f-flow-client-win-x64.exe',
           },
         ],
       };
 
       (axios.get as jest.Mock).mockResolvedValue({ data: mockRelease });
-      (fs.readJsonSync as jest.Mock).mockReturnValue({ version: '1.0.0' });
 
       const updateInfo = await service.checkForUpdates();
 
-      expect(updateInfo.hasUpdate).toBe(true);
+      expect(updateInfo.available).toBe(true);
       expect(updateInfo.latestVersion).toBe('2.0.0');
-      expect(updateInfo.currentVersion).toBe('1.0.0');
+      expect(updateInfo.currentVersion).toBe(current);
       expect(updateInfo.releaseNotes).toBe('Release notes');
     });
 
     it('should return no update when current version is latest', async () => {
+      const current = service.getCurrentVersion();
       const mockRelease = {
-        tag_name: 'v1.0.0',
-        name: 'Version 1.0.0',
+        tag_name: `v${current}`,
+        name: `Version ${current}`,
         body: 'Release notes',
         assets: [],
       };
 
       (axios.get as jest.Mock).mockResolvedValue({ data: mockRelease });
-      (fs.readJsonSync as jest.Mock).mockReturnValue({ version: '1.0.0' });
 
       const updateInfo = await service.checkForUpdates();
 
-      expect(updateInfo.hasUpdate).toBe(false);
-      expect(updateInfo.latestVersion).toBe('1.0.0');
-      expect(updateInfo.currentVersion).toBe('1.0.0');
+      expect(updateInfo.available).toBe(false);
+      expect(updateInfo.latestVersion).toBe(current);
+      expect(updateInfo.currentVersion).toBe(current);
     });
 
     it('should handle API errors gracefully', async () => {
       (axios.get as jest.Mock).mockRejectedValue(new Error('API Error'));
-      (fs.readJsonSync as jest.Mock).mockReturnValue({ version: '1.0.0' });
 
       await expect(service.checkForUpdates()).rejects.toThrow('API Error');
     });
@@ -130,38 +118,40 @@ describe('AutoUpdateService', () => {
     it('should return initial progress state', () => {
       const progress = service.getUpdateProgress();
 
-      expect(progress.isUpdating).toBe(false);
+      expect(progress.stage).toBe('checking');
       expect(progress.progress).toBe(0);
-      expect(progress.status).toBe('idle');
+      expect(progress.message).toBe('Idle');
     });
   });
 
-  describe('getPlatformAssetName', () => {
-    it('should return correct asset name for Windows', () => {
-      Object.defineProperty(process, 'platform', { value: 'win32' });
-      Object.defineProperty(process, 'arch', { value: 'x64' });
+  describe('asset selection', () => {
+    it('should select correct downloadUrl for current platform', async () => {
+      const current = service.getCurrentVersion();
+      const winUrl = 'https://example.com/f-flow-client-win-x64.exe';
+      const macUrl = 'https://example.com/f-flow-client-mac-x64.dmg';
+      const linUrl = 'https://example.com/f-flow-client-linux-x64.deb';
 
-      const assetName = (service as any).getPlatformAssetName();
+      const mockRelease = {
+        tag_name: 'v999.0.0',
+        name: 'Version 999.0.0',
+        body: 'Release notes',
+        assets: [
+          { name: 'f-flow-client-win-x64.exe', browser_download_url: winUrl },
+          { name: 'f-flow-client-mac-x64.dmg', browser_download_url: macUrl },
+          { name: 'f-flow-client-linux-x64.deb', browser_download_url: linUrl },
+        ],
+      };
 
-      expect(assetName).toBe('f-flow-client-win32-x64.exe');
-    });
+      (axios.get as jest.Mock).mockResolvedValue({ data: mockRelease });
 
-    it('should return correct asset name for macOS', () => {
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
-      Object.defineProperty(process, 'arch', { value: 'x64' });
+      const info = await service.checkForUpdates();
 
-      const assetName = (service as any).getPlatformAssetName();
+      const platform = process.platform;
+      const expectedUrl = platform === 'win32' ? winUrl : platform === 'darwin' ? macUrl : linUrl;
 
-      expect(assetName).toBe('f-flow-client-darwin-x64.dmg');
-    });
-
-    it('should return correct asset name for Linux', () => {
-      Object.defineProperty(process, 'platform', { value: 'linux' });
-      Object.defineProperty(process, 'arch', { value: 'x64' });
-
-      const assetName = (service as any).getPlatformAssetName();
-
-      expect(assetName).toBe('f-flow-client-linux-x64.AppImage');
+      expect(info.available).toBe(true);
+      expect(info.currentVersion).toBe(current);
+      expect(info.downloadUrl).toBe(expectedUrl);
     });
   });
 });

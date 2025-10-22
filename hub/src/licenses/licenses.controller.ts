@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Put, Param, HttpException, HttpStatus, Get, Query } from '@nestjs/common';
+import { Body, Controller, Post, Put, Param, HttpException, HttpStatus, Get, Query, HttpCode } from '@nestjs/common';
 import { LicensesService } from './licenses.service';
 import { CreateLicenseDto, ActivateLicenseDto, ValidateLicenseDto } from './dto/create-license.dto';
 
@@ -32,6 +32,7 @@ export class LicensesController {
   }
 
   @Post('activate')
+  @HttpCode(HttpStatus.CREATED)
   async activate(@Body() dto: ActivateLicenseDto) {
     if (!dto?.tenantId || !dto?.deviceId) {
       throw new HttpException(
@@ -141,16 +142,12 @@ export class LicensesController {
         licensed: true,
         status: 'active',
         license: {
-          tenantId: result.license.tenantId,
-          planKey: result.license.planKey,
-          maxSeats: result.license.maxSeats,
-          status: result.license.status,
-          expiresAt: result.license.expiry,
-          graceDays: result.license.graceDays || 7,
-          tenant: {
-            name: result.license.tenant?.name,
-            email: result.license.tenant?.email
-          }
+          tenantId: result.license!.tenantId,
+          planKey: result.license!.planKey,
+          maxSeats: result.license!.maxSeats,
+          status: result.license!.status,
+          expiresAt: result.license!.expiry,
+          graceDays: result.license!.graceDays || 7
         }
       };
     } catch (error: any) {
@@ -162,7 +159,7 @@ export class LicensesController {
   }
 
   private getValidationMessage(reason: string): string {
-    const messages = {
+    const messages: Record<string, string> = {
       'LICENSE_NOT_FOUND': 'Licença não encontrada',
       'LICENSE_INACTIVE': 'Licença inativa',
       'LICENSE_EXPIRED': 'Licença expirada',

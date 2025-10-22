@@ -1,11 +1,16 @@
 import { JSONSchemaType } from 'ajv';
 
+// Align payload schema with generateInventoryEvent and hub consumer expectations
 export interface InventoryAdjustedEventPayload {
   id: string;
   productId: string;
-  adjustment: number;
+  productName: string;
+  productSku?: string | null;
+  delta: number;
   reason: string;
-  createdAt: string;
+  previousStock: number;
+  newStock: number;
+  adjustedAt: string; // ISO date-time
 }
 
 export const inventoryAdjustedEventSchema: JSONSchemaType<InventoryAdjustedEventPayload> = {
@@ -13,10 +18,14 @@ export const inventoryAdjustedEventSchema: JSONSchemaType<InventoryAdjustedEvent
   properties: {
     id: { type: 'string', format: 'uuid' },
     productId: { type: 'string', format: 'uuid' },
-    adjustment: { type: 'number' },
+    productName: { type: 'string' },
+    productSku: { type: 'string', nullable: true },
+    delta: { type: 'number' },
     reason: { type: 'string' },
-    createdAt: { type: 'string', format: 'date-time' },
+    previousStock: { type: 'number' },
+    newStock: { type: 'number' },
+    adjustedAt: { type: 'string', format: 'date-time' },
   },
-  required: ['id', 'productId', 'adjustment', 'reason', 'createdAt'],
+  required: ['id', 'productId', 'productName', 'delta', 'reason', 'previousStock', 'newStock', 'adjustedAt'],
   additionalProperties: false,
 };

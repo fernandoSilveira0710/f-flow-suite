@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils';
 
 interface CartSidebarProps {
   cart: CartItem[];
-  onUpdateQtd: (productId: string, qtd: number) => void;
-  onRemoveItem: (productId: string) => void;
+  onUpdateQtd: (itemId: string, qtd: number) => void;
+  onRemoveItem: (itemId: string) => void;
   onCheckout: () => void;
   discount: number;
   className?: string;
@@ -47,17 +47,17 @@ export function CartSidebar({
         ) : (
           <div className="space-y-3">
             {cart.map((item) => (
-              <div key={item.productId} className="border rounded-lg p-3 space-y-2">
+              <div key={item.id} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <p className="font-medium text-sm">{item.nome}</p>
-                    <p className="text-xs text-muted-foreground">{item.sku}</p>
+                    <p className="font-medium text-sm">{item.produto.nome}</p>
+                    <p className="text-xs text-muted-foreground">{item.produto.sku}</p>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 -mt-1"
-                    onClick={() => onRemoveItem(item.productId)}
+                    onClick={() => onRemoveItem(item.id)}
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -69,7 +69,7 @@ export function CartSidebar({
                       variant="outline"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => onUpdateQtd(item.productId, item.qtd - 1)}
+                      onClick={() => onUpdateQtd(item.id, item.qtd - 1)}
                       disabled={item.qtd <= 1}
                     >
                       <Minus className="h-3 w-3" />
@@ -79,14 +79,14 @@ export function CartSidebar({
                       variant="outline"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => onUpdateQtd(item.productId, item.qtd + 1)}
+                      onClick={() => onUpdateQtd(item.id, item.qtd + 1)}
                     >
                       <Plus className="h-3 w-3" />
                     </Button>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">
-                      {item.qtd}x R$ {item.precoUnit.toFixed(2)}
+                      {item.qtd}x R$ {item.produto.preco.toFixed(2)}
                     </p>
                     <p className="font-semibold">R$ {item.subtotal.toFixed(2)}</p>
                   </div>

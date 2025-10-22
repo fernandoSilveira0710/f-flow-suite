@@ -39,7 +39,8 @@ export default function EditarTutor() {
     setEmail(tutor.email || '');
     setDocumento(tutor.documento || '');
     setEndereco(tutor.endereco || '');
-    setObservacoes(tutor.observacoes || '');
+    // Ajuste: Tutor usa campo 'notas' em vez de 'observacoes'
+    setObservacoes(tutor.notas || '');
     setAtivo(tutor.ativo);
     setLoading(false);
   }, [id, navigate]);
@@ -65,7 +66,8 @@ export default function EditarTutor() {
       email: email.trim() || undefined,
       documento: documento.trim() || undefined,
       endereco: endereco.trim() || undefined,
-      observacoes: observacoes.trim() || undefined,
+      // Ajuste: enviar como 'notas' para o tipo Tutor
+      notas: observacoes.trim() || undefined,
       ativo,
     });
 
@@ -121,7 +123,7 @@ export default function EditarTutor() {
                   id="telefone"
                   value={telefone}
                   onChange={(e) => setTelefone(e.target.value)}
-                  placeholder="(11) 99999-9999"
+                  placeholder="(00) 00000-0000"
                   required
                 />
               </div>
@@ -138,56 +140,50 @@ export default function EditarTutor() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="documento">CPF/CNPJ</Label>
+                <Label htmlFor="documento">Documento</Label>
                 <Input
                   id="documento"
                   value={documento}
                   onChange={(e) => setDocumento(e.target.value)}
-                  placeholder="000.000.000-00"
+                  placeholder="CPF/CNPJ"
                 />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="endereco">Endereço</Label>
+                <Input
+                  id="endereco"
+                  value={endereco}
+                  onChange={(e) => setEndereco(e.target.value)}
+                  placeholder="Rua, número, bairro, cidade"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="observacoes">Observações</Label>
+                <Textarea
+                  id="observacoes"
+                  value={observacoes}
+                  onChange={(e) => setObservacoes(e.target.value)}
+                  placeholder="Notas importantes sobre o tutor"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 md:col-span-2">
+                <Switch id="ativo" checked={ativo} onCheckedChange={setAtivo} />
+                <Label htmlFor="ativo">Ativo</Label>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="endereco">Endereço</Label>
-              <Input
-                id="endereco"
-                value={endereco}
-                onChange={(e) => setEndereco(e.target.value)}
-                placeholder="Rua, número, bairro, cidade"
-              />
-            </div>
+            <Separator />
 
-            <div className="space-y-2">
-              <Label htmlFor="obs">Observações</Label>
-              <Textarea
-                id="obs"
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Informações adicionais sobre o tutor"
-                rows={3}
-              />
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => navigate('/erp/grooming/tutors')}>
+                Cancelar
+              </Button>
+              <Button type="submit">Salvar Alterações</Button>
             </div>
           </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Tutor Ativo</Label>
-              <p className="text-sm text-muted-foreground">
-                Tutores inativos não aparecem na busca
-              </p>
-            </div>
-            <Switch checked={ativo} onCheckedChange={setAtivo} />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={() => navigate('/erp/grooming/tutors')}>
-            Cancelar
-          </Button>
-          <Button type="submit">Salvar Alterações</Button>
         </div>
       </form>
     </div>

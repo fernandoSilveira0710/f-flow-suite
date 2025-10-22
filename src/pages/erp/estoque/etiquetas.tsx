@@ -169,7 +169,7 @@ export default function StockLabelsPage() {
                       <p className="font-medium">{product.nome}</p>
                       <p className="text-sm text-muted-foreground">
                         SKU: {product.sku}
-                        {product.precoVenda && ` • R$ ${product.precoVenda.toFixed(2)}`}
+                        {product.preco && ` • R$ ${product.preco.toFixed(2)}`}
                       </p>
                     </div>
                     <div className="h-5 w-5 rounded border-2 flex items-center justify-center">
@@ -208,8 +208,8 @@ export default function StockLabelsPage() {
                   {includeName && (
                     <p className="text-xs font-medium truncate w-full">{product.nome}</p>
                   )}
-                  {includePrice && product.precoVenda && (
-                    <p className="text-sm font-bold">R$ {product.precoVenda.toFixed(2)}</p>
+                  {includePrice && product.preco && (
+                    <p className="text-sm font-bold">R$ {product.preco.toFixed(2)}</p>
                   )}
                   {includeSKU && <p className="text-xs text-muted-foreground">{product.sku}</p>}
                   {includeBarcode && product.barcode && (

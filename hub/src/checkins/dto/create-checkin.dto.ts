@@ -2,10 +2,10 @@ import { IsString, IsOptional, IsUUID } from 'class-validator';
 
 export class CreateCheckInDto {
   @IsUUID()
-  petId: string;
+  petId!: string;
 
   @IsUUID()
-  professionalId: string;
+  professionalId!: string;
 
   @IsOptional()
   @IsString()

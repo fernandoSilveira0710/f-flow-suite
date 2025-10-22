@@ -3,9 +3,10 @@ import { SalesController } from './sales.controller';
 import { SalesService } from './sales.service';
 import { ValidationModule } from '../common/validation';
 import { PrismaModule } from '../common/prisma/prisma.module';
+import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
-  imports: [ValidationModule, PrismaModule],
+  imports: [ValidationModule, PrismaModule, InventoryModule],
   controllers: [SalesController],
   providers: [SalesService],
 })

@@ -8,8 +8,8 @@ Este documento lista todos os endpoints e portas dos serviços do F-Flow Suite.
 | ------- | ----- | -------- | --------- |
 | **Frontend ERP** | 8080 | http://localhost:8080 | Interface web do ERP |
 | **Site Institucional** | 5173 | http://localhost:5173 | Site institucional (cadastro, planos) |
-| **Hub API** | 8081 | http://localhost:8081 | API central (licenças, auth) |
-| **Client-Local API** | 3001 | http://localhost:3001 | API local (POS, estoque) |
+| **Hub API** | 3001 | http://localhost:3001 | API central (licenças, auth) |
+| **Client-Local API** | 8081 | http://localhost:8081 | API local (POS, estoque) |
 | **Prisma Studio HUB** | 5555 | http://localhost:5555 | Interface do banco HUB |
 | **Prisma Studio Local** | 5556 | http://localhost:5556 | Interface do banco local |
 | **PostgreSQL** | 5432 | localhost:5432 | Banco de dados principal |
@@ -43,7 +43,7 @@ Este documento lista todos os endpoints e portas dos serviços do F-Flow Suite.
 
 ### Exemplo de Login
 ```bash
-curl -X POST http://localhost:8081/public/login \
+curl -X POST http://localhost:3001/public/login \
   -H "Content-Type: application/json" \
   -d '{"email": "logintest@2fsolutions.com.br", "password": "123456"}'
 ```
@@ -80,13 +80,13 @@ curl -X POST http://localhost:8081/public/login \
 
 ### Exemplo de Verificação
 ```bash
-curl http://localhost:3001/users/has-users
+curl http://localhost:8081/users/has-users
 ```
 
 ### Exemplo de Autenticação Offline
 ```bash
 # Autenticação offline (quando Hub indisponível)
-curl -X POST http://localhost:3001/auth/offline-login \
+curl -X POST http://localhost:8081/auth/offline-login \
   -H "Content-Type: application/json" \
   -d '{"email": "logintest@2fsolutions.com.br", "password": "123456"}'
 ```
@@ -127,14 +127,14 @@ Todos os usuários abaixo estão cadastrados no HUB (localhost:5555):
 
 ### Modo Online (Hub + Client-Local)
 1. **Login no ERP**: http://localhost:8080/erp/login
-2. **Autenticação via HUB**: POST http://localhost:8081/public/login
-3. **Sincronização Local**: POST http://localhost:3001/users/sync
+2. **Autenticação via HUB**: POST http://localhost:3001/public/login
+3. **Sincronização Local**: POST http://localhost:8081/users/sync
 4. **Redirecionamento**: http://localhost:8080/erp/dashboard
 
 ### Modo Offline (Client-Local apenas)
 1. **Login no ERP**: http://localhost:8080/erp/login
 2. **Detecção de Hub indisponível**: Timeout/erro de conexão
-3. **Autenticação offline**: POST http://localhost:3001/auth/offline-login
+3. **Autenticação offline**: POST http://localhost:8081/auth/offline-login
 4. **Validação local**: Cache de usuários + licença offline
 5. **Redirecionamento**: http://localhost:8080/erp/dashboard
 
@@ -143,10 +143,10 @@ Todos os usuários abaixo estão cadastrados no HUB (localhost:5555):
 ### Verificar Status dos Serviços
 ```bash
 # Hub API
-curl http://localhost:8081/health
+curl http://localhost:3001/health
 
 # Client-Local API
-curl http://localhost:3001/health
+curl http://localhost:8081/health
 
 # Frontend (deve retornar HTML)
 curl http://localhost:8080/erp/login
@@ -155,23 +155,23 @@ curl http://localhost:8080/erp/login
 ### Testar Autenticação
 ```bash
 # Login via HUB (modo online)
-curl -X POST http://localhost:8081/public/login \
+curl -X POST http://localhost:3001/public/login \
   -H "Content-Type: application/json" \
   -d '{"email": "logintest@2fsolutions.com.br", "password": "123456"}'
 
 # Login offline (quando Hub indisponível)
-curl -X POST http://localhost:3001/auth/offline-login \
+curl -X POST http://localhost:8081/auth/offline-login \
   -H "Content-Type: application/json" \
   -d '{"email": "logintest@2fsolutions.com.br", "password": "123456"}'
 
 # Verificar usuários locais
-curl http://localhost:3001/users/has-users
+curl http://localhost:8081/users/has-users
 ```
 
 ## 📝 Notas Importantes
 
 - **Porta Principal do ERP**: 8080 (não 5173)
-- **Autenticação Real**: Via HUB na porta 8081
+- **Autenticação Real**: Via HUB na porta 3001
 - **Sincronização**: Automática entre HUB e Client-Local
 - **Prisma Studio**: Duas instâncias (HUB e Local)
 - **Banco Local**: SQLite gerenciado automaticamente

@@ -1,6 +1,7 @@
 /**
  * Serviço para sincronização de planos entre Hub, client-local e cache local
  */
+import { API_URLS } from '@/lib/env';
 
 interface SyncPlanData {
   tenantId: string;
@@ -19,8 +20,9 @@ interface SyncResult {
 }
 
 export class PlanSyncService {
-  private static readonly HUB_BASE_URL = 'http://localhost:8081';
-  private static readonly CLIENT_LOCAL_BASE_URL = 'http://localhost:3001';
+  // Centralizar URLs via env.ts
+  private static readonly HUB_BASE_URL = API_URLS.HUB;
+  private static readonly CLIENT_LOCAL_BASE_URL = API_URLS.CLIENT_LOCAL;
 
   /**
    * Sincroniza planos em todas as fontes após login ou alteração de plano
@@ -226,72 +228,20 @@ export class PlanSyncService {
   /**
    * Sincroniza planos após alteração de plano (para uso futuro)
    */
-  static async syncPlansAfterPlanChange(tenantId: string, userId: string, newPlanKey: string): Promise<SyncResult> {
-    console.log('🔄 Iniciando sincronização após alteração de plano...', { tenantId, userId, newPlanKey });
-    
-    const errors: string[] = [];
-
-    try {
-      // 1. Atualizar Hub (se disponível)
-      const hubUpdate = await this.updateHubPlan(tenantId, newPlanKey);
-      if (!hubUpdate.success) {
-        errors.push('Falha ao atualizar Hub: ' + hubUpdate.message);
-        console.warn('⚠️ Falha ao atualizar Hub:', hubUpdate.message);
-      }
-
-      // 2. Sincronizar com client-local
-      const clientLocalSync = await this.syncClientLocal(tenantId, userId, newPlanKey);
-      if (!clientLocalSync.success) {
-        errors.push('Falha na sincronização com client-local: ' + clientLocalSync.message);
-        console.warn('⚠️ Falha na sincronização com client-local:', clientLocalSync.message);
-      }
-
-      // 3. Atualizar cache local
-      const cacheSync = await this.updateClientLocalCache(tenantId, newPlanKey);
-      if (!cacheSync.success) {
-        errors.push('Falha na atualização do cache: ' + cacheSync.message);
-        console.warn('⚠️ Falha na atualização do cache:', cacheSync.message);
-      }
-
-      const success = errors.length === 0;
-      const message = success 
-        ? `Plano alterado e sincronizado com sucesso: ${newPlanKey}`
-        : `Alteração parcial. ${errors.length} erro(s) encontrado(s)`;
-
-      return {
-        success,
-        message,
-        planKey: newPlanKey,
-        errors: errors.length > 0 ? errors : undefined
-      };
-
-    } catch (error) {
-      const errorMessage = `Erro geral na sincronização: ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
-      console.error('❌', errorMessage, error);
-      
-      return {
-        success: false,
-        message: errorMessage,
-        errors: [errorMessage]
-      };
-    }
-  }
 
   /**
    * Atualiza plano no Hub (para uso futuro)
    */
   private static async updateHubPlan(tenantId: string, planKey: string): Promise<{ success: boolean; message: string }> {
     try {
-      // Este endpoint seria implementado no Hub para atualizar planos
-      const response = await fetch(`${this.HUB_BASE_URL}/plans/update`, {
-        method: 'POST',
+      const response = await fetch(`${this.HUB_BASE_URL}/licenses/${tenantId}/plan`, {
+        method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
         },
         body: JSON.stringify({
-          tenantId,
-          planKey,
-          updatedAt: new Date().toISOString()
+          planKey
         }),
         signal: AbortSignal.timeout(5000)
       });
@@ -305,7 +255,7 @@ export class PlanSyncService {
 
       return {
         success: true,
-        message: 'Hub atualizado com sucesso'
+        message: 'Plano atualizado no Hub com sucesso'
       };
 
     } catch (error) {

@@ -164,6 +164,7 @@ model Product {
   category      String?
   salePrice     Float
   costPrice     Float?
+  stockQty      Int            @default(0)
   active        Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt

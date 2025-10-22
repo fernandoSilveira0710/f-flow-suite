@@ -9,7 +9,7 @@ async function testUpdateCache() {
     
     const tenantId = '3cb88e58-b2e7-4fb1-9e0f-eb5a9c4b640b';
     const deviceId = 'test-device-id';
-    const hubBaseUrl = 'http://localhost:8081';
+    const hubBaseUrl = 'http://localhost:3001';
     
     console.log('1. Testando chamada para o Hub...');
     

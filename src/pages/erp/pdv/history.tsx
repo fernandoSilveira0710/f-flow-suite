@@ -165,7 +165,7 @@ export default function HistoryPage() {
                   {selectedSale.items?.map((item, index) => (
                     <div key={index} className="flex justify-between">
                       <span>
-                        {item.qty}x Produto ID: {item.productId}
+                        {item.qty}x {item.productName ?? `Produto ID: ${item.productId}`}
                       </span>
                       <span>R$ {item.subtotal.toFixed(2)}</span>
                     </div>

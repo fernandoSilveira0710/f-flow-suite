@@ -26,10 +26,10 @@ export class PaymentMethodIntegrationDto {
 
 export class PaymentMethodCashRulesDto {
   @IsBoolean()
-  contabilizaNoCaixa: boolean;
+  contabilizaNoCaixa!: boolean;
 
   @IsBoolean()
-  permiteSangria: boolean;
+  permiteSangria!: boolean;
 }
 
 export class PaymentMethodRestrictionsDto {
@@ -50,7 +50,7 @@ export class PaymentMethodRestrictionsDto {
 
 export class PaymentMethodVisibilityDto {
   @IsBoolean()
-  mostrarNoPDV: boolean;
+  mostrarNoPDV!: boolean;
 
   @IsOptional()
   @IsString({ each: true })
@@ -59,23 +59,23 @@ export class PaymentMethodVisibilityDto {
 
 export class CreatePaymentMethodDto {
   @IsString()
-  nome: string;
+  nome!: string;
 
   @IsEnum(PaymentMethodType)
-  tipo: PaymentMethodType;
+  tipo!: PaymentMethodType;
 
   @IsBoolean()
-  ativo: boolean;
+  ativo!: boolean;
 
   @IsNumber()
   @Min(1)
-  ordem: number;
+  ordem!: number;
 
   @IsBoolean()
-  permiteTroco: boolean;
+  permiteTroco!: boolean;
 
   @IsBoolean()
-  permiteParcelas: boolean;
+  permiteParcelas!: boolean;
 
   @IsOptional()
   @IsNumber()
