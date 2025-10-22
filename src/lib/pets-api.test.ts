@@ -6,9 +6,7 @@ import {
   createPet, 
   updatePet, 
   deletePet, 
-  searchPets, 
-  fetchActivePets, 
-  fetchPetSpecies 
+  searchPets 
 } from './pets-api';
 import { apiClient } from './api-client';
 
@@ -26,76 +24,50 @@ describe('pets-api', () => {
 
   describe('fetchPets', () => {
     it('should fetch pets with default parameters', async () => {
-      const mockResponse = {
-        data: [
-          {
-            id: '1',
-            nome: 'Rex',
-            especie: 'Cão',
-            raca: 'Golden Retriever',
-            dataNascimento: '2020-01-01T00:00:00.000Z',
-            peso: 25.5,
-            cor: 'Dourado',
-            sexo: 'M',
-            microchip: '123456789012345',
-            observacoes: 'Pet muito dócil',
-            ativo: true,
-            tutorId: 'customer-1',
-            createdAt: '2024-01-01T00:00:00.000Z',
-            updatedAt: '2024-01-01T00:00:00.000Z',
-            tutor: {
-              id: 'customer-1',
-              nome: 'João Silva',
-              telefone: '11999999999',
-              email: 'joao@example.com',
-            },
+      const mockResponse = [
+        {
+          id: '1',
+          name: 'Rex',
+          species: 'Cão',
+          breed: 'Golden Retriever',
+          birthDate: '2020-01-01T00:00:00.000Z',
+          weight: 25.5,
+          observations: 'Pet muito dócil',
+          active: true,
+          tutorId: 'customer-1',
+          createdAt: new Date('2024-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+          tutor: {
+            id: 'customer-1',
+            name: 'João Silva',
+            phone: '11999999999',
+            email: 'joao@example.com',
           },
-        ],
-        total: 1,
-        page: 1,
-        limit: 20,
-        totalPages: 1,
-      };
+        },
+      ];
 
       mockApiClient.mockResolvedValue(mockResponse);
 
       const result = await fetchPets();
 
-      expect(mockApiClient).toHaveBeenCalledWith('/pets', {
-        method: 'GET',
-        params: {
-          page: 1,
-          limit: 20,
-        },
-      });
+      expect(mockApiClient).toHaveBeenCalledWith('/api/pets');
       expect(result).toEqual(mockResponse);
     });
 
     it('should fetch pets with custom filters', async () => {
       const filters = {
-        page: 2,
-        limit: 10,
-        search: 'Rex',
+        q: 'Rex',
         tutorId: 'customer-1',
-        ativo: true,
+        active: true,
       };
 
-      const mockResponse = {
-        data: [],
-        total: 0,
-        page: 2,
-        limit: 10,
-        totalPages: 0,
-      };
+      const mockResponse: any[] = [];
 
       mockApiClient.mockResolvedValue(mockResponse);
 
       const result = await fetchPets(filters);
 
-      expect(mockApiClient).toHaveBeenCalledWith('/pets', {
-        method: 'GET',
-        params: filters,
-      });
+      expect(mockApiClient).toHaveBeenCalledWith('/api/pets?q=Rex&tutorId=customer-1&active=true');
       expect(result).toEqual(mockResponse);
     });
   });
@@ -104,23 +76,20 @@ describe('pets-api', () => {
     it('should fetch a single pet by id', async () => {
       const mockPet = {
         id: '1',
-        nome: 'Rex',
-        especie: 'Cão',
-        raca: 'Golden Retriever',
-        dataNascimento: '2020-01-01T00:00:00.000Z',
-        peso: 25.5,
-        cor: 'Dourado',
-        sexo: 'M',
-        microchip: '123456789012345',
-        observacoes: 'Pet muito dócil',
-        ativo: true,
+        name: 'Rex',
+        species: 'Cão',
+        breed: 'Golden Retriever',
+        birthDate: '2020-01-01T00:00:00.000Z',
+        weight: 25.5,
+        observations: 'Pet muito dócil',
+        active: true,
         tutorId: 'customer-1',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
         tutor: {
           id: 'customer-1',
-          nome: 'João Silva',
-          telefone: '11999999999',
+          name: 'João Silva',
+          phone: '11999999999',
           email: 'joao@example.com',
         },
       };
@@ -129,80 +98,51 @@ describe('pets-api', () => {
 
       const result = await fetchPet('1');
 
-      expect(mockApiClient).toHaveBeenCalledWith('/pets/1', {
-        method: 'GET',
-      });
+      expect(mockApiClient).toHaveBeenCalledWith('/api/pets/1');
       expect(result).toEqual(mockPet);
     });
   });
 
   describe('fetchPetsByTutor', () => {
-    it('should fetch pets by tutor id', async () => {
-      const mockPets = [
-        {
-          id: '1',
-          nome: 'Rex',
-          especie: 'Cão',
-          raca: 'Golden Retriever',
-          dataNascimento: '2020-01-01T00:00:00.000Z',
-          peso: 25.5,
-          cor: 'Dourado',
-          sexo: 'M',
-          microchip: '123456789012345',
-          observacoes: 'Pet muito dócil',
-          ativo: true,
-          tutorId: 'customer-1',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-        },
+    it('should fetch pets by tutor', async () => {
+      const mockResponse = [
+        { id: '1', name: 'Rex', species: 'Cão', active: true, tutorId: 'customer-1', createdAt: new Date(), updatedAt: new Date() },
       ];
 
-      mockApiClient.mockResolvedValue(mockPets);
+      mockApiClient.mockResolvedValue(mockResponse);
 
       const result = await fetchPetsByTutor('customer-1');
 
-      expect(mockApiClient).toHaveBeenCalledWith('/pets/tutor/customer-1', {
-        method: 'GET',
-      });
-      expect(result).toEqual(mockPets);
+      expect(mockApiClient).toHaveBeenCalledWith('/api/pets?tutorId=customer-1');
+      expect(result).toEqual(mockResponse);
     });
   });
 
   describe('createPet', () => {
     it('should create a new pet', async () => {
       const petData = {
-        nome: 'Bella',
-        especie: 'Gato',
-        raca: 'Persa',
-        dataNascimento: new Date('2021-03-15'),
-        peso: 4.2,
-        cor: 'Branco',
-        sexo: 'F' as const,
-        microchip: '987654321098765',
-        observacoes: 'Gata muito carinhosa',
-        ativo: true,
-        tutorId: 'customer-2',
+        tutorId: 'customer-1',
+        name: 'Rex',
+        species: 'Cão',
+        breed: 'Golden Retriever',
+        weight: 25.5,
+        birthDate: '2020-01-01T00:00:00.000Z',
+        observations: 'Pet muito dócil',
+        active: true,
       };
 
       const mockCreatedPet = {
         id: '2',
         ...petData,
-        dataNascimento: petData.dataNascimento.toISOString(),
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-        tutor: {
-          id: 'customer-2',
-          nome: 'Maria Santos',
-          telefone: '11888888888',
-          email: 'maria@example.com',
-        },
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
       };
 
       mockApiClient.mockResolvedValue(mockCreatedPet);
 
       const result = await createPet(petData);
 
-      expect(mockApiClient).toHaveBeenCalledWith('/pets', {
+      expect(mockApiClient).toHaveBeenCalledWith('/api/pets', {
         method: 'POST',
         body: petData,
       });
@@ -213,39 +153,30 @@ describe('pets-api', () => {
   describe('updatePet', () => {
     it('should update an existing pet', async () => {
       const updateData = {
-        nome: 'Rex Jr.',
-        peso: 30.0,
+        name: 'Rex Jr.',
+        weight: 26,
       };
 
       const mockUpdatedPet = {
         id: '1',
-        nome: 'Rex Jr.',
-        especie: 'Cão',
-        raca: 'Golden Retriever',
-        dataNascimento: '2020-01-01T00:00:00.000Z',
-        peso: 30.0,
-        cor: 'Dourado',
-        sexo: 'M',
-        microchip: '123456789012345',
-        observacoes: 'Pet muito dócil',
-        ativo: true,
         tutorId: 'customer-1',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-        tutor: {
-          id: 'customer-1',
-          nome: 'João Silva',
-          telefone: '11999999999',
-          email: 'joao@example.com',
-        },
+        name: 'Rex Jr.',
+        species: 'Cão',
+        breed: 'Golden Retriever',
+        birthDate: '2020-01-01T00:00:00.000Z',
+        weight: 26,
+        observations: 'Pet muito dócil',
+        active: true,
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
       };
 
       mockApiClient.mockResolvedValue(mockUpdatedPet);
 
       const result = await updatePet('1', updateData);
 
-      expect(mockApiClient).toHaveBeenCalledWith('/pets/1', {
-        method: 'PUT',
+      expect(mockApiClient).toHaveBeenCalledWith('/api/pets/1', {
+        method: 'PATCH',
         body: updateData,
       });
       expect(result).toEqual(mockUpdatedPet);
@@ -254,129 +185,29 @@ describe('pets-api', () => {
 
   describe('deletePet', () => {
     it('should delete a pet', async () => {
-      const mockDeletedPet = {
-        id: '1',
-        nome: 'Rex',
-        especie: 'Cão',
-        raca: 'Golden Retriever',
-        dataNascimento: '2020-01-01T00:00:00.000Z',
-        peso: 25.5,
-        cor: 'Dourado',
-        sexo: 'M',
-        microchip: '123456789012345',
-        observacoes: 'Pet muito dócil',
-        ativo: true,
-        tutorId: 'customer-1',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-        tutor: {
-          id: 'customer-1',
-          nome: 'João Silva',
-          telefone: '11999999999',
-          email: 'joao@example.com',
-        },
-      };
-
-      mockApiClient.mockResolvedValue(mockDeletedPet);
+      mockApiClient.mockResolvedValue(undefined);
 
       const result = await deletePet('1');
 
-      expect(mockApiClient).toHaveBeenCalledWith('/pets/1', {
+      expect(mockApiClient).toHaveBeenCalledWith('/api/pets/1', {
         method: 'DELETE',
       });
-      expect(result).toEqual(mockDeletedPet);
+      expect(result).toBeUndefined();
     });
   });
 
   describe('searchPets', () => {
     it('should search pets by term', async () => {
       const mockSearchResults = [
-        {
-          id: '1',
-          nome: 'Rex',
-          especie: 'Cão',
-          raca: 'Golden Retriever',
-          dataNascimento: '2020-01-01T00:00:00.000Z',
-          peso: 25.5,
-          cor: 'Dourado',
-          sexo: 'M',
-          microchip: '123456789012345',
-          observacoes: 'Pet muito dócil',
-          ativo: true,
-          tutorId: 'customer-1',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          tutor: {
-            id: 'customer-1',
-            nome: 'João Silva',
-            telefone: '11999999999',
-            email: 'joao@example.com',
-          },
-        },
+        { id: '1', name: 'Rex', species: 'Cão', active: true, tutorId: 'customer-1', createdAt: new Date(), updatedAt: new Date() },
       ];
 
       mockApiClient.mockResolvedValue(mockSearchResults);
 
       const result = await searchPets('Rex');
 
-      expect(mockApiClient).toHaveBeenCalledWith('/pets/search', {
-        method: 'GET',
-        params: { q: 'Rex' },
-      });
+      expect(mockApiClient).toHaveBeenCalledWith('/api/pets?q=Rex');
       expect(result).toEqual(mockSearchResults);
-    });
-  });
-
-  describe('fetchActivePets', () => {
-    it('should fetch only active pets', async () => {
-      const mockActivePets = [
-        {
-          id: '1',
-          nome: 'Rex',
-          especie: 'Cão',
-          raca: 'Golden Retriever',
-          dataNascimento: '2020-01-01T00:00:00.000Z',
-          peso: 25.5,
-          cor: 'Dourado',
-          sexo: 'M',
-          microchip: '123456789012345',
-          observacoes: 'Pet muito dócil',
-          ativo: true,
-          tutorId: 'customer-1',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          tutor: {
-            id: 'customer-1',
-            nome: 'João Silva',
-            telefone: '11999999999',
-            email: 'joao@example.com',
-          },
-        },
-      ];
-
-      mockApiClient.mockResolvedValue(mockActivePets);
-
-      const result = await fetchActivePets();
-
-      expect(mockApiClient).toHaveBeenCalledWith('/pets/active', {
-        method: 'GET',
-      });
-      expect(result).toEqual(mockActivePets);
-    });
-  });
-
-  describe('fetchPetSpecies', () => {
-    it('should fetch distinct pet species', async () => {
-      const mockSpecies = ['Cão', 'Gato', 'Pássaro', 'Peixe'];
-
-      mockApiClient.mockResolvedValue(mockSpecies);
-
-      const result = await fetchPetSpecies();
-
-      expect(mockApiClient).toHaveBeenCalledWith('/pets/species', {
-        method: 'GET',
-      });
-      expect(result).toEqual(mockSpecies);
     });
   });
 });
