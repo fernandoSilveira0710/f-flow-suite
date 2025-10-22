@@ -130,19 +130,18 @@ export default function NovoPet() {
       <PageHeader
         title={`Novo Pet para ${customer.name}`}
         description="Cadastre um novo pet para o cliente"
-        action={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate(`/erp/clientes/${id}`)}>
-              <User className="h-4 w-4 mr-2" />
-              Ver Cliente
-            </Button>
-            <Button variant="outline" onClick={() => navigate(`/erp/clientes/${id}/pets`)}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Button>
-          </div>
-        }
       />
+
+      <div className="flex gap-2 justify-end">
+        <Button variant="outline" onClick={() => navigate(`/erp/clientes/${id}`)}>
+          <User className="h-4 w-4 mr-2" />
+          Ver Cliente
+        </Button>
+        <Button variant="outline" onClick={() => navigate(`/erp/clientes/${id}/pets`)}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Voltar
+        </Button>
+      </div>
 
       {/* Customer Info */}
       <Card>
@@ -247,50 +246,14 @@ export default function NovoPet() {
                   placeholder="0.0"
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="color">Cor</Label>
-                <Input
-                  id="color"
-                  value={formData.color || ''}
-                  onChange={(e) => handleInputChange('color', e.target.value)}
-                  placeholder="Cor do pet"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="gender">Sexo</Label>
-                <Select
-                  value={formData.gender || ''}
-                  onValueChange={(value) => handleInputChange('gender', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o sexo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Macho">Macho</SelectItem>
-                    <SelectItem value="Fêmea">Fêmea</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="microchip">Microchip</Label>
-                <Input
-                  id="microchip"
-                  value={formData.microchip || ''}
-                  onChange={(e) => handleInputChange('microchip', e.target.value)}
-                  placeholder="Número do microchip"
-                />
-              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Observações</Label>
+              <Label htmlFor="observations">Observações</Label>
               <Textarea
-                id="notes"
-                value={formData.notes || ''}
-                onChange={(e) => handleInputChange('notes', e.target.value)}
+                id="observations"
+                value={formData.observations || ''}
+                onChange={(e) => handleInputChange('observations', e.target.value)}
                 placeholder="Observações sobre o pet (temperamento, cuidados especiais, etc.)"
                 rows={3}
               />

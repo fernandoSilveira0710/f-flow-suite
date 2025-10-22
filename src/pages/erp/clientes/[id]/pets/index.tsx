@@ -106,23 +106,22 @@ export default function GerenciarPetsCliente() {
       <PageHeader
         title={`Pets de ${customer.name}`}
         description="Gerencie os pets do cliente"
-        action={
-          <div className="flex gap-2">
-            <Button onClick={() => navigate(`/erp/clientes/${id}/pets/novo`)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Pet
-            </Button>
-            <Button variant="outline" onClick={() => navigate(`/erp/clientes/${id}`)}>
-              <User className="h-4 w-4 mr-2" />
-              Ver Cliente
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/erp/clientes')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Button>
-          </div>
-        }
       />
+
+      <div className="flex gap-2 justify-end">
+        <Button onClick={() => navigate(`/erp/clientes/${id}/pets/novo`)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Pet
+        </Button>
+        <Button variant="outline" onClick={() => navigate(`/erp/clientes/${id}`)}>
+          <User className="h-4 w-4 mr-2" />
+          Ver Cliente
+        </Button>
+        <Button variant="outline" onClick={() => navigate('/erp/clientes')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Voltar
+        </Button>
+      </div>
 
       {/* Customer Info Card */}
       <Card>
@@ -210,18 +209,12 @@ export default function GerenciarPetsCliente() {
                     <span className="font-medium">{pet.weight} kg</span>
                   </div>
                 )}
-                {pet.color && (
-                  <div>
-                    <span className="text-sm text-muted-foreground">Cor: </span>
-                    <span className="font-medium">{pet.color}</span>
-                  </div>
-                )}
               </div>
 
-              {pet.notes && (
+              {pet.observations && (
                 <div className="pt-2 border-t">
                   <div className="text-sm text-muted-foreground mb-1">Observações:</div>
-                  <div className="text-sm">{pet.notes}</div>
+                  <div className="text-sm">{pet.observations}</div>
                 </div>
               )}
 
@@ -264,29 +257,6 @@ export default function GerenciarPetsCliente() {
           </Card>
         ))}
       </div>
-
-      {filteredPets.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Heart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">
-              {searchTerm ? 'Nenhum pet encontrado' : 'Nenhum pet cadastrado'}
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              {searchTerm 
-                ? 'Tente ajustar os filtros de busca'
-                : 'Comece adicionando o primeiro pet deste cliente'
-              }
-            </p>
-            {!searchTerm && (
-              <Button onClick={() => navigate(`/erp/clientes/${id}/pets/novo`)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Pet
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
