@@ -420,10 +420,8 @@ export default function PlanoPage() {
         if (subscriptionResponse.ok) {
           // Atualizar plano local
           await handlePlanUpdate(mappedPlan);
-          toast({
-            title: 'Sucesso',
-            description: 'Plano selecionado e assinatura criada com sucesso',
-          });
+
++          toast.success('Plano selecionado e assinatura criada com sucesso');
           await loadPlanFromHub(); // Recarregar informações
           await loadInvoices(); // Recarregar faturas
           return;
@@ -438,10 +436,8 @@ export default function PlanoPage() {
       // Fallback: apenas atualizar localmente
       try {
         await handlePlanUpdate(mappedPlan);
-        toast({
-          title: 'Sucesso',
-          description: 'Plano atualizado localmente (Hub indisponível)',
-        });
+
++        toast.success('Plano atualizado localmente (Hub indisponível)');
         await loadPlanFromHub();
       } catch (localError) {
         console.error('Erro ao atualizar plano localmente:', localError);
@@ -463,11 +459,7 @@ export default function PlanoPage() {
         }
       }
       
-      toast({
-        title: 'Erro ao selecionar plano',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast.error('Erro ao selecionar plano', { description: errorMessage });
     }
   };
 
