@@ -16,7 +16,7 @@ import {
   type UpdateProfessionalDto,
 } from '@/lib/professionals-api';
 import { getServices } from '@/lib/schedule-api';
-import { ArrowLeft, User, Box } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 export default function EditarProfissional() {
   const { id } = useParams<{ id: string }>();
@@ -26,7 +26,7 @@ export default function EditarProfissional() {
   const [professional, setProfessional] = useState<ProfessionalResponseDto | null>(null);
   const services = getServices();
 
-  const [role, setRole] = useState<'Professional' | 'Resource'>('Professional');
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -50,13 +50,12 @@ export default function EditarProfissional() {
     }
 
     setProfessional(loadedProfessional);
-    setRole(loadedProfessional.role);
     setName(loadedProfessional.name);
     setEmail(loadedProfessional.email || '');
     setPhone(loadedProfessional.phone || '');
     setSpecialty(loadedProfessional.specialty || '');
     setDescription(loadedProfessional.description || '');
-    setServiceIds(loadedProfessional.serviceIds || []);
+    setServiceIds(loadedProfessional.services || []);
     setActive(loadedProfessional.active);
     setLoading(false);
   }, [id, navigate, toast]);
@@ -77,7 +76,6 @@ export default function EditarProfissional() {
 
     const updateData: UpdateProfessionalDto = {
       name: name.trim(),
-      role,
       email: email.trim() || undefined,
       phone: phone.trim() || undefined,
       specialty: specialty.trim() || undefined,
@@ -90,7 +88,7 @@ export default function EditarProfissional() {
 
     if (updated) {
       toast({
-        title: `${role === 'Professional' ? 'Profissional' : 'Recurso'} atualizado`,
+        title: 'Profissional atualizado',
         description: `${updated.name} foi atualizado com sucesso`,
       });
       navigate('/erp/agenda/profissionais');
@@ -119,35 +117,16 @@ export default function EditarProfissional() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <PageHeader
-          title={`Editar ${role === 'Professional' ? 'Profissional' : 'Recurso'}`}
-          description={professional?.name}
+          title={"Editar Profissional"}
+          description={"Complete os dados do profissional"}
+          actionLabel="Voltar"
+          actionIcon={ArrowLeft}
+          onAction={() => navigate('/erp/agenda/profissionais')}
         />
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-3xl space-y-6">
-        {/* Tipo (read-only for now) */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tipo</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/50">
-              {role === 'Professional' ? (
-                <User className="h-6 w-6" />
-              ) : (
-                <Box className="h-6 w-6" />
-              )}
-              <div>
-                <p className="font-medium">
-                  {role === 'Professional' ? 'Profissional' : 'Recurso'}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {role === 'Professional' ? 'Atendente, funcionário' : 'Sala, box, cadeira'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
 
         {/* Informações Básicas */}
         <Card>
@@ -204,8 +183,7 @@ export default function EditarProfissional() {
           <CardHeader>
             <CardTitle>Serviços Atendidos</CardTitle>
             <CardDescription>
-              Selecione quais serviços este {role === 'Professional' ? 'profissional' : 'recurso'}{' '}
-              pode atender
+              Selecione quais serviços este profissional pode atender
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -5,10 +5,10 @@
 
 // URLs das APIs
 export const API_URLS = {
-  HUB: import.meta.env.VITE_HUB_API_URL || 'http://127.0.0.1:3001',
-  CLIENT_LOCAL: import.meta.env.VITE_CLIENT_LOCAL_API_URL || 'http://127.0.0.1:8081',
-  SITE: import.meta.env.VITE_SITE_URL || 'http://127.0.0.1:5173',
-  FRONTEND: import.meta.env.VITE_FRONTEND_URL || 'http://127.0.0.1:8080',
+  HUB: import.meta.env.VITE_HUB_API_URL || 'http://localhost:3001',
+  CLIENT_LOCAL: import.meta.env.VITE_CLIENT_LOCAL_API_URL || 'http://localhost:8081',
+  SITE: import.meta.env.VITE_SITE_URL || 'http://localhost:5173',
+  FRONTEND: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:8080',
 } as const;
 
 // URLs de desenvolvimento

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { PlanSyncService } from '@/services/plan-sync.service';
@@ -48,9 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [licenseCacheLastChecked, setLicenseCacheLastChecked] = useState<string | null>(null);
   const [offlineDaysLeft, setOfflineDaysLeft] = useState<number | null>(null);
   const navigate = useNavigate();
+  const hasInitCheckRef = useRef(false);
 
   // Pequena utilidade para fetch com timeout explícito
-  const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 6000) => {
+  const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 10000) => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -69,10 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (storedUser) {
           setUser(JSON.parse(storedUser));
         }
-        
-        // Iniciar verificação de licença sem bloquear indefinidamente o loading.
         const licenseCheck = checkLicenseStatus();
-        // Espera no máximo 1.5s antes de liberar UI; licença continua em background.
         await Promise.race([
           licenseCheck,
           new Promise((resolve) => setTimeout(resolve, 1500)),
@@ -85,6 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    if (hasInitCheckRef.current) {
+      return;
+    }
+    hasInitCheckRef.current = true;
     checkAuthStatus();
   }, []);
 
@@ -98,9 +100,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // SEMPRE limpar estado antes de nova consulta
       setLicenseStatus(null);
       
-      // Consulta DIRETA ao client-local - SEM CACHE
+      // Consulta via proxy do ERP (preferencial em dev)
       let statusResponse: Response;
       try {
+        statusResponse = await fetchWithTimeout(`/licensing/status?t=${Date.now()}`, {
+          method: 'GET',
+          cache: 'no-cache',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            ...(tenantId && { 'x-tenant-id': tenantId })
+          }
+        }, 10000);
+      } catch (e) {
+        console.warn('Falha via proxy /licensing/status; tentando direto no client-local', e);
         statusResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
           method: 'GET',
           cache: 'no-cache',
@@ -112,25 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             'Expires': '0',
             ...(tenantId && { 'x-tenant-id': tenantId })
           }
-        }, 6000);
-      } catch (e) {
-        if ((e as any)?.name === 'AbortError') {
-          console.warn('⏱️ Timeout em /licensing/status, tentando novamente com 8000ms');
-          statusResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
-            method: 'GET',
-            cache: 'no-cache',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0',
-              ...(tenantId && { 'x-tenant-id': tenantId })
-            }
-          }, 8000);
-        } else {
-          throw e;
-        }
+        }, 10000);
       }
       
       if (!statusResponse.ok) {
@@ -159,18 +157,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn('⚠️ Falha ao calcular dias offline restantes', e);
       }
       
-      const installResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/install-status?t=${Date.now()}`, {
-        method: 'GET',
-        cache: 'no-cache',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          ...(tenantId && { 'x-tenant-id': tenantId })
-        }
-      }, 3000);
+      let installResponse: Response;
+      try {
+        installResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/install-status?t=${Date.now()}`, {
+          method: 'GET',
+          cache: 'no-cache',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            ...(tenantId && { 'x-tenant-id': tenantId })
+          }
+        }, 6000);
+      } catch (e) {
+        console.warn('Falha via proxy /licensing/install-status; tentando direto no client-local', e);
+        installResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/install-status?t=${Date.now()}`, {
+          method: 'GET',
+          cache: 'no-cache',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            ...(tenantId && { 'x-tenant-id': tenantId })
+          }
+        }, 8000);
+      }
       
       if (!installResponse.ok) {
         throw new Error(`Install status request failed: ${installResponse.status}`);
@@ -738,16 +753,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [fetchWithTimeout]);
 
-  const value: AuthContextType = {
-    user,
-    licenseStatus,
-    isLoading,
-    login,
-    logout,
-    checkLicenseStatus,
-    isFirstInstallation,
-    hasLocalUsers
-  };
+  // Removido objeto 'value' não utilizado para evitar erro de tipagem.
 
   return (
     <AuthContext.Provider value={{
