@@ -16,7 +16,7 @@ const tipos: ResourceType[] = ['BOX', 'GAIOLA', 'MESA', 'SECADOR'];
 export default function NovoRecurso() {
   const navigate = useNavigate();
   const [resourceTypes] = useState(() => getResourceTypes().filter(rt => rt.active));
-  const [tipo, setTipo] = useState<ResourceType>(resourceTypes[0]?.name || 'BOX');
+  const [tipo, setTipo] = useState<ResourceType>(resourceTypes[0]?.name as ResourceType || 'BOX');
   const [nome, setNome] = useState('');
   const [capacidadeSimultanea, setCapacidadeSimultanea] = useState('1');
   const [ativo, setAtivo] = useState(true);

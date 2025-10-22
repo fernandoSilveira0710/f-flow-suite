@@ -228,56 +228,6 @@ export class PlanSyncService {
   /**
    * Sincroniza planos após alteração de plano (para uso futuro)
    */
-  static async syncPlansAfterPlanChange(tenantId: string, userId: string, newPlanKey: string): Promise<SyncResult> {
-    console.log('🔄 Iniciando sincronização após alteração de plano...', { tenantId, userId, newPlanKey });
-    
-    const errors: string[] = [];
-
-    try {
-      // 1. Atualizar Hub (se disponível)
-      const hubUpdate = await this.updateHubPlan(tenantId, newPlanKey);
-      if (!hubUpdate.success) {
-        errors.push('Falha ao atualizar Hub: ' + hubUpdate.message);
-        console.warn('⚠️ Falha ao atualizar Hub:', hubUpdate.message);
-      }
-
-      // 2. Sincronizar com client-local
-      const clientLocalSync = await this.syncClientLocal(tenantId, userId, newPlanKey);
-      if (!clientLocalSync.success) {
-        errors.push('Falha na sincronização com client-local: ' + clientLocalSync.message);
-        console.warn('⚠️ Falha na sincronização com client-local:', clientLocalSync.message);
-      }
-
-      // 3. Atualizar cache local
-      const cacheSync = await this.updateClientLocalCache(tenantId, newPlanKey);
-      if (!cacheSync.success) {
-        errors.push('Falha na atualização do cache: ' + cacheSync.message);
-        console.warn('⚠️ Falha na atualização do cache:', cacheSync.message);
-      }
-
-      const success = errors.length === 0;
-      const message = success 
-        ? `Plano alterado e sincronizado com sucesso: ${newPlanKey}`
-        : `Alteração parcial. ${errors.length} erro(s) encontrado(s)`;
-
-      return {
-        success,
-        message,
-        planKey: newPlanKey,
-        errors: errors.length > 0 ? errors : undefined
-      };
-
-    } catch (error) {
-      const errorMessage = `Erro geral na sincronização: ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
-      console.error('❌', errorMessage, error);
-      
-      return {
-        success: false,
-        message: errorMessage,
-        errors: [errorMessage]
-      };
-    }
-  }
 
   /**
    * Atualiza plano no Hub (para uso futuro)
