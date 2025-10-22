@@ -31,9 +31,9 @@ DisableDirPage=no
 
 [Files]
 Source: "{#ClientBinary}"; DestDir: "{app}"; DestName: "f-flow-client.exe"; Flags: ignoreversion
-Source: "client-local\\installers\\install-windows.ps1"; DestDir: "{app}\\installers"; Flags: ignoreversion
-Source: "client-local\\installers\\uninstall-windows.ps1"; DestDir: "{app}\\installers"; Flags: ignoreversion
-Source: "client-local\\.env.example"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\\install-windows.ps1"; DestDir: "{app}\\installers"; Flags: ignoreversion
+Source: "..\\uninstall-windows.ps1"; DestDir: "{app}\\installers"; Flags: ignoreversion
+Source: "..\\..\\.env.example"; DestDir: "{app}"; Flags: ignoreversion
 
 [Tasks]
 Name: "desktopicon"; Description: "Criar atalho na área de trabalho"; Flags: checkedonce
