@@ -24,68 +24,46 @@ describe('customers-api', () => {
 
   describe('fetchCustomers', () => {
     it('should fetch customers with default parameters', async () => {
-      const mockResponse = {
-        data: [
-          {
-            id: '1',
-            nome: 'João Silva',
-            documento: '12345678901',
-            email: 'joao@example.com',
-            telefone: '11999999999',
-            dataNascimento: '1990-01-01T00:00:00.000Z',
-            endereco: 'Rua A, 123',
-            tags: ['VIP'],
-            notas: 'Cliente especial',
-            ativo: true,
-            createdAt: '2024-01-01T00:00:00.000Z',
-            updatedAt: '2024-01-01T00:00:00.000Z',
-            pets: [],
-          },
-        ],
-        total: 1,
-        page: 1,
-        limit: 20,
-        totalPages: 1,
-      };
+      const mockResponse = [
+        {
+          id: '1',
+          name: 'João Silva',
+          documento: '12345678901',
+          email: 'joao@example.com',
+          phone: '11999999999',
+          dataNascISO: '1990-01-01T00:00:00.000Z',
+          address: 'Rua A, 123',
+          tags: 'VIP',
+          notes: 'Cliente especial',
+          active: true,
+          createdAt: new Date('2024-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+          pets: [],
+        },
+      ];
 
       mockApiClient.mockResolvedValue(mockResponse);
 
       const result = await fetchCustomers();
 
-      expect(mockApiClient).toHaveBeenCalledWith('/customers', {
-        method: 'GET',
-        params: {
-          page: 1,
-          limit: 20,
-        },
-      });
+      expect(mockApiClient).toHaveBeenCalledWith('/api/customers');
       expect(result).toEqual(mockResponse);
     });
 
     it('should fetch customers with custom filters', async () => {
       const filters = {
-        page: 2,
-        limit: 10,
-        search: 'João',
-        ativo: true,
+        q: 'João',
+        active: true,
+        tags: ['VIP'],
       };
 
-      const mockResponse = {
-        data: [],
-        total: 0,
-        page: 2,
-        limit: 10,
-        totalPages: 0,
-      };
+      const mockResponse: any[] = [];
 
       mockApiClient.mockResolvedValue(mockResponse);
 
       const result = await fetchCustomers(filters);
 
-      expect(mockApiClient).toHaveBeenCalledWith('/customers', {
-        method: 'GET',
-        params: filters,
-      });
+      expect(mockApiClient).toHaveBeenCalledWith('/api/customers?q=Jo%C3%A3o&active=true&tags=VIP');
       expect(result).toEqual(mockResponse);
     });
   });
@@ -94,23 +72,24 @@ describe('customers-api', () => {
     it('should fetch a single customer by id', async () => {
       const mockCustomer = {
         id: '1',
-        nome: 'João Silva',
+        name: 'João Silva',
         documento: '12345678901',
         email: 'joao@example.com',
-        telefone: '11999999999',
-        dataNascimento: '1990-01-01T00:00:00.000Z',
-        endereco: 'Rua A, 123',
-        tags: ['VIP'],
-        notas: 'Cliente especial',
-        ativo: true,
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
+        phone: '11999999999',
+        dataNascISO: '1990-01-01T00:00:00.000Z',
+        address: 'Rua A, 123',
+        tags: 'VIP',
+        notes: 'Cliente especial',
+        active: true,
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
         pets: [
           {
             id: 'pet-1',
-            nome: 'Rex',
-            especie: 'Cão',
-            raca: 'Golden Retriever',
+            name: 'Rex',
+            species: 'Cão',
+            breed: 'Golden Retriever',
+            active: true,
           },
         ],
       };
@@ -119,9 +98,7 @@ describe('customers-api', () => {
 
       const result = await fetchCustomer('1');
 
-      expect(mockApiClient).toHaveBeenCalledWith('/customers/1', {
-        method: 'GET',
-      });
+      expect(mockApiClient).toHaveBeenCalledWith('/api/customers/1');
       expect(result).toEqual(mockCustomer);
     });
   });
@@ -129,23 +106,22 @@ describe('customers-api', () => {
   describe('createCustomer', () => {
     it('should create a new customer', async () => {
       const customerData = {
-        nome: 'Maria Santos',
+        name: 'Maria Santos',
         documento: '98765432100',
         email: 'maria@example.com',
-        telefone: '11888888888',
-        dataNascimento: new Date('1985-05-15'),
-        endereco: 'Rua B, 456',
-        tags: ['Premium'],
-        notas: 'Cliente premium',
-        ativo: true,
+        phone: '11888888888',
+        dataNascISO: new Date('1985-05-15').toISOString(),
+        address: 'Rua B, 456',
+        tags: 'Premium',
+        notes: 'Cliente premium',
+        active: true,
       };
 
       const mockCreatedCustomer = {
         id: '2',
         ...customerData,
-        dataNascimento: customerData.dataNascimento.toISOString(),
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
         pets: [],
       };
 
@@ -153,7 +129,7 @@ describe('customers-api', () => {
 
       const result = await createCustomer(customerData);
 
-      expect(mockApiClient).toHaveBeenCalledWith('/customers', {
+      expect(mockApiClient).toHaveBeenCalledWith('/api/customers', {
         method: 'POST',
         body: customerData,
       });
@@ -164,23 +140,23 @@ describe('customers-api', () => {
   describe('updateCustomer', () => {
     it('should update an existing customer', async () => {
       const updateData = {
-        nome: 'João Silva Santos',
-        telefone: '11777777777',
+        name: 'João Silva Santos',
+        phone: '11777777777',
       };
 
       const mockUpdatedCustomer = {
         id: '1',
-        nome: 'João Silva Santos',
+        name: 'João Silva Santos',
         documento: '12345678901',
         email: 'joao@example.com',
-        telefone: '11777777777',
-        dataNascimento: '1990-01-01T00:00:00.000Z',
-        endereco: 'Rua A, 123',
-        tags: ['VIP'],
-        notas: 'Cliente especial',
-        ativo: true,
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
+        phone: '11777777777',
+        dataNascISO: '1990-01-01T00:00:00.000Z',
+        address: 'Rua A, 123',
+        tags: 'VIP',
+        notes: 'Cliente especial',
+        active: true,
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
         pets: [],
       };
 
@@ -188,8 +164,8 @@ describe('customers-api', () => {
 
       const result = await updateCustomer('1', updateData);
 
-      expect(mockApiClient).toHaveBeenCalledWith('/customers/1', {
-        method: 'PUT',
+      expect(mockApiClient).toHaveBeenCalledWith('/api/customers/1', {
+        method: 'PATCH',
         body: updateData,
       });
       expect(result).toEqual(mockUpdatedCustomer);
@@ -200,17 +176,17 @@ describe('customers-api', () => {
     it('should delete a customer', async () => {
       const mockDeletedCustomer = {
         id: '1',
-        nome: 'João Silva',
+        name: 'João Silva',
         documento: '12345678901',
         email: 'joao@example.com',
-        telefone: '11999999999',
-        dataNascimento: '1990-01-01T00:00:00.000Z',
-        endereco: 'Rua A, 123',
-        tags: ['VIP'],
-        notas: 'Cliente especial',
-        ativo: true,
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
+        phone: '11999999999',
+        dataNascISO: '1990-01-01T00:00:00.000Z',
+        address: 'Rua A, 123',
+        tags: 'VIP',
+        notes: 'Cliente especial',
+        active: true,
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
         pets: [],
       };
 
@@ -218,7 +194,7 @@ describe('customers-api', () => {
 
       const result = await deleteCustomer('1');
 
-      expect(mockApiClient).toHaveBeenCalledWith('/customers/1', {
+      expect(mockApiClient).toHaveBeenCalledWith('/api/customers/1', {
         method: 'DELETE',
       });
       expect(result).toEqual(mockDeletedCustomer);
@@ -230,17 +206,17 @@ describe('customers-api', () => {
       const mockSearchResults = [
         {
           id: '1',
-          nome: 'João Silva',
+          name: 'João Silva',
           documento: '12345678901',
           email: 'joao@example.com',
-          telefone: '11999999999',
-          dataNascimento: '1990-01-01T00:00:00.000Z',
-          endereco: 'Rua A, 123',
-          tags: ['VIP'],
-          notas: 'Cliente especial',
-          ativo: true,
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
+          phone: '11999999999',
+          dataNascISO: '1990-01-01T00:00:00.000Z',
+          address: 'Rua A, 123',
+          tags: 'VIP',
+          notes: 'Cliente especial',
+          active: true,
+          createdAt: new Date('2024-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2024-01-01T00:00:00.000Z'),
           pets: [],
         },
       ];
@@ -249,10 +225,7 @@ describe('customers-api', () => {
 
       const result = await searchCustomers('João');
 
-      expect(mockApiClient).toHaveBeenCalledWith('/customers/search', {
-        method: 'GET',
-        params: { q: 'João' },
-      });
+      expect(mockApiClient).toHaveBeenCalledWith('/api/customers?q=Jo%C3%A3o');
       expect(result).toEqual(mockSearchResults);
     });
   });
@@ -262,17 +235,17 @@ describe('customers-api', () => {
       const mockActiveCustomers = [
         {
           id: '1',
-          nome: 'João Silva',
+          name: 'João Silva',
           documento: '12345678901',
           email: 'joao@example.com',
-          telefone: '11999999999',
-          dataNascimento: '1990-01-01T00:00:00.000Z',
-          endereco: 'Rua A, 123',
-          tags: ['VIP'],
-          notas: 'Cliente especial',
-          ativo: true,
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
+          phone: '11999999999',
+          dataNascISO: '1990-01-01T00:00:00.000Z',
+          address: 'Rua A, 123',
+          tags: 'VIP',
+          notes: 'Cliente especial',
+          active: true,
+          createdAt: new Date('2024-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2024-01-01T00:00:00.000Z'),
           pets: [],
         },
       ];
@@ -281,9 +254,7 @@ describe('customers-api', () => {
 
       const result = await fetchActiveCustomers();
 
-      expect(mockApiClient).toHaveBeenCalledWith('/customers/active', {
-        method: 'GET',
-      });
+      expect(mockApiClient).toHaveBeenCalledWith('/api/customers?active=true');
       expect(result).toEqual(mockActiveCustomers);
     });
   });
