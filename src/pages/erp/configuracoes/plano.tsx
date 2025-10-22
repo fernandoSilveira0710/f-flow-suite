@@ -370,7 +370,7 @@ export default function PlanoPage() {
     try {
       await updatePlan(planKey);
       toast.success('Plano atualizado com sucesso');
-      await loadPlan(); // Recarregar informações
+      await loadPlanFromHub(); // Recarregar informações
     } catch (error) {
       console.error('Erro ao atualizar plano:', error);
       toast.error('Erro ao atualizar plano');
@@ -424,7 +424,7 @@ export default function PlanoPage() {
             title: 'Sucesso',
             description: 'Plano selecionado e assinatura criada com sucesso',
           });
-          await loadPlan(); // Recarregar informações
+          await loadPlanFromHub(); // Recarregar informações
           await loadInvoices(); // Recarregar faturas
           return;
         } else {
@@ -442,7 +442,7 @@ export default function PlanoPage() {
           title: 'Sucesso',
           description: 'Plano atualizado localmente (Hub indisponível)',
         });
-        await loadPlan();
+        await loadPlanFromHub();
       } catch (localError) {
         console.error('Erro ao atualizar plano localmente:', localError);
         throw new Error('Falha ao atualizar plano tanto no Hub quanto localmente');
