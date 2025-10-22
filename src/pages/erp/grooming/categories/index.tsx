@@ -157,6 +157,7 @@ export default function GroomingCategoriesIndex() {
 
         {filteredCategories.length === 0 ? (
           <EmptyState
+            icon={Search}
             title="Nenhuma categoria encontrada"
             description="Não há categorias cadastradas ou que correspondam à sua busca."
           />

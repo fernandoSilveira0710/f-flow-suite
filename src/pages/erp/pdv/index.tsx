@@ -1536,7 +1536,7 @@ export default function PdvPage() {
             <DialogTitle>Desconto no Item</DialogTitle>
             <DialogDescription>
               {selectedItemIndex >= 0 && cart[selectedItemIndex] 
-                ? `Aplicar desconto em: ${cart[selectedItemIndex]?.produto?.nome ?? cart[selectedItemIndex]?.produto?.sku ?? cart[selectedItemIndex]?.nome ?? ''}`
+                ? `Aplicar desconto em: ${cart[selectedItemIndex]?.produto?.nome ?? cart[selectedItemIndex]?.produto?.sku ?? ''}`
                 : 'Selecione um item primeiro'}
             </DialogDescription>
           </DialogHeader>
