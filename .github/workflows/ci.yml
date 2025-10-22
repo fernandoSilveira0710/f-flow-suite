@@ -233,7 +233,7 @@ jobs:
 
       - name: Compile installer (Inno Setup)
         run: |
-          & 'C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe' 'client-local\\installers\\windows\\f-flow-client-installer.iss' /DClientBinary='installer_assets\\f-flow-client-win32-x64.exe' /DERPUrl='https://erp.f-flow.com' /DHubUrl='https://hub.f-flow.com'
+          & 'C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe' 'client-local\\installers\\windows\\f-flow-client-installer.iss' /DClientBinary=installer_assets\\f-flow-client-win32-x64.exe /DERPUrl=https://erp.f-flow.com /DHubUrl=https://hub.f-flow.com
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
