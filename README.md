@@ -31,9 +31,6 @@ Após o setup, você terá:
 - **Site Institucional**: http://localhost:5173
 - **Hub API**: http://localhost:3001 (NestJS + PostgreSQL)
 - **Client-local API**: http://localhost:8081 (NestJS + SQLite)
-- **Prisma Studio HUB**: http://localhost:5555 (Base de dados do HUB)
-- **Prisma Studio Client-Local**: http://localhost:5556 (Base de dados local)
-- **Adminer**: http://localhost:8080 (PostgreSQL UI)
 - **PostgreSQL**: localhost:5432
 
 ### 👥 Usuários de Teste

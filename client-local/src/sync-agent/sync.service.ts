@@ -251,7 +251,7 @@ export class SyncService {
         }
       });
 
-      const result = summary.reduce((acc, item) => {
+      const result = summary.reduce((acc: Record<string, number>, item: { status: string | null; _count: number }) => {
         acc[item.status || 'unknown'] = item._count;
         return acc;
       }, {} as Record<string, number>);

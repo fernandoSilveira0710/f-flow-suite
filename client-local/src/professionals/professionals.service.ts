@@ -35,7 +35,7 @@ export class ProfessionalsService {
       orderBy: { name: 'asc' },
     });
 
-    return professionals.map(professional => this.mapToResponseDto(professional));
+    return professionals.map((professional: any) => this.mapToResponseDto(professional));
   }
 
   async findOne(id: string): Promise<ProfessionalResponseDto> {
