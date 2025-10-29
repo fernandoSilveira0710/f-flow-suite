@@ -13,6 +13,8 @@ export default defineConfig({
   server: {
     port: 8080,
     host: true,
+    strictPort: true,
+    allowedHosts: ['erp.local', 'localhost'],
     proxy: {
       '/tenants': {
         target: 'http://localhost:3001',

@@ -1,8 +1,13 @@
 import { loadEnvConfig } from './common/env';
 import { bootstrap } from './bootstrap';
 import { runAsWindowsService } from './windows-service';
+import { initFileLogger } from './common/logger';
 
 async function main() {
+  // Initialize file logger early to capture startup messages
+  initFileLogger();
+  console.log('Client Local starting...');
+
   // Load environment configuration
   loadEnvConfig();
   

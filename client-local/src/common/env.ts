@@ -15,12 +15,24 @@ export function loadEnvConfig(): void {
 
   for (const candidate of candidates) {
     if (!candidate) continue;
-    const path = join(process.cwd(), candidate);
-    if (!existsSync(path)) continue;
-    loadDotenv({ path });
-    logger.log(`Loaded environment variables from ${candidate}`);
-    envLoaded = true;
-    return;
+
+    // 1) Try current working directory
+    const cwdPath = join(process.cwd(), candidate);
+    if (existsSync(cwdPath)) {
+      loadDotenv({ path: cwdPath });
+      logger.log(`Loaded environment variables from ${candidate} (cwd)`);
+      envLoaded = true;
+      return;
+    }
+
+    // 2) Try next to compiled dist (service mode safety)
+    const distSiblingPath = join(__dirname, '..', candidate);
+    if (existsSync(distSiblingPath)) {
+      loadDotenv({ path: distSiblingPath });
+      logger.log(`Loaded environment variables from ${candidate} (dist sibling)`);
+      envLoaded = true;
+      return;
+    }
   }
 
   logger.warn('No .env file found; relying on system environment');
