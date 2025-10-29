@@ -30,3 +30,7 @@ dist-ssr
 *.sln
 *.sw?
 hub/.env
+ 
+# Build outputs and installer artifacts (do not commit)
+client-local/build/
+client-local/installers/windows/build/
