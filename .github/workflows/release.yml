@@ -107,6 +107,12 @@ jobs:
           npm run build
           cd ..
 
+          # Baixar Node MSI para gerar o bootstrapper
+          $version = "18.19.1"
+          $msiUrl = "https://nodejs.org/dist/v$version/node-v$version-x64.msi"
+          New-Item -ItemType Directory -Force -Path "installers/wix" | Out-Null
+          Invoke-WebRequest -Uri $msiUrl -OutFile "installers/wix/node-v$version-x64.msi"
+
           # Compilar MSI com WiX
           pwsh installers/wix/build.ps1 -Version "${{ github.ref_name }}" -ProductName "F-Flow Suite" -Manufacturer "2F Solutions"
 
@@ -122,6 +128,18 @@ jobs:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: installers/wix/FFlowSuite.msi
           asset_name: FFlowSuite-${{ github.ref_name }}.msi
+          asset_content_type: application/octet-stream
+
+      # Upload Bootstrapper (Windows)
+      - name: Upload Windows Bootstrapper Asset
+        if: matrix.platform == 'win32'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: installers/wix/FFlowSuiteBootstrapper.exe
+          asset_name: FFlowSuiteBootstrapper-${{ github.ref_name }}.exe
           asset_content_type: application/octet-stream
 
       # macOS Installer

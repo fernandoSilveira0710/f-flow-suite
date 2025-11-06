@@ -5,10 +5,10 @@
     <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.RtfLicense" />
 
     <Chain>
-      <!-- Node.js MSI (exemplo: Node 18 x64). Pode ser ajustado para outra versão. -->
-      <MsiPackage Id="NodeJs" DisplayName="Node.js Runtime" Compressed="no" Vital="yes" Permanent="yes" EnableFeatureSelection="no" SourceFile="node-v18.19.1-x64.msi" />
+      <!-- Node.js MSI (exemplo: Node 18 x64). Embutido no bootstrapper -->
+      <MsiPackage Id="NodeJs" DisplayName="Node.js Runtime" Compressed="yes" Vital="yes" Permanent="yes" EnableFeatureSelection="no" SourceFile="node-v18.19.1-x64.msi" />
 
-      <!-- MSI principal do F-Flow Suite (gerado a partir de Product.wxs) -->
+      <!-- MSI principal do F-Flow Suite (gerado a partir de Product.wxs, embutido) -->
       <MsiPackage Id="FflowMsi" DisplayName="F-Flow Suite" Compressed="yes" Vital="yes" Permanent="no" EnableFeatureSelection="no" SourceFile="FFlowSuite.msi" />
     </Chain>
   </Bundle>

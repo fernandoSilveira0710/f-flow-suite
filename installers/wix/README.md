@@ -32,6 +32,7 @@ Antes de compilar o MSI, gere os builds e coloque os arquivos nas localizações
 
 4. Pré-requisito Node.js:
    - Faça download do MSI do Node.js (ex.: `node-v18.19.1-x64.msi`) e coloque ao lado de `Bundle.wxs`.
+   - O `Bundle.wxs` está configurado com `Compressed="yes"` para embutir o Node MSI e o `FFlowSuite.msi` dentro do `FFlowSuiteBootstrapper.exe`.
 
 ## Compilar
 
@@ -44,7 +45,7 @@ cd installers/wix
 
 Este script irá:
 - Compilar o `Product.wxs` em `FFlowSuite.msi`
-- Compilar o `Bundle.wxs` em um `FFlowSuiteBootstrapper.exe` que instala o Node e depois o MSI
+- Compilar o `Bundle.wxs` em um `FFlowSuiteBootstrapper.exe` que instala o Node e depois o MSI, com ambos embutidos como payloads comprimidos
  - Colher (harvest) o conteúdo de `dist/` com `heat` para incluir todos os arquivos estáticos do ERP
 
 ## Instalar
@@ -52,10 +53,11 @@ Este script irá:
 - Via bootstrapper: execute `FFlowSuiteBootstrapper.exe`
 - Ou diretamente: `msiexec /i FFlowSuite.msi`
 
-Durante a instalação:
+ Durante a instalação:
 - Os arquivos são copiados para `C:\Program Files\F-Flow Suite\...`
 - Os serviços da API (8081) e ERP (8080) são registrados automaticamente via Custom Action silenciosa
 - Atalhos são criados no Desktop e Menu Iniciar, apontando para o `launcher.ps1`
+ - Ao final da instalação, o instalador abre automaticamente `http://localhost:8080/erp/login` no navegador
 
 ## Desinstalar
 

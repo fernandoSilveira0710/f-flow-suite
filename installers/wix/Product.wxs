@@ -91,4 +91,17 @@
       <Custom Action="InstallServicesCA" After="InstallFiles">NOT Installed</Custom>
     </InstallExecuteSequence>
   </Fragment>
+
+  <Fragment>
+    <!-- Custom Action final: abre o ERP no navegador ao término da instalação -->
+    <CustomAction Id="OpenErpCA"
+                  Directory="INSTALLDIR"
+                  ExeCommand='[System64Folder]WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process \"http://localhost:8080/erp/login\""'
+                  Execute="immediate" Return="ignore" Impersonate="yes" />
+
+    <InstallExecuteSequence>
+      <!-- Executa após finalizar a transação, apenas em primeira instalação -->
+      <Custom Action="OpenErpCA" After="InstallFinalize">NOT Installed</Custom>
+    </InstallExecuteSequence>
+  </Fragment>
 </Wix>

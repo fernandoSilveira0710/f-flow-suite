@@ -184,6 +184,14 @@ jobs:
           npx prisma generate
           npm run build
 
+      - name: Download Node MSI (para gerar bootstrapper)
+        shell: pwsh
+        run: |
+          $version = "18.19.1"
+          $msiUrl = "https://nodejs.org/dist/v$version/node-v$version-x64.msi"
+          New-Item -ItemType Directory -Force -Path "installers/wix" | Out-Null
+          Invoke-WebRequest -Uri $msiUrl -OutFile "installers/wix/node-v$version-x64.msi"
+
       - name: Build MSI (WiX)
         shell: pwsh
         run: |
@@ -194,6 +202,14 @@ jobs:
         with:
           name: f-flow-client-win-msi
           path: installers\\wix\\FFlowSuite.msi
+          retention-days: 7
+
+      - name: Upload bootstrapper artifact (se existir)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: f-flow-client-win-bootstrapper
+          path: installers\\wix\\FFlowSuiteBootstrapper.exe
           retention-days: 7
 
   security-scan:

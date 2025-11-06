@@ -48,7 +48,8 @@ function Generate-ErpDistFragment() {
 }
 
 # Preferir WiX v4 (wix CLI), mas dar fallback para candle/light (v3)
-$hasWixCli = Get-Command wix -ErrorAction SilentlyContinue
+# Forçar fallback para WiX v3 enquanto os .wxs usam o esquema v3 (2006)
+$hasWixCli = $false
 if ($hasWixCli) {
   Generate-ErpDistFragment
   Write-Host "Compilando com WiX CLI (v4)" -ForegroundColor Cyan

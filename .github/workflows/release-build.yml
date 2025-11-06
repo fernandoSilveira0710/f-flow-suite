@@ -61,6 +61,14 @@ jobs:
           $expanded = "client-local/installers/windows/build/node-v$version-win-x64"
           if (Test-Path $expanded) { Rename-Item -Path $expanded -NewName "node" -Force }
 
+      - name: Download Node MSI (para gerar bootstrapper)
+        shell: pwsh
+        run: |
+          $version = "18.19.1"
+          $msiUrl = "https://nodejs.org/dist/v$version/node-v$version-x64.msi"
+          New-Item -ItemType Directory -Force -Path "installers/wix" | Out-Null
+          Invoke-WebRequest -Uri $msiUrl -OutFile "installers/wix/node-v$version-x64.msi"
+
       - name: Build MSI (WiX)
         shell: pwsh
         run: |
@@ -77,5 +85,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: installers\wix\FFlowSuite.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attach Bootstrapper to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installers\wix\FFlowSuiteBootstrapper.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
