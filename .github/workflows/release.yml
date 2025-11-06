@@ -110,17 +110,7 @@ jobs:
           # Compilar MSI com WiX
           pwsh installers/wix/build.ps1 -Version "${{ github.ref_name }}" -ProductName "F-Flow Suite" -Manufacturer "2F Solutions"
 
-      - name: Rename binary
-        shell: bash
-        working-directory: client-local
-        run: |
-          if [ "${{ matrix.platform }}" = "win32" ]; then
-            mv f-flow-client-win.exe f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
-          elif [ "${{ matrix.platform }}" = "darwin" ]; then
-            mv f-flow-client-macos f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}
-          else
-            mv f-flow-client-linux f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}
-          fi
+      # Removido: renomeação de binários gerados por pkg
 
       # Upload MSI (Windows)
       - name: Upload Windows MSI Asset
@@ -154,15 +144,7 @@ jobs:
           # For now, we'll just copy the binary as a placeholder
           cp client-local/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }} f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
 
-      - name: Upload Binary Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: client-local/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
-          asset_name: f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
-          asset_content_type: application/octet-stream
+      # Removido: upload de binários standalone (pkg)
 
       # Opcional: Upload do bootstrapper, se gerado
       - name: Upload Windows Bootstrapper Asset

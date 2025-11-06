@@ -52,8 +52,8 @@ $hasWixCli = Get-Command wix -ErrorAction SilentlyContinue
 if ($hasWixCli) {
   Generate-ErpDistFragment
   Write-Host "Compilando com WiX CLI (v4)" -ForegroundColor Cyan
-  wix build ./Product.wxs ./ErpDist.wxs -o ./FFlowSuite.msi --arch x64 --define Version=$Version --define ProductName="$ProductName" --define Manufacturer="$Manufacturer" --define ErpDistSource=..\\..\\dist
-  wix build ./Bundle.wxs -o ./FFlowSuiteBootstrapper.exe --arch x64
+  wix build ./Product.wxs ./ErpDist.wxs -o ./FFlowSuite.msi -arch x64 --define Version=$Version --define ProductName="$ProductName" ...
+  wix build ./Bundle.wxs -o ./FFlowSuiteBootstrapper.exe -arch x64
 } else {
   Write-Host "Compilando com candle/light (WiX v3)" -ForegroundColor Cyan
   Ensure-Tool 'candle'
