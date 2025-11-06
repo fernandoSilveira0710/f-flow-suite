@@ -3,7 +3,6 @@ import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { createLogger, StructuredLogger } from './common/logger';
 import { loadEnvConfig } from './common/env';
-import { PrismaClient } from '@prisma/client';
 import { spawn } from 'child_process';
 import { existsSync, copyFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
@@ -172,12 +171,32 @@ export async function bootstrap(): Promise<void> {
     
     // Create NestJS application
     logger.log('Creating NestJS application...');
-    const app = await NestFactory.create(AppModule, {
-      bufferLogs: true,
-    });
+    try {
+      const dbgDir = (process.env.ProgramData || 'C://ProgramData') + '//FFlow//logs//client-local';
+      try { require('fs').mkdirSync(dbgDir, { recursive: true }); } catch {}
+      require('fs').appendFileSync(dbgDir + '//startup-debug.log', `[${new Date().toISOString()}] before NestFactory.create\n`);
+    } catch {}
+    let app;
+    try {
+      app = await NestFactory.create(AppModule, {
+        bufferLogs: true,
+      });
+      try {
+        const dbgDir = (process.env.ProgramData || 'C://ProgramData') + '//FFlow//logs//client-local';
+        require('fs').appendFileSync(dbgDir + '//startup-debug.log', `[${new Date().toISOString()}] after NestFactory.create\n`);
+      } catch {}
+    } catch (e) {
+      try {
+        const dbgDir = (process.env.ProgramData || 'C://ProgramData') + '//FFlow//logs//client-local';
+        require('fs').appendFileSync(dbgDir + '//startup-debug.log', `[${new Date().toISOString()}] NestFactory.create error: ${e instanceof Error ? e.stack || e.message : String(e)}\n`);
+      } catch {}
+      throw e;
+    }
     
     // Configure structured logger for NestJS
+    try { require('fs').appendFileSync(((process.env.ProgramData||'C://ProgramData')+'//FFlow//logs//client-local//startup-debug.log'), `[${new Date().toISOString()}] before useLogger\n`); } catch {}
     app.useLogger(new StructuredLogger(logDir));
+    try { require('fs').appendFileSync(((process.env.ProgramData||'C://ProgramData')+'//FFlow//logs//client-local//startup-debug.log'), `[${new Date().toISOString()}] after useLogger\n`); } catch {}
     logger.log('Structured logger configured successfully');
     
     // Configure CORS
@@ -202,6 +221,7 @@ export async function bootstrap(): Promise<void> {
       }
     };
 
+    try { require('fs').appendFileSync(((process.env.ProgramData||'C://ProgramData')+'//FFlow//logs//client-local//startup-debug.log'), `[${new Date().toISOString()}] before enableCors\n`); } catch {}
     app.enableCors({
       origin: (origin, callback) => {
         // Allow non-browser requests (e.g., curl, server-to-server)
@@ -228,10 +248,12 @@ export async function bootstrap(): Promise<void> {
       optionsSuccessStatus: 200,
       preflightContinue: false,
     });
+    try { require('fs').appendFileSync(((process.env.ProgramData||'C://ProgramData')+'//FFlow//logs//client-local//startup-debug.log'), `[${new Date().toISOString()}] after enableCors\n`); } catch {}
     logger.log('CORS configured successfully');
     
     // Verificação de licença na inicialização
     try {
+      try { require('fs').appendFileSync(((process.env.ProgramData||'C://ProgramData')+'//FFlow//logs//client-local//startup-debug.log'), `[${new Date().toISOString()}] before license check\n`); } catch {}
       logger.log('Checking license status on startup...');
       const { StartupLicenseGuard } = await import('./licensing/startup-license.guard');
       const startupGuard = app.get(StartupLicenseGuard);
@@ -242,6 +264,7 @@ export async function bootstrap(): Promise<void> {
       // Verifica status da licença
       const licenseCheck = await startupGuard.checkStartupLicense();
       
+      try { require('fs').appendFileSync(((process.env.ProgramData||'C://ProgramData')+'//FFlow//logs//client-local//startup-debug.log'), `[${new Date().toISOString()}] after license check\n`); } catch {}
       if (!licenseCheck.canStart) {
         logger.error(`License check failed: ${licenseCheck.message}`);
         logger.error('Application cannot start due to license restrictions');
@@ -262,13 +285,15 @@ export async function bootstrap(): Promise<void> {
     }
     
     // Start server
+    try { require('fs').appendFileSync(((process.env.ProgramData||'C://ProgramData')+'//FFlow//logs//client-local//startup-debug.log'), `[${new Date().toISOString()}] before listen\n`); } catch {}
     const port = process.env.CLIENT_HTTP_PORT
       ? Number(process.env.CLIENT_HTTP_PORT)
       : (process.env.PORT ? Number(process.env.PORT) : 8081);
-    const host = '127.0.0.1';
     
-    await app.listen(port, host);
-    logger.log(`F-Flow Client Local server started on http://${host}:${port}`);
+    // Listen on default interface to support localhost via IPv4/IPv6
+    await app.listen(port);
+    try { require('fs').appendFileSync(((process.env.ProgramData||'C://ProgramData')+'//FFlow//logs//client-local//startup-debug.log'), `[${new Date().toISOString()}] after listen\n`); } catch {}
+    logger.log(`F-Flow Client Local server started on port ${port}`);
     
     // Graceful shutdown handlers
     process.on('SIGTERM', async () => {
@@ -285,6 +310,14 @@ export async function bootstrap(): Promise<void> {
     
   } catch (error) {
     const logger = new Logger('Bootstrap');
+    try {
+      const localAppData = process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local');
+      const logDir = join(localAppData, 'F-Flow Suite', 'logs');
+      try { mkdirSync(logDir, { recursive: true }); } catch {}
+      const logFile = join(logDir, 'bootstrap-error.log');
+      const payload = `\n[${new Date().toISOString()}] Startup error: ${error instanceof Error ? error.stack || error.message : String(error)}\n`;
+      require('fs').appendFileSync(logFile, payload);
+    } catch {}
     logger.error('Failed to start F-Flow Client Local server', error);
     process.exit(1);
   }

@@ -13,6 +13,8 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "build:pkg": "npm run prisma:generate && npm run build && pkg dist/main.js --targets node18-win-x64 --output build/f-flow-client.exe",
+    "build:pkg:nogen": "npm run build && pkg dist/main.js --targets node18-win-x64 --output build/f-flow-client.exe",
+    "installer:fast": "\"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\" installers/windows/f-flow-client-installer.iss",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
@@ -101,13 +103,28 @@
   },
   "pkg": {
     "assets": [
-      "node_modules/.prisma/**/*",
-      "node_modules/@prisma/client/**/*",
       "prisma/**/*",
-      "node_modules/axios/**/*"
+      "node_modules/axios/**/*",
+      "node_modules/@prisma/client/package.json",
+      "node_modules/@nestjs/**/package.json",
+      "node_modules/.prisma/client/**/*",
+      "installers/windows/winsw/WinSW-x64.exe",
+      "../site/dist/**/*"
     ],
     "scripts": [
-      "dist/**/*.js"
+      "dist/**/*.js",
+      "node_modules/@nestjs/**/*.js",
+      "node_modules/@nestjs/**/*.d.ts",
+      "node_modules/@nestjs/platform-express/**/*.js",
+      "node_modules/@nestjs/common/**/*.js",
+      "node_modules/@nestjs/core/**/*.js",
+      "node_modules/@prisma/client/**/*.js",
+      "node_modules/@prisma/client/runtime/**/*.js",
+      "node_modules/.prisma/client/**/*.js",
+      "node_modules/rxjs/**/*.js",
+      "node_modules/reflect-metadata/**/*.js",
+      "node_modules/class-transformer/**/*.js",
+      "node_modules/class-validator/**/*.js"
     ]
   },
   "prisma": {

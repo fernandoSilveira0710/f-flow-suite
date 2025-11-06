@@ -100,36 +100,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // SEMPRE limpar estado antes de nova consulta
       setLicenseStatus(null);
       
-      // Consulta via proxy do ERP (preferencial em dev)
-      let statusResponse: Response;
-      try {
-        statusResponse = await fetchWithTimeout(`/licensing/status?t=${Date.now()}`, {
-          method: 'GET',
-          cache: 'no-cache',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            ...(tenantId && { 'x-tenant-id': tenantId })
-          }
-        }, 10000);
-      } catch (e) {
-        console.warn('Falha via proxy /licensing/status; tentando direto no client-local', e);
-        statusResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
-          method: 'GET',
-          cache: 'no-cache',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            ...(tenantId && { 'x-tenant-id': tenantId })
-          }
-        }, 10000);
-      }
+      // Consulta direta ao client-local (8081). Evita HTML do ERP em produção.
+      let statusResponse: Response = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
+        method: 'GET',
+        cache: 'no-cache',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          ...(tenantId && { 'x-tenant-id': tenantId })
+        }
+      }, 10000);
       
       if (!statusResponse.ok) {
         throw new Error(`Status request failed: ${statusResponse.status}`);
@@ -233,29 +216,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ETAPA 1: Tentar autenticação no Hub (verificar cadastro + licenças)
       console.log('📡 ETAPA 1: Tentando autenticação no Hub...');
       let hubResponse;
-      let hubAvailable = true;
+      // Se Hub não estiver configurado (ou estiver apontando para localhost padrão), considerar como offline
+      const hubConfigured = Boolean(import.meta.env.VITE_HUB_API_URL);
+      const isDefaultLocalHub = API_URLS.HUB.includes('localhost:3001');
+      let hubAvailable = hubConfigured && !isDefaultLocalHub;
       
-      try {
-        console.log('🌐 Fazendo requisição para Hub:', ENDPOINTS.HUB_LOGIN);
-        hubResponse = await fetch(ENDPOINTS.HUB_LOGIN, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email, password }),
-          signal: AbortSignal.timeout(5000) // Timeout de 5 segundos
-        });
-        console.log('📡 Resposta do Hub - Status:', hubResponse.status, 'OK:', hubResponse.ok);
-      } catch (hubError) {
-        console.warn('❌ Hub não disponível:', hubError);
-        hubAvailable = false;
-        
-        // Mostrar mensagem informativa sobre tentativa offline
-        toast({
-          title: "Servidor principal indisponível",
-          description: "Tentando fazer login offline com dados em cache...",
-          variant: "default",
-        });
+      if (hubAvailable) {
+        try {
+          console.log('🌐 Fazendo requisição para Hub:', ENDPOINTS.HUB_LOGIN);
+          hubResponse = await fetch(ENDPOINTS.HUB_LOGIN, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+            signal: AbortSignal.timeout(5000) // Timeout de 5 segundos
+          });
+          console.log('📡 Resposta do Hub - Status:', hubResponse.status, 'OK:', hubResponse.ok);
+        } catch (hubError) {
+          console.warn('❌ Hub não disponível:', hubError);
+          hubAvailable = false;
+          
+          // Mostrar mensagem informativa sobre tentativa offline
+          toast({
+            title: "Servidor principal indisponível",
+            description: "Tentando fazer login offline com dados em cache...",
+            variant: "default",
+          });
+        }
+      } else {
+        console.log('ℹ️ Hub não configurado ou apontando para localhost padrão; seguindo fluxo offline.');
       }
 
       // ETAPA 2: Se Hub disponível, processar resposta
@@ -693,6 +683,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [hubLastCheck, setHubLastCheck] = useState<string | null>(null);
 
   const checkHubConnectivity = useCallback(async (): Promise<boolean> => {
+    // Evitar requisição ao Hub se não houver configuração explícita
+    const hubConfigured = Boolean(import.meta.env.VITE_HUB_API_URL);
+    const isDefaultLocalHub = API_URLS.HUB.includes('localhost:3001');
+    if (!hubConfigured || isDefaultLocalHub) {
+      setIsHubOnline(false);
+      return false;
+    }
+
     try {
       const res = await fetchWithTimeout(`${ENDPOINTS.HUB_HEALTH}?t=${Date.now()}`, { method: 'GET' }, 3000);
       const ok = res.ok;

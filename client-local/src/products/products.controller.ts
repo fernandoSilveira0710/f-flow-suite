@@ -20,7 +20,11 @@ export class ProductsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(
-    @Body(ValidationPipe) createProductDto: CreateProductDto,
+    @Body(new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    })) createProductDto: CreateProductDto,
   ): Promise<ProductResponseDto> {
     return this.productsService.create(createProductDto);
   }
@@ -38,7 +42,11 @@ export class ProductsController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @Body(ValidationPipe) updateProductDto: UpdateProductDto,
+    @Body(new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    })) updateProductDto: UpdateProductDto,
   ): Promise<ProductResponseDto> {
     return this.productsService.update(id, updateProductDto);
   }

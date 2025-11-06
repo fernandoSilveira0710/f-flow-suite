@@ -151,10 +151,10 @@ export class LicensingService implements OnModuleInit {
           }
         });
         
-        if (dbToken) {
+        if (dbToken && dbToken.token) {
           token = dbToken.token;
           // Sync token back to TokenStore for future use
-          await this.tokenStore.saveToken(dbToken.tenantId, dbToken.deviceId, token);
+          await this.tokenStore.saveToken(dbToken.tenantId, dbToken.deviceId, dbToken.token);
         }
       }
       

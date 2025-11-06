@@ -232,6 +232,10 @@ export default function ErpLayout() {
                 const label = hubPlanLabels[String(currentPlan)] || String(currentPlan);
                 return <p className="text-sm font-semibold capitalize">{label}</p>;
               })()}
+              {/* Versão do cliente local / ERP */}
+              <p className="text-xs text-sidebar-accent-foreground/70 mt-1">
+                Versão: {import.meta.env.VITE_APP_VERSION || 'dev'}
+              </p>
               <Button variant="link" size="sm" className="p-0 h-auto mt-1" asChild>
                 <a href={ENDPOINTS.SITE_RENOVACAO} target="_blank" rel="noopener noreferrer">Fazer Upgrade</a>
               </Button>
