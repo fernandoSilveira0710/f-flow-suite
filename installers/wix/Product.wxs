@@ -56,6 +56,7 @@
         <File Source="..\windows\service-install.ps1" Name="service-install.ps1" />
         <File Source="..\windows\service-uninstall.ps1" Name="service-uninstall.ps1" />
         <File Source="..\windows\launcher.ps1" Name="launcher.ps1" />
+        <File Source="..\windows\winsw\WinSW-x64.exe" Name="WinSW-x64.exe" />
       </Component>
     </ComponentGroup>
   </Fragment>
@@ -74,5 +75,17 @@
       <RemoveFolder Id="ProgramMenuCleanup" Directory="ProgramMenuFflow" On="uninstall" />
       <RegistryValue Root="HKCU" Key="Software\F-Flow\Installer" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
     </Component>
+  </Fragment>
+
+  <Fragment>
+    <!-- Custom Action: registra serviços automaticamente após copiar arquivos (deferred, no impersonation) -->
+    <CustomAction Id="InstallServicesCA"
+                  Directory="INSTALLDIR"
+                  ExeCommand='[System64Folder]WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLDIR]\installers\windows\service-install.ps1&quot; -InstallRoot &quot;[INSTALLDIR]&quot;'
+                  Execute="deferred" Return="check" Impersonate="no" />
+
+    <InstallExecuteSequence>
+      <Custom Action="InstallServicesCA" After="InstallFiles">NOT Installed</Custom>
+    </InstallExecuteSequence>
   </Fragment>
 </Wix>

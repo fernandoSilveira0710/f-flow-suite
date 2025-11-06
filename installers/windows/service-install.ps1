@@ -21,7 +21,7 @@ function Resolve-Nssm {
   if (Test-Path $local) { return (Resolve-Path $local).Path }
   $global = "C:\Program Files\nssm\nssm.exe"
   if (Test-Path $global) { return (Resolve-Path $global).Path }
-  Write-Error "nssm.exe não encontrado. Coloque 'nssm.exe' em '$local' ou instale-o em '$global'."
+  return $null
 }
 
 function Install-Service-WithNssm {
@@ -51,11 +51,8 @@ if (-not (Test-Path $NodePath)) {
   $NodePath = "C:\Program Files (x86)\nodejs\node.exe"
 }
 if (-not (Test-Path $NodePath)) {
-  Write-Error "Node.exe não encontrado. Instale o Node.js 18+ antes de continuar."
+  throw "Node.exe não encontrado. Instale o Node.js 18+ antes de continuar."
 }
-
-# Resolver NSSM
-$script:NSSM = Resolve-Nssm -PathHint $NssmPath
 
 # Criar diretórios de logs
 New-Item -ItemType Directory -Force -Path "C:\ProgramData\FFlow\logs" | Out-Null
@@ -64,16 +61,71 @@ New-Item -ItemType Directory -Force -Path "C:\ProgramData\FFlow\logs" | Out-Null
 $ApiScript = Join-Path $InstallRoot "client-local\main.js"
 $ErpRoot = Join-Path $InstallRoot "erp\dist"
 
-if (-not (Test-Path $ApiScript)) { Write-Error "Script da API não encontrado: $ApiScript" }
-if (-not (Test-Path $ErpRoot)) { Write-Error "Build do ERP não encontrado: $ErpRoot" }
+if (-not (Test-Path $ApiScript)) { throw "Script da API não encontrado: $ApiScript" }
+if (-not (Test-Path $ErpRoot)) { throw "Build do ERP não encontrado: $ErpRoot" }
 
-# Instalar serviço da API local (8081)
-$apiArgs = "`"$ApiScript`" --service"
-Install-Service-WithNssm -SvcName $ServiceNameApi -DisplayName "F-Flow Client Local" -Exe $NodePath -Args $apiArgs -WorkDir (Split-Path $ApiScript -Parent)
+# Tentar NSSM; se não houver, usar WinSW embutido
+$script:NSSM = Resolve-Nssm -PathHint $NssmPath
+if ($script:NSSM) {
+  # Instalar serviço da API local (8081)
+  $apiArgs = "`"$ApiScript`" --service"
+  Install-Service-WithNssm -SvcName $ServiceNameApi -DisplayName "F-Flow Client Local" -Exe $NodePath -Args $apiArgs -WorkDir (Split-Path $ApiScript -Parent)
 
-# Instalar serviço do ERP estático (8080)
-$erpArgs = "`"$ApiScript`" --erp-service --root `"$ErpRoot`" --port 8080"
-Install-Service-WithNssm -SvcName $ServiceNameErp -DisplayName "F-Flow ERP Local" -Exe $NodePath -Args $erpArgs -WorkDir (Split-Path $ApiScript -Parent)
+  # Instalar serviço do ERP estático (8080)
+  $erpArgs = "`"$ApiScript`" --erp-service --root `"$ErpRoot`" --port 8080"
+  Install-Service-WithNssm -SvcName $ServiceNameErp -DisplayName "F-Flow ERP Local" -Exe $NodePath -Args $erpArgs -WorkDir (Split-Path $ApiScript -Parent)
+} else {
+  # Fallback WinSW
+  $ProgramDataRoot = Join-Path $env:ProgramData "FFlow"
+  $ServiceRoot = Join-Path $ProgramDataRoot "service"
+  New-Item -ItemType Directory -Path $ServiceRoot -Force | Out-Null
+
+  $WinSwExe = Join-Path $PSScriptRoot "winsw\WinSW-x64.exe"
+  if (-not (Test-Path $WinSwExe)) { throw "WinSW-x64.exe não encontrado em $WinSwExe" }
+
+  # API Service
+  $ApiXml = Join-Path $ServiceRoot "$ServiceNameApi.xml"
+  @"
+<service>
+  <id>$ServiceNameApi</id>
+  <name>F-Flow Client Local Service</name>
+  <description>F-Flow Suite Client Local Server</description>
+  <executable>$NodePath</executable>
+  <arguments>`"$ApiScript`" --service</arguments>
+  <workingdirectory>$(Split-Path $ApiScript -Parent)</workingdirectory>
+  <logpath>C:\ProgramData\FFlow\logs\client-local</logpath>
+  <startmode>Automatic</startmode>
+  <stoptimeout>15000</stoptimeout>
+  <resetfailure>86400</resetfailure>
+  <onfailure>restart</onfailure>
+</service>
+"@ | Set-Content -Path $ApiXml -Encoding UTF8
+
+  # ERP Service
+  $ErpXml = Join-Path $ServiceRoot "$ServiceNameErp.xml"
+  @"
+<service>
+  <id>$ServiceNameErp</id>
+  <name>F-Flow ERP Local Service</name>
+  <description>Serves local ERP build with static server</description>
+  <executable>$NodePath</executable>
+  <arguments>`"$ApiScript`" --erp-service --root `"$ErpRoot`" --port 8080</arguments>
+  <logpath>C:\ProgramData\FFlow\logs\erp</logpath>
+  <startmode>Automatic</startmode>
+  <stoptimeout>15000</stoptimeout>
+  <resetfailure>86400</resetfailure>
+  <onfailure>restart</onfailure>
+</service>
+"@ | Set-Content -Path $ErpXml -Encoding UTF8
+
+  & $WinSwExe uninstall $ApiXml 2>$null
+  & $WinSwExe install $ApiXml
+  & $WinSwExe start $ApiXml
+
+  & $WinSwExe uninstall $ErpXml 2>$null
+  & $WinSwExe install $ErpXml
+  & $WinSwExe start $ErpXml
+}
 
 Write-Host "Serviços instalados e iniciados:" -ForegroundColor Green
 Write-Host " - $ServiceNameApi (API local em 8081)" -ForegroundColor Green
