@@ -13,12 +13,38 @@ function Ensure-Tool($tool) {
   }
 }
 
+# Tentar detectar o WiX v3 e adicionar ao PATH desta sessão
+function Add-WixV3ToPath() {
+  $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+  $pf64 = [Environment]::GetEnvironmentVariable('ProgramFiles')
+  $candidates = @(
+    (Join-Path $pf86 'WiX Toolset v3.14\\bin'),
+    (Join-Path $pf64 'WiX Toolset v3.14\\bin'),
+    (Join-Path $pf86 'WiX Toolset v3.11\\bin'),
+    (Join-Path $pf64 'WiX Toolset v3.11\\bin')
+  )
+  foreach ($dir in $candidates) {
+    if (Test-Path $dir) {
+      if (-not ($env:Path -like "*${dir}*")) {
+        $env:Path = "$dir;" + $env:Path
+        Write-Host "Adicionado ao PATH: $dir" -ForegroundColor Yellow
+      }
+      return $true
+    }
+  }
+  return $false
+}
+
+# Garantir que ferramentas do WiX v3 estejam acessíveis
+Add-WixV3ToPath | Out-Null
+
 # Gerar fragmento para incluir todo o conteúdo de 'dist' (ERP) via heat
 function Generate-ErpDistFragment() {
   Ensure-Tool 'heat'
   Write-Host "Gerando fragmento ErpDist.wxs com heat (conteúdo de dist/)" -ForegroundColor Cyan
   $distPath = "..\\..\\dist"
-  & heat dir $distPath -gg -sfrag -sreg -dr ErpDistDir -cg ErpDistComponents -var var.ErpDistSource -out ErpDist.wxs
+  $absDist = (Resolve-Path $distPath).Path
+  & heat dir $absDist -gg -sfrag -sreg -dr ErpDistDir -cg ErpDistComponents -var var.ErpDistSource -out ErpDist.wxs
 }
 
 # Preferir WiX v4 (wix CLI), mas dar fallback para candle/light (v3)
@@ -34,11 +60,17 @@ if ($hasWixCli) {
   Ensure-Tool 'light'
   Generate-ErpDistFragment
 
-  candle -dVersion=$Version -dProductName="$ProductName" -dManufacturer="$Manufacturer" -dErpDistSource=..\\..\\dist -arch x64 Product.wxs ErpDist.wxs -out Product.wixobj ErpDist.wixobj
+  $absDist = (Resolve-Path "..\\..\\dist").Path
+  candle -ext WixUtilExtension -dVersion=$Version -dProductName="$ProductName" -dManufacturer="$Manufacturer" -dErpDistSource="$absDist" -arch x64 Product.wxs ErpDist.wxs
   light -ext WixUtilExtension Product.wixobj ErpDist.wixobj -o FFlowSuite.msi
 
-  candle -arch x64 Bundle.wxs -out Bundle.wixobj
-  light Bundle.wixobj -o FFlowSuiteBootstrapper.exe
+  $nodeMsi = Join-Path (Get-Location) 'node-v18.19.1-x64.msi'
+  if (Test-Path $nodeMsi) {
+    candle -ext WixBalExtension -arch x64 Bundle.wxs
+    light -ext WixBalExtension Bundle.wixobj -o FFlowSuiteBootstrapper.exe
+  } else {
+    Write-Warning "Bundle não compilado: 'node-v18.19.1-x64.msi' não encontrado ao lado de Bundle.wxs. Pulei o bootstrapper."
+  }
 }
 
 Write-Host "Build concluído: FFlowSuite.msi e FFlowSuiteBootstrapper.exe" -ForegroundColor Green

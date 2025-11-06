@@ -44,6 +44,17 @@ function Install-Service-WithNssm {
   & $script:NSSM start $SvcName
 }
 
+function Ensure-WinSW {
+  $winswDir = Join-Path $PSScriptRoot "winsw"
+  New-Item -ItemType Directory -Force -Path $winswDir | Out-Null
+  $WinSwExe = Join-Path $winswDir "WinSW-x64.exe"
+  if (Test-Path $WinSwExe) { return $WinSwExe }
+  Write-Host "Baixando WinSW-x64.exe..." -ForegroundColor Cyan
+  $url = "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe"
+  Invoke-WebRequest -Uri $url -OutFile $WinSwExe -UseBasicParsing
+  return $WinSwExe
+}
+
 Require-Admin
 
 # Validar Node
@@ -80,8 +91,7 @@ if ($script:NSSM) {
   $ServiceRoot = Join-Path $ProgramDataRoot "service"
   New-Item -ItemType Directory -Path $ServiceRoot -Force | Out-Null
 
-  $WinSwExe = Join-Path $PSScriptRoot "winsw\WinSW-x64.exe"
-  if (-not (Test-Path $WinSwExe)) { throw "WinSW-x64.exe não encontrado em $WinSwExe" }
+  $WinSwExe = Ensure-WinSW
 
   # API Service
   $ApiXml = Join-Path $ServiceRoot "$ServiceNameApi.xml"
