@@ -87,6 +87,8 @@ Source: "..\..\build\query_engine-windows.dll.node"; DestDir: "{app}\prisma-clie
 #ifexist "..\\..\\build\\seed.db"
 Source: "..\..\build\seed.db"; DestDir: "{app}"; Flags: ignoreversion
 #endif
+; === PRISMA MIGRATIONS (for packaged binary migration runner) ===
+Source: "..\\..\\prisma\\migrations\\*"; DestDir: "{app}\\prisma\\migrations"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; === NESTJS AND CORE RUNTIME MODULES (to satisfy pkg FS resolution) ===
 ; Include essential NestJS modules to avoid MODULE_NOT_FOUND at runtime
@@ -218,7 +220,7 @@ begin
     '  <env name="LOCAL_LOG_DIR" value="' + ClientLogs + '"/>'#13#10 +
     '  <env name="CLIENT_HTTP_PORT" value="8081"/>'#13#10 +
     '  <env name="NODE_ENV" value="production"/>'#13#10 +
-    '  <env name="SKIP_MIGRATIONS" value="true"/>'#13#10 +
+    '  <env name="SKIP_MIGRATIONS" value="false"/>'#13#10 +
     '  <env name="LICENSING_ENFORCED" value="false"/>'#13#10 +
     '  <startmode>Automatic</startmode>'#13#10 +
     '  <stoptimeout>15000</stoptimeout>'#13#10 +
@@ -265,7 +267,7 @@ begin
              'LOCAL_LOG_DIR=' + ExpandConstant('{commonappdata}') + '\FFlow\logs\client-local'#13#10 +
              'PRISMA_CLIENT_ENGINE_TYPE=library'#13#10 +
              'PRISMA_QUERY_ENGINE_LIBRARY=' + ExpandConstant('{app}') + '\prisma-client\query_engine-windows.dll.node'#13#10 +
-             'SKIP_MIGRATIONS=true'#13#10 +
+             'SKIP_MIGRATIONS=false'#13#10 +
              'NODE_ENV=production'#13#10;
   SaveStringToFile(EnvPath, Content, False);
 end;

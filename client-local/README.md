@@ -102,6 +102,10 @@ HUB_BASE_URL=http://localhost:3001
 # Licenciamento
 LICENSE_FILE=./license.jwt
 LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----..."
+
+# Migrações do Prisma
+SKIP_MIGRATIONS=false
+MAINTENANCE_TOKEN=change-me-strong-token
 ```
 
 ### Configurações Importantes
@@ -194,6 +198,26 @@ systemctl --user start f-flow-client-local
 systemctl --user stop f-flow-client-local
 journalctl --user -u f-flow-client-local -f
 ```
+
+## 🗄️ Migrações do Banco (Prisma)
+
+- Em desenvolvimento, as migrations são aplicadas via Prisma CLI.
+- Em binários empacotados, as migrations `.sql` são aplicadas automaticamente na primeira inicialização quando `SKIP_MIGRATIONS=false`.
+- O instalador para Windows copia `client-local/prisma/migrations` para `{app}\prisma\migrations` e define `SKIP_MIGRATIONS=false`.
+
+### Executar migrações manualmente (Admin)
+
+- Endpoint: `POST /maintenance/migrate`
+- Header: `x-admin-token: {MAINTENANCE_TOKEN}`
+- Respostas:
+  - `200 OK`: Migrações executadas com sucesso
+  - `401 Unauthorized`: Token inválido ou ausente
+  - `500`: Erro ao aplicar migrações
+
+### Variáveis relacionadas
+
+- `SKIP_MIGRATIONS`: Se `true`, ignora migrações na inicialização.
+- `MAINTENANCE_TOKEN`: Token necessário para chamar o endpoint administrativo de migrações.
 
 ## 🧪 Testes
 

@@ -31,6 +31,12 @@ try {
     Copy-Item "$SourceDir\build\query_engine-windows.dll.node" -Destination "$InstallPath\" -Force
     Copy-Item "$SourceDir\build\seed.db" -Destination "$InstallPath\" -Force
 
+    # Copiar migrations do Prisma para execução pelo runner empacotado
+    if (Test-Path "$SourceDir\prisma\migrations") {
+        Write-Host "Copiando migrations do Prisma..." -ForegroundColor Cyan
+        Copy-Item "$SourceDir\prisma\migrations\*" -Destination "$InstallPath\prisma\migrations\" -Recurse -Force
+    }
+
     # Copiar arquivos do ERP
     Write-Host "Copiando arquivos do ERP..." -ForegroundColor Cyan
     Copy-Item "$PSScriptRoot\build\erp-server.exe" -Destination "$InstallPath\installers\windows\" -Force
@@ -59,7 +65,7 @@ HUB_BASE_URL=https://hub.fflow.com.br
 DATABASE_URL="file:./local.db"
 LOCAL_DATA_DIR=$InstallPath
 LOCAL_LOG_DIR=C:\ProgramData\FFlow\logs\client-local
-SKIP_MIGRATIONS=true
+SKIP_MIGRATIONS=false
 NODE_ENV=production
 "@
     Set-Content -Path "$InstallPath\.env" -Value $EnvContent -Encoding UTF8

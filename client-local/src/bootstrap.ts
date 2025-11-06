@@ -155,11 +155,21 @@ export async function bootstrap(): Promise<void> {
     // Ensure Prisma engine path when running as packaged binary
     setupPrismaEngineIfPackaged();
 
-    // Run migrations (can be skipped via env)
-    if ((process as any).pkg) {
-      logger.log('Skipping Prisma migrations in packaged binary');
-    } else if (process.env.SKIP_MIGRATIONS !== 'true') {
-      await runMigrations();
+    // Run migrations (controlled via env flag)
+    const skipMigrations = process.env.SKIP_MIGRATIONS === 'true';
+    if (!skipMigrations) {
+      if ((process as any).pkg) {
+        // Packaged binary: run migrations using bundled SQL files
+        try {
+          const { runPackagedMigrations } = await import('./common/migrations/migration-runner');
+          await runPackagedMigrations({ migrationsRoot: join(dirname(process.execPath), 'prisma', 'migrations') });
+          logger.log('Packaged migrations applied successfully');
+        } catch (e) {
+          logger.warn(`Failed to apply packaged migrations: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      } else {
+        await runMigrations();
+      }
     } else {
       logger.log('Skipping Prisma migrations due to SKIP_MIGRATIONS=true');
     }

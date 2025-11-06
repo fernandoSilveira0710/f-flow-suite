@@ -122,6 +122,35 @@ function copyPrismaEngine(installRoot: string) {
   }
 }
 
+function copyPrismaClientFolder(installRoot: string) {
+  // Prefer bundled prisma-client next to the executable (pkg/distribution)
+  const exeDir = path.dirname(process.execPath);
+  const bundledClientDir = path.join(exeDir, 'prisma-client');
+
+  if (fs.existsSync(bundledClientDir)) {
+    try {
+      fse.copySync(bundledClientDir, path.join(installRoot, 'prisma-client'), { overwrite: true });
+      return true;
+    } catch (err) {
+      console.warn('Falha ao copiar pasta prisma-client do diretório do executável:', (err as Error).message);
+    }
+  }
+
+  // Fallback (dev): try to copy from node_modules/.prisma/client
+  const devClientDir = path.join(process.cwd(), 'node_modules', '.prisma', 'client');
+  if (fs.existsSync(devClientDir)) {
+    try {
+      fse.copySync(devClientDir, path.join(installRoot, 'prisma-client'), { overwrite: true });
+      return true;
+    } catch (err) {
+      console.warn('Falha ao copiar pasta prisma-client de node_modules:', (err as Error).message);
+    }
+  }
+
+  console.warn('Pasta prisma-client não encontrada. O serviço pode falhar ao iniciar o Prisma.');
+  return false;
+}
+
 function copyErpDistIfAvailable(installRoot: string) {
   const assetErpDist = assetPath('..', '..', 'site', 'dist');
   const target = path.join(installRoot, 'erp', 'dist');
@@ -199,6 +228,9 @@ export async function selfInstallWindows(): Promise<boolean> {
 
   // Copy Prisma engine if available next to exe
   copyPrismaEngine(installRoot);
+
+  // Copy Prisma client JS bundle (index.js e artefatos gerados)
+  copyPrismaClientFolder(installRoot);
 
   // Copy ERP assets if bundled
   const erpCopied = copyErpDistIfAvailable(installRoot);

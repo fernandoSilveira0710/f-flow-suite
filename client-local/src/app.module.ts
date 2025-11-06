@@ -25,6 +25,7 @@ import { PlansModule } from './plans/plans.module';
 import { AuthModule } from './auth/auth.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
+ import { MaintenanceModule } from './maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
     PlansModule,
     AuthModule,
     PaymentMethodsModule,
+    MaintenanceModule,
   ],
 })
 export class AppModule {}
