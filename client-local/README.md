@@ -66,17 +66,11 @@ npm run start:dev
 npm run build
 ```
 
-### Gerar Executáveis
+### Distribuição (Windows)
 
-```bash
-# Gera binários para todas as plataformas
-npm run build:pkg
-
-# Os executáveis serão criados em:
-# - build/f-flow-client-win.exe (Windows)
-# - build/f-flow-client-macos (macOS)
-# - build/f-flow-client-linux (Linux)
-```
+- A distribuição é feita via instalador MSI gerado com WiX.
+- Artefatos e scripts estão em `installers/wix/`. Use `build.ps1` para compilar.
+- Para instalar, execute o `FFlowSuite.msi` como Administrador.
 
 ## 🔧 Configuração
 
@@ -118,14 +112,14 @@ MAINTENANCE_TOKEN=change-me-strong-token
 
 ### Windows
 
+Instalação via MSI (WiX):
+
 ```powershell
 # Executar como Administrador
-cd installers
-.\install-windows.ps1
-
-# Desinstalar
-.\uninstall-windows.ps1
+Start-Process installers\wix\FFlowSuite.msi -Verb RunAs
 ```
+
+O MSI registra os serviços e chama os scripts necessários (ex.: service-install). Não é mais necessário usar WinSW/nssm ou instaladores Inno Setup.
 
 ### macOS
 
