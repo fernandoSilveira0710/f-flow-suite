@@ -45,6 +45,7 @@ function sendFile(res: http.ServerResponse, filePath: string) {
 export async function startErpStaticServer(opts: Options = {}) {
   const root = path.resolve(opts.root || path.join(process.cwd(), 'erp', 'dist'));
   const preferredPort = opts.port ?? 8080;
+  const basePath = '/erp';
 
   if (!dirExists(root)) {
     console.error(`[ERP] Root directory does not exist: ${root}`);
@@ -92,12 +93,22 @@ export async function startErpStaticServer(opts: Options = {}) {
 
   const server = http.createServer((req, res) => {
     let urlPath = (req.url || '/').split('?')[0];
-    if (urlPath === '/') urlPath = '/index.html';
+    // Normalize and strip base '/erp' if present, so requests like '/erp/assets/*' map to root 'assets/*'
+    if (urlPath === basePath || urlPath === `${basePath}/`) {
+      urlPath = '/index.html';
+    } else if (urlPath.startsWith(basePath + '/')) {
+      urlPath = urlPath.slice(basePath.length) || '/index.html';
+    } else if (urlPath === '/') {
+      // Allow root to serve index too
+      urlPath = '/index.html';
+    }
+
     const filePath = path.join(root, decodeURIComponent(urlPath));
 
     if (fileExists(filePath)) {
       return sendFile(res, filePath);
     }
+    // SPA fallback for client-side routes
     return sendFile(res, indexFile);
   });
 
