@@ -67,8 +67,16 @@ if ($hasWixCli) {
 
   $nodeMsi = Join-Path (Get-Location) 'node-v18.19.1-x64.msi'
   if (Test-Path $nodeMsi) {
-    candle -ext WixBalExtension -arch x64 Bundle.wxs
-    light -ext WixBalExtension Bundle.wixobj -o FFlowSuiteBootstrapper.exe
+    $mbaDll = Resolve-Path '..\bootstrapper-app\bin\Release\FflowBootstrapperApp.dll' -ErrorAction SilentlyContinue
+    if ($mbaDll) {
+      Write-Host "Compilando Bundle com Managed Bootstrapper Application (MBA)" -ForegroundColor Cyan
+      candle -ext WixBalExtension -arch x64 Bundle.MBA.wxs
+      light -ext WixBalExtension Bundle.MBA.wixobj -o FFlowSuiteBootstrapper.exe
+    } else {
+      Write-Host "Compilando Bundle com UI padrão (sem MBA)" -ForegroundColor Cyan
+      candle -ext WixBalExtension -arch x64 Bundle.wxs
+      light -ext WixBalExtension Bundle.wixobj -o FFlowSuiteBootstrapper.exe
+    }
   } else {
     Write-Warning "Bundle não compilado: 'node-v18.19.1-x64.msi' não encontrado ao lado de Bundle.wxs. Pulei o bootstrapper."
   }

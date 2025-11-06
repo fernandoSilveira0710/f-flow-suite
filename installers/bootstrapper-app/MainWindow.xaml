@@ -1,0 +1,27 @@
+<Window x:Class="FflowBootstrapperApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="F-Flow Suite" Height="360" Width="520" WindowStartupLocation="CenterScreen">
+  <Grid Background="#FAFAFA" Margin="24">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <StackPanel Orientation="Horizontal" Margin="0,0,0,16" VerticalAlignment="Top">
+      <Ellipse Width="64" Height="64" Fill="#E6F4EA" Stroke="#34A853" StrokeThickness="2"/>
+      <TextBlock Text="Instalação concluída com sucesso!" FontSize="22" FontWeight="Bold" Margin="16,8,0,0"/>
+    </StackPanel>
+
+    <TextBlock Grid.Row="1" TextWrapping="Wrap" FontSize="14" Foreground="#333">
+      O atalho foi criado na sua área de trabalho.
+      Você pode acessar o ERP pelo seu navegador em
+      http://localhost:8080/erp/login.
+    </TextBlock>
+
+    <Button Grid.Row="2" Content="Abrir ERP" Width="160" Height="40" HorizontalAlignment="Left"
+            Background="#1E66FF" Foreground="White" FontWeight="SemiBold"
+            Click="OpenErp_Click"/>
+  </Grid>
+</Window>

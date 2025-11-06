@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:bal="http://schemas.microsoft.com/wix/BalExtension">
+  <!-- Bootstrapper (Burn) com UI customizada via ManagedBootstrapperApplicationHost -->
+  <Bundle Name="F-Flow Suite Bootstrapper" Version="1.0.0.0" Manufacturer="2F Solutions" UpgradeCode="B58A4A15-6F3B-4F74-9E3D-9C3ACB9F3A11">
+    <BootstrapperApplicationRef Id="ManagedBootstrapperApplicationHost" SourceFile="..\bootstrapper-app\bin\Release\FflowBootstrapperApp.dll" />
+
+    <Chain>
+      <!-- Node.js MSI embutido -->
+      <MsiPackage Id="NodeJs" DisplayName="Node.js Runtime" Compressed="yes" Vital="yes" Permanent="yes" EnableFeatureSelection="no" SourceFile="node-v18.19.1-x64.msi" />
+
+      <!-- MSI principal embutido -->
+      <MsiPackage Id="FflowMsi" DisplayName="F-Flow Suite" Compressed="yes" Vital="yes" Permanent="no" EnableFeatureSelection="no" SourceFile="FFlowSuite.msi" />
+    </Chain>
+  </Bundle>
+</Wix>
