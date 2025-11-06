@@ -20,16 +20,15 @@ Antes de compilar o MSI, gere os builds e coloque os arquivos nas localizações
 
 1. Build do ERP (web):
    - Na raiz: `npm run build` → gera `dist/`
-   - O instalador copiará `dist/index.html` para `Program Files\\F-Flow Suite\\erp\\dist\\index.html`.
+   - O instalador copiará todo o conteúdo de `dist/` para `Program Files\\F-Flow Suite\\erp\\dist\\` (JS/CSS/assets). O script de build usa `heat` para colher automaticamente os arquivos.
 
 2. Build do Client-Local (API):
    - Em `client-local`: `npm run build` → gera `client-local/dist/main.js`
    - O instalador copiará `client-local/dist/main.js` para `Program Files\\F-Flow Suite\\client-local\\main.js`.
 
 3. Scripts de serviço e launcher:
-   - `installers/windows/service-install.ps1`
-   - `installers/windows/service-uninstall.ps1`
-   - `installers/windows/launcher.ps1`
+   - Serviços: instalados em `Program Files\\F-Flow Suite\\installers\\windows\\` (`service-install.ps1`, `service-uninstall.ps1`, `WinSW-x64.exe`)
+   - Launcher: instalado em `Program Files\\F-Flow Suite\\launchers\\launcher.ps1`
 
 4. Pré-requisito Node.js:
    - Faça download do MSI do Node.js (ex.: `node-v18.19.1-x64.msi`) e coloque ao lado de `Bundle.wxs`.
@@ -46,25 +45,23 @@ cd installers/wix
 Este script irá:
 - Compilar o `Product.wxs` em `FFlowSuite.msi`
 - Compilar o `Bundle.wxs` em um `FFlowSuiteBootstrapper.exe` que instala o Node e depois o MSI
+ - Colher (harvest) o conteúdo de `dist/` com `heat` para incluir todos os arquivos estáticos do ERP
 
 ## Instalar
 
 - Via bootstrapper: execute `FFlowSuiteBootstrapper.exe`
 - Ou diretamente: `msiexec /i FFlowSuite.msi`
 
-Após a instalação, rode o script de serviço para registrar os serviços:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\F-Flow Suite\installers\windows\service-install.ps1"
-```
+Durante a instalação:
+- Os arquivos são copiados para `C:\Program Files\F-Flow Suite\...`
+- Os serviços da API (8081) e ERP (8080) são registrados automaticamente via Custom Action silenciosa
+- Atalhos são criados no Desktop e Menu Iniciar, apontando para o `launcher.ps1`
 
 ## Desinstalar
 
-Desinstalação limpa:
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\F-Flow Suite\installers\windows\service-uninstall.ps1"
-msiexec /x FFlowSuite.msi
-```
+Desinstalação:
+- Use `msiexec /x FFlowSuite.msi` ou o atalho de desinstalação no Menu Iniciar.
+- Opcional: caso deseje parar/remover serviços manualmente, use `service-uninstall.ps1` em `installers\windows`.
 
 ## Observações
 

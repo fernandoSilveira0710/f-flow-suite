@@ -13,19 +13,29 @@ function Ensure-Tool($tool) {
   }
 }
 
+# Gerar fragmento para incluir todo o conteúdo de 'dist' (ERP) via heat
+function Generate-ErpDistFragment() {
+  Ensure-Tool 'heat'
+  Write-Host "Gerando fragmento ErpDist.wxs com heat (conteúdo de dist/)" -ForegroundColor Cyan
+  $distPath = "..\\..\\dist"
+  & heat dir $distPath -gg -sfrag -sreg -dr ErpDistDir -cg ErpDistComponents -var var.ErpDistSource -out ErpDist.wxs
+}
+
 # Preferir WiX v4 (wix CLI), mas dar fallback para candle/light (v3)
 $hasWixCli = Get-Command wix -ErrorAction SilentlyContinue
 if ($hasWixCli) {
+  Generate-ErpDistFragment
   Write-Host "Compilando com WiX CLI (v4)" -ForegroundColor Cyan
-  wix build ./Product.wxs -o ./FFlowSuite.msi --arch x64 --define Version=$Version --define ProductName="$ProductName" --define Manufacturer="$Manufacturer"
+  wix build ./Product.wxs ./ErpDist.wxs -o ./FFlowSuite.msi --arch x64 --define Version=$Version --define ProductName="$ProductName" --define Manufacturer="$Manufacturer" --define ErpDistSource=..\\..\\dist
   wix build ./Bundle.wxs -o ./FFlowSuiteBootstrapper.exe --arch x64
 } else {
   Write-Host "Compilando com candle/light (WiX v3)" -ForegroundColor Cyan
   Ensure-Tool 'candle'
   Ensure-Tool 'light'
+  Generate-ErpDistFragment
 
-  candle -dVersion=$Version -dProductName="$ProductName" -dManufacturer="$Manufacturer" -arch x64 Product.wxs -out Product.wixobj
-  light -ext WixUtilExtension Product.wixobj -o FFlowSuite.msi
+  candle -dVersion=$Version -dProductName="$ProductName" -dManufacturer="$Manufacturer" -dErpDistSource=..\\..\\dist -arch x64 Product.wxs ErpDist.wxs -out Product.wixobj ErpDist.wixobj
+  light -ext WixUtilExtension Product.wixobj ErpDist.wixobj -o FFlowSuite.msi
 
   candle -arch x64 Bundle.wxs -out Bundle.wixobj
   light Bundle.wixobj -o FFlowSuiteBootstrapper.exe

@@ -39,24 +39,26 @@
     <!-- Componentes principais: instalam os artefatos gerados (client-local/dist e web/dist) e scripts -->
     <ComponentGroup Id="AppFiles">
       <!-- Copiar client-local/dist (API) -->
-      <Component Id="ClientLocalDist" Guid="7F1E9C5E-4D3B-4C59-9F30-FFLOW00010001">
+      <Component Id="ClientLocalDist" Guid="7F1E9C5E-4D3B-4C59-9F30-FFLOW00010001" Directory="ClientLocalDir">
         <CreateFolder />
         <!-- Espera que os arquivos sejam colocados antes do build do MSI -->
         <File Source="..\..\client-local\dist\main.js" KeyPath="yes" Name="main.js" />
       </Component>
 
       <!-- Copiar ERP build (web/dist) -->
-      <Component Id="ErpDist" Guid="A90C5E2B-1E7B-4C71-9E33-FFLOW00010002">
-        <CreateFolder />
-        <File Source="..\..\dist\index.html" KeyPath="yes" Name="index.html" />
-      </Component>
+      <!-- Conteúdo completo da pasta dist será incluído via harvest (ErpDist.wxs) -->
+      <ComponentGroupRef Id="ErpDistComponents" />
 
-      <!-- Scripts de instalação de serviço e launcher -->
-      <Component Id="InstallerScripts" Guid="C2E4D0AA-6F88-4BCA-8EFA-FFLOW00010003">
+      <!-- Scripts de instalação de serviço (Windows) -->
+      <Component Id="WindowsInstallerScripts" Guid="C2E4D0AA-6F88-4BCA-8EFA-FFLOW00010003" Directory="WindowsInstallersDir">
         <File Source="..\windows\service-install.ps1" Name="service-install.ps1" />
         <File Source="..\windows\service-uninstall.ps1" Name="service-uninstall.ps1" />
-        <File Source="..\windows\launcher.ps1" Name="launcher.ps1" />
         <File Source="..\windows\winsw\WinSW-x64.exe" Name="WinSW-x64.exe" />
+      </Component>
+
+      <!-- Launcher para atalhos -->
+      <Component Id="LauncherScript" Guid="B4A7B2C1-7E5F-4D9A-9B2E-FFLOW00010004" Directory="LaunchersDir">
+        <File Source="..\windows\launcher.ps1" Name="launcher.ps1" />
       </Component>
     </ComponentGroup>
   </Fragment>
