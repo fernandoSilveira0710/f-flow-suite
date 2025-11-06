@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <Product Id="*" Name="F-Flow Suite" Language="1046" Version="1.0.0.0" Manufacturer="2F Solutions" UpgradeCode="D2D2A0A1-4E9C-4C66-9B12-FFLOW00000001">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
+    <MajorUpgrade AllowDowngrades="no" DowngradeErrorMessage="Uma versão mais recente do F-Flow Suite já está instalada." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="MainFeature" Title="F-Flow Suite" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="DesktopShortcutComponent" />
+      <ComponentRef Id="StartMenuShortcutComponent" />
+    </Feature>
+
+    <!-- Observação: Custom actions para instalar/remover serviços serão definidas no Bundle (Burn) ou via scripts pós-instalação -->
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLDIR" Name="F-Flow Suite">
+          <Directory Id="ClientLocalDir" Name="client-local" />
+          <Directory Id="ErpDir" Name="erp">
+            <Directory Id="ErpDistDir" Name="dist" />
+          </Directory>
+          <Directory Id="InstallersDir" Name="installers">
+            <Directory Id="WindowsInstallersDir" Name="windows" />
+          </Directory>
+          <Directory Id="LaunchersDir" Name="launchers" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ProgramMenuFflow" Name="F-Flow" />
+      </Directory>
+      <Directory Id="DesktopFolder" />
+    </Directory>
+  </Fragment>
+
+  <Fragment>
+    <!-- Componentes principais: instalam os artefatos gerados (client-local/dist e web/dist) e scripts -->
+    <ComponentGroup Id="AppFiles">
+      <!-- Copiar client-local/dist (API) -->
+      <Component Id="ClientLocalDist" Guid="7F1E9C5E-4D3B-4C59-9F30-FFLOW00010001">
+        <CreateFolder />
+        <!-- Espera que os arquivos sejam colocados antes do build do MSI -->
+        <File Source="..\..\client-local\dist\main.js" KeyPath="yes" Name="main.js" />
+      </Component>
+
+      <!-- Copiar ERP build (web/dist) -->
+      <Component Id="ErpDist" Guid="A90C5E2B-1E7B-4C71-9E33-FFLOW00010002">
+        <CreateFolder />
+        <File Source="..\..\dist\index.html" KeyPath="yes" Name="index.html" />
+      </Component>
+
+      <!-- Scripts de instalação de serviço e launcher -->
+      <Component Id="InstallerScripts" Guid="C2E4D0AA-6F88-4BCA-8EFA-FFLOW00010003">
+        <File Source="..\windows\service-install.ps1" Name="service-install.ps1" />
+        <File Source="..\windows\service-uninstall.ps1" Name="service-uninstall.ps1" />
+        <File Source="..\windows\launcher.ps1" Name="launcher.ps1" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+  <Fragment>
+    <!-- Atalhos: Launcher para abrir ERP em 8080 -->
+    <Component Id="DesktopShortcutComponent" Guid="E1E4D3D1-0EFE-4E47-A9C7-FFLOW00020001">
+      <Shortcut Id="DesktopShortcutFflowErp" Directory="DesktopFolder" Name="F-Flow ERP" WorkingDirectory="INSTALLDIR" Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe" Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLDIR]\launchers\launcher.ps1&quot;" />
+      <RemoveFolder Id="DesktopFolderCleanup" Directory="DesktopFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\F-Flow\Installer" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="StartMenuShortcutComponent" Guid="F3FBA90C-2D3A-4E7A-9B5C-FFLOW00020002">
+      <Shortcut Id="StartMenuShortcutFflowErp" Directory="ProgramMenuFflow" Name="Abrir ERP" WorkingDirectory="INSTALLDIR" Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe" Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLDIR]\launchers\launcher.ps1&quot;" />
+      <Shortcut Id="StartMenuShortcutUninstall" Directory="ProgramMenuFflow" Name="Desinstalar F-Flow Suite" WorkingDirectory="INSTALLDIR" Target="msiexec.exe" Arguments="/x [ProductCode]" />
+      <RemoveFolder Id="ProgramMenuCleanup" Directory="ProgramMenuFflow" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\F-Flow\Installer" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+  </Fragment>
+</Wix>

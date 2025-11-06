@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:bal="http://schemas.microsoft.com/wix/BalExtension">
+  <!-- Bootstrapper (Burn) para instalar Node.js como pré-requisito e o MSI do F-Flow -->
+  <Bundle Name="F-Flow Suite Bootstrapper" Version="1.0.0.0" Manufacturer="2F Solutions" UpgradeCode="2B5E9E90-2F6A-4D8A-9A2F-FFLOWBUNDLE0001">
+    <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.RtfLicense" />
+
+    <Chain>
+      <!-- Node.js MSI (exemplo: Node 18 x64). Pode ser ajustado para outra versão. -->
+      <MsiPackage Id="NodeJs" DisplayName="Node.js Runtime" Compressed="no" Vital="yes" Permanent="yes" EnableFeatureSelection="no" SourceFile="node-v18.19.1-x64.msi" />
+
+      <!-- MSI principal do F-Flow Suite (gerado a partir de Product.wxs) -->
+      <MsiPackage Id="FflowMsi" DisplayName="F-Flow Suite" Compressed="yes" Vital="yes" Permanent="no" EnableFeatureSelection="no" SourceFile="FFlowSuite.msi" />
+    </Chain>
+  </Bundle>
+</Wix>
