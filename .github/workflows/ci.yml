@@ -159,87 +159,41 @@ jobs:
           path: dist/
           retention-days: 7
 
-  build-client-binaries:
-    name: Build Client Binaries
-    runs-on: ${{ matrix.os }}
-    needs: lint-and-test
-    
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            platform: win32
-            arch: x64
-            ext: .exe
-          - os: macos-latest
-            platform: darwin
-            arch: x64
-            ext: ''
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-            ext: ''
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: client-local/package-lock.json
-
-      - name: Install dependencies
-        working-directory: client-local
-        run: npm ci
-
-      - name: Generate Prisma client
-        working-directory: client-local
-        run: npx prisma generate
-
-      - name: Build application
-        working-directory: client-local
-        run: npm run build
-
-      - name: Create binary with pkg (matrix-targeted)
-        working-directory: client-local
-        run: npx pkg dist/main.js --targets node18-${{ matrix.platform }}-${{ matrix.arch }} --output build/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
-
-      - name: Upload binary artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: client-binary-${{ matrix.platform }}-${{ matrix.arch }}
-          path: client-local/build/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
-          retention-days: 7
+  # Removido: job de build de binários com pkg para múltiplas plataformas
 
   build-windows-installer:
     name: Build Windows Installer
     runs-on: windows-latest
-    needs: build-client-binaries
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Download client binary (Windows)
-        uses: actions/download-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: client-binary-win32-x64
-          path: client-local\installers\windows\installer_assets
+          node-version: '18'
 
-      - name: Install Inno Setup
-        run: choco install innosetup -y
-
-      - name: Compile installer (Inno Setup)
+      - name: Build ERP frontend (root)
         run: |
-          & 'C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe' 'client-local\\installers\\windows\\f-flow-client-installer.iss' /DClientBinary=installer_assets\\f-flow-client-win32-x64.exe /DERPUrl=https://erp.f-flow.com /DHubUrl=https://hub.f-flow.com
+          npm ci
+          npm run build
+
+      - name: Prepare client-local
+        working-directory: client-local
+        run: |
+          npm ci
+          npx prisma generate
+          npm run build
+
+      - name: Build MSI (WiX)
+        shell: pwsh
+        run: |
+          pwsh installers/wix/build.ps1 -Version "0.0.0-ci" -ProductName "F-Flow Suite" -Manufacturer "2F Solutions"
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: f-flow-client-win-installer
-          path: client-local\\installers\\windows\\build\\installer\\f-flow-client-win-installer.exe
+          name: f-flow-client-win-msi
+          path: installers\\wix\\FFlowSuite.msi
           retention-days: 7
 
   security-scan:

@@ -28,6 +28,7 @@ jobs:
 
       - name: Build ERP frontend (Vite)
         run: |
+          npm ci
           npm run build
 
       - name: Generate Prisma Client (client-local)
@@ -42,29 +43,11 @@ jobs:
         run: |
           npm run build
 
-      - name: Build ERP server exe (pkg)
-        working-directory: client-local
-        run: |
-          npx pkg installers\\windows\\erp-server.js --targets node18-win-x64 --output build\\erp-server.exe
+      # Removido: build de executáveis com pkg
 
-      - name: Copy Prisma engine to build dir
-        working-directory: client-local
-        shell: pwsh
-        run: |
-          $engineCandidates = @(
-            "node_modules/@prisma/client/libquery_engine-windows.dll.node",
-            "node_modules/@prisma/engines/libquery_engine-windows.dll.node",
-            "node_modules/@prisma/engines/query_engine-windows.dll.node"
-          )
-          $engineOut = "build/query_engine-windows.dll.node"
-          foreach ($c in $engineCandidates) {
-            if (Test-Path $c) { Copy-Item $c -Destination $engineOut -Force; Write-Host "Copied engine: $c -> $engineOut"; break }
-          }
+      # Removido: cópia manual de engine do Prisma para build com pkg
 
-      - name: Build client-local exe (pkg)
-        working-directory: client-local
-        run: |
-          npx pkg dist/main.js --targets node18-win-x64 --output build/f-flow-client.exe
+      # Removido: build de executáveis com pkg
 
       - name: Download Node.js portable (win-x64)
         shell: pwsh
@@ -78,28 +61,21 @@ jobs:
           $expanded = "client-local/installers/windows/build/node-v$version-win-x64"
           if (Test-Path $expanded) { Rename-Item -Path $expanded -NewName "node" -Force }
 
-      - name: Install Inno Setup
-        run: |
-          choco install innosetup -y
-
-      - name: Compile Inno Setup installer
-        working-directory: client-local\installers\windows
+      - name: Build MSI (WiX)
         shell: pwsh
         run: |
-          $iscc = "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe"
-          if (-not (Test-Path $iscc)) { $iscc = "C:\\Program Files\\Inno Setup 6\\ISCC.exe" }
-          & $iscc f-flow-client-installer.iss
+          pwsh installers/wix/build.ps1 -Version "${{ github.event.release.tag_name }}" -ProductName "F-Flow Suite" -Manufacturer "2F Solutions"
 
-      - name: Upload Installer Artifact
+      - name: Upload MSI Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: f-flow-windows-installer
-          path: client-local\installers\windows\Output\*
+          name: f-flow-windows-msi
+          path: installers\wix\FFlowSuite.msi
 
-      - name: Attach installer to release
+      - name: Attach MSI to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: client-local\installers\windows\Output\*.exe
+          files: installers\wix\FFlowSuite.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

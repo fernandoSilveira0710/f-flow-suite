@@ -824,12 +824,12 @@ Para voltar ao modo de desenvolvimento:
 
 ## 📋 Critérios de Aceite
 
-- ✅ `npm run build:pkg` gera executáveis para Win/Mac/Linux
+- ✅ Instalador MSI (WiX) gera pacote para Windows
 - ✅ Primeira execução cria diretórios e executa migrations
 - ✅ `GET /health` retorna `{ status: 'ok' }`
-- ✅ Instalação como serviço funciona em todos os SOs
+- ✅ Instalação como serviço via `installers/wix/service-install.ps1` funciona no Windows
 - ✅ Logs estruturados com rotação
-- ✅ Desinstalação limpa sem afetar dados do usuário
+- ✅ Desinstalação limpa via `installers/wix/service-uninstall.ps1` sem afetar dados do usuário
 
 ## 🤝 Contribuição
 

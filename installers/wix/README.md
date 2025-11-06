@@ -27,7 +27,7 @@ Antes de compilar o MSI, gere os builds e coloque os arquivos nas localizações
    - O instalador copiará `client-local/dist/main.js` para `Program Files\\F-Flow Suite\\client-local\\main.js`.
 
 3. Scripts de serviço e launcher:
-   - Serviços: instalados em `Program Files\\F-Flow Suite\\installers\\windows\\` (`service-install.ps1`, `service-uninstall.ps1`, `WinSW-x64.exe`)
+   - Serviços: instalados em `Program Files\\F-Flow Suite\\installers\\windows\\` (`service-install.ps1`, `service-uninstall.ps1`)
    - Launcher: instalado em `Program Files\\F-Flow Suite\\launchers\\launcher.ps1`
 
 4. Pré-requisito Node.js:

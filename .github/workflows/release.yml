@@ -65,18 +65,8 @@ jobs:
           - os: windows-latest
             platform: win32
             arch: x64
-            ext: .exe
+            ext: ''
             installer_ext: .msi
-          - os: macos-latest
-            platform: darwin
-            arch: x64
-            ext: ''
-            installer_ext: .dmg
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-            ext: ''
-            installer_ext: .AppImage
     
     steps:
       - name: Checkout code
@@ -101,9 +91,24 @@ jobs:
         working-directory: client-local
         run: npm run build
 
-      - name: Create binary with pkg
-        working-directory: client-local
-        run: npm run build:pkg
+      # Build MSI (WiX) — sem pkg/Inno Setup
+      - name: Build MSI (WiX)
+        if: matrix.platform == 'win32'
+        shell: pwsh
+        run: |
+          # Build ERP frontend (gera ./dist na raiz)
+          npm ci
+          npm run build
+
+          # Preparar client-local
+          cd client-local
+          npm ci
+          npx prisma generate
+          npm run build
+          cd ..
+
+          # Compilar MSI com WiX
+          pwsh installers/wix/build.ps1 -Version "${{ github.ref_name }}" -ProductName "F-Flow Suite" -Manufacturer "2F Solutions"
 
       - name: Rename binary
         shell: bash
@@ -117,17 +122,17 @@ jobs:
             mv f-flow-client-linux f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}
           fi
 
-      # Windows Installer
-      - name: Create Windows Installer
+      # Upload MSI (Windows)
+      - name: Upload Windows MSI Asset
         if: matrix.platform == 'win32'
-        shell: pwsh
-        run: |
-          # Install Inno Setup
-          choco install innosetup -y
-
-          # Compile installer with Inno Setup
-          $iscc = 'C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe'
-          & $iscc 'client-local\\installers\\windows\\f-flow-client-installer.iss' /DClientBinary="client-local\\f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}" /DERPUrl="https://erp.f-flow.com" /DHubUrl="https://hub.f-flow.com"
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: installers/wix/FFlowSuite.msi
+          asset_name: FFlowSuite-${{ github.ref_name }}.msi
+          asset_content_type: application/octet-stream
 
       # macOS Installer
       - name: Create macOS Installer
@@ -159,27 +164,19 @@ jobs:
           asset_name: f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
           asset_content_type: application/octet-stream
 
-      - name: Upload Windows Installer Asset
+      # Opcional: Upload do bootstrapper, se gerado
+      - name: Upload Windows Bootstrapper Asset
         if: matrix.platform == 'win32'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: client-local/installers/windows/build/installer/f-flow-client-win-installer.exe
-          asset_name: f-flow-client-win-installer.exe
+          asset_path: installers/wix/FFlowSuiteBootstrapper.exe
+          asset_name: FFlowSuiteBootstrapper-${{ github.ref_name }}.exe
           asset_content_type: application/octet-stream
 
-      - name: Upload Installer Asset (non-Windows)
-        if: matrix.platform != 'win32'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
-          asset_name: f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
-          asset_content_type: application/octet-stream
+      # Removido suporte a instaladores non-Windows (pkg/AppImage/DMG)
 
   build-hub-docker:
     name: Build and Push Hub Docker Image
