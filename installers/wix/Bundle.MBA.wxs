@@ -1,12 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:bal="http://schemas.microsoft.com/wix/BalExtension">
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:bal="http://schemas.microsoft.com/wix/BalExtension" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <!-- Bootstrapper (Burn) com UI customizada via ManagedBootstrapperApplicationHost -->
-  <Bundle Name="F-Flow Suite Bootstrapper" Version="1.0.0.0" Manufacturer="2F Solutions" UpgradeCode="B58A4A15-6F3B-4F74-9E3D-9C3ACB9F3A11">
-    <BootstrapperApplicationRef Id="ManagedBootstrapperApplicationHost" SourceFile="..\bootstrapper-app\bin\Release\FflowBootstrapperApp.dll" />
+  <Bundle Name="F-Flow Suite Bootstrapper" Version="1.0.0.0" Manufacturer="2F Solutions" UpgradeCode="B58A4A15-6F3B-4F74-9E3D-9C3ACB9F3A11" Compressed="yes">
+    <BootstrapperApplicationRef Id="ManagedBootstrapperApplicationHost">
+      <Payload Name="FflowBootstrapperApp.dll" SourceFile="..\bootstrapper-app\bin\Release\net48\FflowBootstrapperApp.dll" />
+    </BootstrapperApplicationRef>
+
+    <!-- Detecção de .NET Framework 4.8: Release >= 528040 -->
+    <util:RegistrySearch Id="RegSearch_NetFx48Release" Root="HKLM" Key="SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" Value="Release" Variable="NetFxRelease" Win64="yes" />
+
+    <!-- Detecção de Node.js por chave de registro -->
+    <util:RegistrySearch Id="RegSearch_NodeJsInstalled" Root="HKLM" Key="SOFTWARE\Node.js" Value="InstallPath" Variable="NodeJsInstalled" Win64="yes" />
 
     <Chain>
+      <!-- Pré-requisito .NET Framework 4.8 (instalador offline embutido) -->
+      <ExePackage Id="NetFx48" DisplayName="Microsoft .NET Framework 4.8" Compressed="yes" PerMachine="yes" Vital="yes" DetectCondition="NetFxRelease &gt;= 528040" InstallCommand="/quiet /norestart" SourceFile="ndp48-x86-x64-allos-enu.exe" />
+
       <!-- Node.js MSI embutido -->
-      <MsiPackage Id="NodeJs" DisplayName="Node.js Runtime" Compressed="yes" Vital="yes" Permanent="yes" EnableFeatureSelection="no" SourceFile="node-v18.19.1-x64.msi" />
+      <MsiPackage Id="NodeJs" DisplayName="Node.js Runtime" Compressed="yes" Vital="yes" Permanent="yes" EnableFeatureSelection="no" SourceFile="node-v18.19.1-x64.msi" InstallCondition="NOT NodeJsInstalled" />
 
       <!-- MSI principal embutido -->
       <MsiPackage Id="FflowMsi" DisplayName="F-Flow Suite" Compressed="yes" Vital="yes" Permanent="no" EnableFeatureSelection="no" SourceFile="FFlowSuite.msi" />

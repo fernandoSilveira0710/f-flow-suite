@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [ main, develop ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, develop ]
 
@@ -192,6 +193,27 @@ jobs:
           New-Item -ItemType Directory -Force -Path "installers/wix" | Out-Null
           Invoke-WebRequest -Uri $msiUrl -OutFile "installers/wix/node-v$version-x64.msi"
 
+      - name: Install WiX Toolset 3 (Chocolatey)
+        shell: pwsh
+        run: |
+          choco install wixtoolset -y
+
+      - name: Set WixToolsetDir env
+        shell: pwsh
+        run: |
+          $candidates = @(
+            'C:\Program Files (x86)\WiX Toolset v3.14',
+            'C:\Program Files\WiX Toolset v3.14',
+            'C:\Program Files (x86)\WiX Toolset v3.11',
+            'C:\Program Files\WiX Toolset v3.11'
+          )
+          foreach ($d in $candidates) { if (Test-Path $d) { "WixToolsetDir=$d" | Out-File -FilePath $env:GITHUB_ENV -Append; break } }
+
+      - name: Build Managed Bootstrapper Application (WPF)
+        shell: pwsh
+        run: |
+          msbuild installers\bootstrapper-app\FflowBootstrapperApp.csproj /p:Configuration=Release /m
+
       - name: Build MSI (WiX)
         shell: pwsh
         run: |
@@ -210,7 +232,36 @@ jobs:
         with:
           name: f-flow-client-win-bootstrapper
           path: installers\\wix\\FFlowSuiteBootstrapper.exe
+          if-no-files-found: warn
           retention-days: 7
+
+  release-windows-installer:
+    name: Publish Release (Windows Installer)
+    runs-on: ubuntu-latest
+    needs: build-windows-installer
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download artifacts (MSI e Bootstrapper)
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+          merge-multiple: true
+
+      - name: List assets
+        run: ls -la release_assets
+
+      - name: Create GitHub Release and upload assets
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          name: F-Flow Suite ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generateReleaseNotes: true
+          artifacts: release_assets/*
+          artifactErrorsFailBuild: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   security-scan:
     name: Security Scan

@@ -1,0 +1,8 @@
+is_global = true
+build_property.RootNamespace = FflowBootstrapperApp
+build_property.ProjectDir = C:\Users\Fernando\Documents\2F SOLUTIONS\f-flow-suite\installers\bootstrapper-app\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.CsWinRTUseWindowsUIXamlProjections = false
+build_property.EffectiveAnalysisLevelStyle = 
+build_property.EnableCodeStyleSeverity = 

@@ -29,6 +29,8 @@ function Add-WixV3ToPath() {
         $env:Path = "$dir;" + $env:Path
         Write-Host "Adicionado ao PATH: $dir" -ForegroundColor Yellow
       }
+      # Exportar WixToolsetDir (raiz) para facilitar referência a BootstrapperCore.dll
+      $env:WixToolsetDir = Split-Path $dir -Parent
       return $true
     }
   }
@@ -67,6 +69,24 @@ if ($hasWixCli) {
 
   $nodeMsi = Join-Path (Get-Location) 'node-v18.19.1-x64.msi'
   if (Test-Path $nodeMsi) {
+    # Tentar compilar o MBA WPF se msbuild/dotnet estiverem disponíveis
+    $mbaProj = '..\bootstrapper-app\FflowBootstrapperApp.csproj'
+    if (Test-Path $mbaProj) {
+      $msbuild = Get-Command msbuild -ErrorAction SilentlyContinue
+      if ($msbuild) {
+        Write-Host "Compilando projeto MBA via MSBuild" -ForegroundColor Cyan
+        & $msbuild.Path $mbaProj /p:Configuration=Release /v:m
+      } else {
+        $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+        if ($dotnet) {
+          Write-Host "Compilando projeto MBA via dotnet build" -ForegroundColor Cyan
+          & $dotnet.Path build $mbaProj -c Release
+        } else {
+          Write-Warning "MSBuild/dotnet não encontrados; mantendo fallback para UI padrão."
+        }
+      }
+    }
+
     $mbaDll = Resolve-Path '..\bootstrapper-app\bin\Release\FflowBootstrapperApp.dll' -ErrorAction SilentlyContinue
     if ($mbaDll) {
       Write-Host "Compilando Bundle com Managed Bootstrapper Application (MBA)" -ForegroundColor Cyan
