@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ServiceTrayMonitor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a8a1291f3c6e6d1d6a0ec22f08eee3070841e20d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f306f5f8dcc06db0eab08d470c5e03aa563cefa3")]
 [assembly: System.Reflection.AssemblyProductAttribute("ServiceTrayMonitor")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ServiceTrayMonitor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
