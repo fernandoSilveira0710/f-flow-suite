@@ -37,3 +37,4 @@ client-local/installers/windows/build/
 installers/wix/node-v18.19.1-x64.msi
 installers/wix/out/FFlowSuiteBootstrapper.exe
 installers/wix/out/FFlowSuiteBootstrapper.wixpdb
+installers/wix/out-wpf

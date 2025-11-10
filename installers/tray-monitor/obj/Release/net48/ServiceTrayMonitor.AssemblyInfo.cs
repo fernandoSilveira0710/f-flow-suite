@@ -10,12 +10,12 @@
 using System;
 using System.Reflection;
 
-[assembly: System.Reflection.AssemblyCompanyAttribute("FflowBootstrapperApp")]
+[assembly: System.Reflection.AssemblyCompanyAttribute("ServiceTrayMonitor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
 [assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a8a1291f3c6e6d1d6a0ec22f08eee3070841e20d")]
-[assembly: System.Reflection.AssemblyProductAttribute("FflowBootstrapperApp")]
-[assembly: System.Reflection.AssemblyTitleAttribute("FflowBootstrapperApp")]
+[assembly: System.Reflection.AssemblyProductAttribute("ServiceTrayMonitor")]
+[assembly: System.Reflection.AssemblyTitleAttribute("ServiceTrayMonitor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
 
 // Gerado pela classe WriteCodeFragment do MSBuild.

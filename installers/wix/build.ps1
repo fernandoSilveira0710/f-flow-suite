@@ -6,6 +6,20 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Diretório de saída consolidada
+$OutDir = Join-Path (Get-Location) 'out-wpf'
+if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir | Out-Null }
+
+# Garantir que todos os comandos candle/light/heat rodem a partir da pasta do script
+Push-Location $PSScriptRoot
+
+# Se a versão não foi informada (default 1.0.0.0), gera uma versão dinâmica
+if ($Version -eq '1.0.0.0') {
+  $verA = [int](Get-Date).DayOfYear   # 1..366
+  $verB = ([int](Get-Date).Hour * 100 + [int](Get-Date).Minute) # 0..2359
+  $Version = "1.0.$verA.$verB"
+}
+
 function Ensure-Tool($tool) {
   $exists = Get-Command $tool -ErrorAction SilentlyContinue
   if (-not $exists) {
@@ -45,8 +59,14 @@ function Generate-ErpDistFragment() {
   Ensure-Tool 'heat'
   Write-Host "Gerando fragmento ErpDist.wxs com heat (conteúdo de dist/)" -ForegroundColor Cyan
   $distPath = "..\\..\\dist"
-  $absDist = (Resolve-Path $distPath).Path
-  & heat dir $absDist -gg -sfrag -sreg -dr ErpDistDir -cg ErpDistComponents -var var.ErpDistSource -out ErpDist.wxs
+  if (Test-Path $distPath) {
+    $absDist = (Resolve-Path $distPath).Path
+    & heat dir $absDist -gg -sfrag -sreg -dr ErpDistDir -cg ErpDistComponents -var var.ErpDistSource -out ErpDist.wxs
+    return $true
+  } else {
+    Write-Warning "Pasta 'dist' não encontrada; pulando geração de ErpDist.wxs e build do MSI. Usarei MSI já gerado se existir."
+    return $false
+  }
 }
 
 # Preferir WiX v4 (wix CLI), mas dar fallback para candle/light (v3)
@@ -61,11 +81,38 @@ if ($hasWixCli) {
   Write-Host "Compilando com candle/light (WiX v3)" -ForegroundColor Cyan
   Ensure-Tool 'candle'
   Ensure-Tool 'light'
-  Generate-ErpDistFragment
+  $erpReady = Generate-ErpDistFragment
+  $msiPath = Join-Path $OutDir 'FFlowSuite.msi'
+  if ($erpReady) {
+    # Compilar app de bandeja (monitor de serviços) antes do MSI para garantir que o arquivo exista
+    $trayProj = '..\tray-monitor\ServiceTrayMonitor.csproj'
+    if (Test-Path $trayProj) {
+      $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+      if ($dotnet) {
+        Write-Host "Compilando app de bandeja (monitor de serviços)" -ForegroundColor Cyan
+        & $dotnet.Path build $trayProj -c Release
+      } else {
+        $msbuild = Get-Command msbuild -ErrorAction SilentlyContinue
+        if ($msbuild) {
+          Write-Host "Compilando app de bandeja via MSBuild" -ForegroundColor Cyan
+          & $msbuild.Path $trayProj /p:Configuration=Release /v:m
+        } else {
+          Write-Warning "MSBuild/dotnet não encontrados; app de bandeja não será compilado."
+        }
+      }
+    }
 
-  $absDist = (Resolve-Path "..\\..\\dist").Path
+    $absDist = (Resolve-Path "..\\..\\dist").Path
   candle -ext WixUtilExtension -dVersion=$Version -dProductName="$ProductName" -dManufacturer="$Manufacturer" -dErpDistSource="$absDist" -arch x64 Product.wxs ErpDist.wxs
-  light -ext WixUtilExtension Product.wixobj ErpDist.wixobj -o FFlowSuite.msi
+  light -ext WixUtilExtension Product.wixobj ErpDist.wixobj -o $msiPath
+  } else {
+    if (-not (Test-Path $msiPath)) {
+      if (Test-Path 'FFlowSuite.msi') { Copy-Item 'FFlowSuite.msi' $msiPath -Force }
+    }
+    if (-not (Test-Path $msiPath)) {
+      Write-Warning "FFlowSuite.msi não encontrado em '$msiPath' e 'installers/wix'. O build do bundle pode falhar."
+    }
+  }
 
   $nodeMsi = Join-Path (Get-Location) 'node-v18.19.1-x64.msi'
   if (Test-Path $nodeMsi) {
@@ -87,19 +134,46 @@ if ($hasWixCli) {
       }
     }
 
-    $mbaDll = Resolve-Path '..\bootstrapper-app\bin\Release\FflowBootstrapperApp.dll' -ErrorAction SilentlyContinue
+    # MSI agora é referenciado diretamente a partir de out-wpf nos .wxs; não é necessário copiar
+
+    # Compilar app de bandeja (monitor de serviços)
+    $trayProj = '..\tray-monitor\ServiceTrayMonitor.csproj'
+    if (Test-Path $trayProj) {
+      $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+      if ($dotnet) {
+        Write-Host "Compilando app de bandeja (monitor de serviços)" -ForegroundColor Cyan
+        & $dotnet.Path build $trayProj -c Release
+      } else {
+        $msbuild = Get-Command msbuild -ErrorAction SilentlyContinue
+        if ($msbuild) {
+          Write-Host "Compilando app de bandeja via MSBuild" -ForegroundColor Cyan
+          & $msbuild.Path $trayProj /p:Configuration=Release /v:m
+        } else {
+          Write-Warning "MSBuild/dotnet não encontrados; app de bandeja não será compilado."
+        }
+      }
+    }
+
+    # Sempre gerar StdBA (UI padrão, sem .NET)
+    Write-Host "Compilando Bundle StdBA (sem .NET)" -ForegroundColor Cyan
+    candle -ext WixUtilExtension -ext WixBalExtension -dVersion=$Version -dProductName="$ProductName" -dManufacturer="$Manufacturer" -arch x64 Bundle.wxs
+    light -ext WixUtilExtension -ext WixBalExtension Bundle.wixobj -o (Join-Path $OutDir '2F Solutions (StdBA).exe')
+
+    # Gerar MBA (WPF, requer .NET 4.8) se a DLL existir
+    $mbaDll = Resolve-Path '..\bootstrapper-app\bin\Release\net48\FflowBootstrapperApp.dll' -ErrorAction SilentlyContinue
     if ($mbaDll) {
-      Write-Host "Compilando Bundle com Managed Bootstrapper Application (MBA)" -ForegroundColor Cyan
-      candle -ext WixBalExtension -arch x64 Bundle.MBA.wxs
-      light -ext WixBalExtension Bundle.MBA.wixobj -o FFlowSuiteBootstrapper.exe
+      Write-Host "Compilando Bundle MBA (WPF, requer .NET 4.8)" -ForegroundColor Cyan
+      candle -ext WixUtilExtension -ext WixBalExtension -dVersion=$Version -dProductName="$ProductName" -dManufacturer="$Manufacturer" -arch x64 Bundle.MBA.wxs
+      light -ext WixUtilExtension -ext WixBalExtension Bundle.MBA.wixobj -dWixMbaPrereqPackageId=NetFx48 -dWixMbaPrereqLicenseUrl=https://go.microsoft.com/fwlink/?LinkId=2085155 -o (Join-Path $OutDir '2F Solutions.exe')
     } else {
-      Write-Host "Compilando Bundle com UI padrão (sem MBA)" -ForegroundColor Cyan
-      candle -ext WixBalExtension -arch x64 Bundle.wxs
-      light -ext WixBalExtension Bundle.wixobj -o FFlowSuiteBootstrapper.exe
+      Write-Warning "DLL do MBA não encontrada; gerado apenas StdBA."
     }
   } else {
     Write-Warning "Bundle não compilado: 'node-v18.19.1-x64.msi' não encontrado ao lado de Bundle.wxs. Pulei o bootstrapper."
   }
 }
 
-Write-Host "Build concluído: FFlowSuite.msi e FFlowSuiteBootstrapper.exe" -ForegroundColor Green
+Write-Host "Build concluído: MSI + StdBA + MBA (quando disponível) em out-wpf" -ForegroundColor Green
+
+# Retornar ao diretório original
+Pop-Location
