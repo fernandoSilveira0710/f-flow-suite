@@ -60,6 +60,10 @@
         <File Source="..\windows\service-uninstall.ps1" Name="service-uninstall.ps1" KeyPath="yes" />
       </Component>
 
+      <Component Id="BrandingIcon" Guid="*" Directory="InstallersDir">
+        <File Source="..\2F.ico" Name="2F.ico" KeyPath="yes" />
+      </Component>
+
       <!-- Launcher para atalhos -->
       <Component Id="LauncherScript" Guid="*" Directory="LaunchersDir">
         <File Source="..\windows\launcher.ps1" Name="launcher.ps1" />
@@ -117,6 +121,19 @@
     <InstallExecuteSequence>
       <!-- Executa após finalizar a transação, apenas em primeira instalação -->
       <Custom Action="OpenErpCA" After="InstallFinalize">NOT Installed</Custom>
+    </InstallExecuteSequence>
+  </Fragment>
+
+  <Fragment>
+    <!-- Custom Action final: inicia o Tray Monitor ao término da instalação -->
+    <CustomAction Id="LaunchTrayMonitorCA"
+                  Directory="INSTALLDIR"
+                  ExeCommand='[System64Folder]WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process \"[INSTALLDIR]\\monitor\\ServiceTrayMonitor.exe\""'
+                  Execute="immediate" Return="ignore" Impersonate="yes" />
+
+    <InstallExecuteSequence>
+      <!-- Executa após o OpenErpCA, apenas na primeira instalação -->
+      <Custom Action="LaunchTrayMonitorCA" After="OpenErpCA">NOT Installed</Custom>
     </InstallExecuteSequence>
   </Fragment>
 </Wix>

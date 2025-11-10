@@ -4,7 +4,7 @@
     <OutputType>WinExe</OutputType>
     <Nullable>disable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
-    <ApplicationIcon></ApplicationIcon>
+    <ApplicationIcon>..\2F.ico</ApplicationIcon>
     <AssemblyName>ServiceTrayMonitor</AssemblyName>
   </PropertyGroup>
 

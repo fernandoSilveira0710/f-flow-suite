@@ -3,6 +3,8 @@ using System.Drawing;
 using System.Linq;
 using System.ServiceProcess;
 using System.Windows.Forms;
+using System.Net;
+using System.IO;
 
 namespace ServiceTrayMonitor
 {
@@ -25,7 +27,8 @@ namespace ServiceTrayMonitor
             _tray = new NotifyIcon
             {
                 Visible = true,
-                Text = "F-Flow Monitor de Serviços"
+                Text = "F-Flow Monitor de Serviços",
+                Icon = LoadBrandIcon()
             };
 
             _menu = new ContextMenuStrip();
@@ -57,22 +60,23 @@ namespace ServiceTrayMonitor
         {
             var api = GetServiceStatus(ServiceApi);
             var erp = GetServiceStatus(ServiceErp);
+            var hub = GetHubHealthStatus();
 
-            var allOk = api == ServiceControllerStatus.Running && erp == ServiceControllerStatus.Running;
-            var someStopped = api == ServiceControllerStatus.Stopped || erp == ServiceControllerStatus.Stopped;
+            var allOk = api == ServiceControllerStatus.Running && erp == ServiceControllerStatus.Running && hub == "OK";
+            var someStopped = api == ServiceControllerStatus.Stopped || erp == ServiceControllerStatus.Stopped || hub != "OK";
 
-            // Ícone básico: informação quando OK, aviso quando parcial, erro quando parado
-            _tray.Icon = allOk ? SystemIcons.Information : (someStopped ? SystemIcons.Error : SystemIcons.Warning);
+            // Ícone fixo de marca (não alterar dinamicamente)
 
             var apiText = $"API: {MapStatus(api)}";
             var erpText = $"ERP: {MapStatus(erp)}";
-            _tray.Text = $"F-Flow Monitor\n{apiText}\n{erpText}";
+            var hubText = $"Hub: {hub}";
+            _tray.Text = $"F-Flow Monitor\n{apiText}\n{erpText}\n{hubText}";
 
             // Mostra dica esporádica em caso de erro
             if (someStopped)
             {
                 _tray.BalloonTipTitle = "Serviços F-Flow";
-                _tray.BalloonTipText = $"{apiText}; {erpText}";
+                _tray.BalloonTipText = $"{apiText}; {erpText}; {hubText}";
                 _tray.BalloonTipIcon = ToolTipIcon.Error;
                 _tray.ShowBalloonTip(1000);
             }
@@ -99,6 +103,44 @@ namespace ServiceTrayMonitor
                 case ServiceControllerStatus.Stopped: return "Parado";
                 case ServiceControllerStatus.Paused: return "Pausado";
                 default: return status.ToString();
+            }
+        }
+
+        private static Icon LoadBrandIcon()
+        {
+            try
+            {
+                var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "installers", "2F.ico");
+                var full = Path.GetFullPath(path);
+                if (File.Exists(full))
+                {
+                    return new Icon(full);
+                }
+            }
+            catch { }
+            return SystemIcons.Application;
+        }
+
+        private static string GetHubHealthStatus()
+        {
+            try
+            {
+                var req = (HttpWebRequest)WebRequest.Create("http://localhost:3001/health");
+                req.Method = "GET";
+                req.Timeout = 1500; // 1.5s timeout para não travar a UI
+                using (var resp = (HttpWebResponse)req.GetResponse())
+                {
+                    if (resp.StatusCode == HttpStatusCode.OK)
+                    {
+                        // Opcionalmente poderíamos ler o corpo, mas OK já é suficiente
+                        return "OK";
+                    }
+                    return $"Erro ({(int)resp.StatusCode})";
+                }
+            }
+            catch
+            {
+                return "Indisponível";
             }
         }
     }
