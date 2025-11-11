@@ -107,7 +107,7 @@ if ($script:NSSM) {
   <startmode>Automatic</startmode>
   <stoptimeout>15000</stoptimeout>
   <resetfailure>86400</resetfailure>
-  <onfailure>restart</onfailure>
+  <onfailure action="restart" delay="10 sec" />
 </service>
 "@ | Set-Content -Path $ApiXml -Encoding UTF8
 
@@ -124,7 +124,7 @@ if ($script:NSSM) {
   <startmode>Automatic</startmode>
   <stoptimeout>15000</stoptimeout>
   <resetfailure>86400</resetfailure>
-  <onfailure>restart</onfailure>
+  <onfailure action="restart" delay="10 sec" />
 </service>
 "@ | Set-Content -Path $ErpXml -Encoding UTF8
 
