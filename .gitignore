@@ -38,3 +38,9 @@ installers/wix/node-v18.19.1-x64.msi
 installers/wix/out/FFlowSuiteBootstrapper.exe
 installers/wix/out/FFlowSuiteBootstrapper.wixpdb
 installers/wix/out-wpf
+out-wpf
+out-wpf/2F Solutions (StdBA).exe
+out-wpf/2F Solutions (StdBA).wixpdb
+out-wpf/2F Solutions.exe
+out-wpf/FFlowSuite.wixpdb
+out-wpf/FFlowSuite.msi

@@ -42,7 +42,8 @@
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "vite_react_shadcn_ts": "file:.."
   },
   "devDependencies": {
     "@nestjs/testing": "^10.0.0",

@@ -176,9 +176,9 @@ function App() {
           <Route path="banho-tosa" element={<Navigate to="/erp/dashboard" replace />} />
           
           {/* Agenda - bloqueada */}
-          // ... existing code ...
+          {/* ... existing code ... */}
           {/* Remover rotas específicas de Agenda */}
-          // (rotas como agenda/novo, agenda/:id, agenda/servicos, profissionais, clientes foram removidas)
+          {/* (rotas como agenda/novo, agenda/:id, agenda/servicos, profissionais, clientes foram removidas) */}
           <Route path="agenda/servicos/novo" element={<NovoServico />} />
           <Route path="agenda/servicos/:id/editar" element={<EditarServico />} />
           <Route path="agenda/profissionais" element={<ProfissionaisIndex />} />
@@ -217,7 +217,7 @@ function App() {
           <Route path="grooming/categories" element={<GroomingCategoriesIndex />} />
           
           {/* Remover rotas específicas de Grooming */}
-          // (rotas como grooming, grooming/:id, grooming/new, services, pets, resources, tutors, profissionais, categories foram removidas)
+          {/* (rotas como grooming, grooming/:id, grooming/new, services, pets, resources, tutors, profissionais, categories foram removidas) */}
           <Route path="grooming/services/novo" element={<NovoGroomingService />} />
           <Route path="grooming/services/:id/editar" element={<EditarGroomingService />} />
           <Route path="grooming/pets" element={<GroomingPetsIndex />} />
@@ -242,6 +242,9 @@ function App() {
           
           {/* Relatórios - manter */}
           <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
+
+          {/* Fallback interno do ERP para evitar NotFound fora do layout */}
+          <Route path="*" element={<NotFound />} />
           
           {/* Settings Routes (EN - canonical) */}
           <Route path="settings" element={<SettingsLayout />}>

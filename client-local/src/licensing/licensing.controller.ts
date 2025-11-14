@@ -138,7 +138,7 @@ export class LicensingController {
   }
 
   @Post('update-cache')
-  async updateCache(@Body() updateData: { tenantId: string; planKey: string; lastChecked: string; updatedAt: string }) {
+  async updateCache(@Body() updateData: { tenantId: string; planKey: string; lastChecked?: string; updatedAt?: string; expiresAt?: string; graceDays?: number }) {
     try {
       this.logger.log(`Updating license cache for tenant ${updateData.tenantId}: ${updateData.planKey}`);
       const result = await this.licensingService.updateLicenseCache(updateData);

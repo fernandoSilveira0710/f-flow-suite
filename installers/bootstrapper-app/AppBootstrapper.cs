@@ -10,9 +10,13 @@ namespace FflowBootstrapperApp
     {
         private bool _fflowMsiPresent = false;
         private bool _nodePresent = false;
+        private string _installedVersion = null;
+        private MainWindow _window;
 
         public AppBootstrapper()
         {
+            DetectBegin += (s, e) => UpdateUi("Preparando instalação...", "Verificando pré‑requisitos e instalação existente.");
+
             // Captura estados dos pacotes durante a detecção
             DetectPackageComplete += (s, e) =>
             {
@@ -30,57 +34,99 @@ namespace FflowBootstrapperApp
                 catch { /* ignore */ }
             };
 
-            // Se tudo já está presente, apenas informa e sai; caso contrário planeja instalação
             DetectComplete += (s, e) =>
             {
+                // Ler versão instalada do Registro
+                try
+                {
+                    using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey("Software\\F-Flow\\Installer"))
+                    {
+                        _installedVersion = key?.GetValue("InstalledVersion") as string;
+                    }
+                }
+                catch { /* ignore */ }
+
+                var targetVersion = Engine.StringVariables.Contains("WixBundleVersion") ? Engine.StringVariables["WixBundleVersion"] : null;
+                if (_window != null) { _window.Dispatcher.Invoke(() => _window.SetVersionInfo(_installedVersion, targetVersion)); }
+
                 if (_fflowMsiPresent && _nodePresent)
                 {
-                    try
-                    {
-                        MessageBox.Show(
-                            "Seu sistema já está com a última versão.",
-                            "F-Flow Suite",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information
-                        );
-                    }
-                    catch { /* ignore */ }
-
-                    Engine.Quit(0);
+                    UpdateUi("F‑Flow já está instalado.", "Nenhuma ação necessária.");
+                    if (_window != null) { _window.Dispatcher.Invoke(() => _window.ShowOpenErp(true)); }
+                    QuitSuccess();
                     return;
                 }
 
+                UpdateUi("Instalação necessária.", "Planejando instalação dos componentes.");
                 Engine.Plan(LaunchAction.Install);
             };
-            PlanComplete += (s, e) => Engine.Apply(IntPtr.Zero);
+
+            PlanComplete += (s, e) =>
+            {
+                UpdateUi("Instalando...", "Aplicando instalação. Aguarde.");
+                Engine.Apply(IntPtr.Zero);
+            };
+
+            ExecuteProgress += (s, e) =>
+            {
+                try { if (_window != null) { _window.Dispatcher.Invoke(() => _window.SetProgress(e.OverallPercentage)); } } catch { }
+            };
+
             ApplyComplete += OnApplyComplete;
         }
 
         protected override void Run()
         {
-            Engine.Detect();
-        }
-
-        private void OnApplyComplete(object sender, ApplyCompleteEventArgs e)
-        {
-            // Abre a janela de sucesso em thread STA (WPF)
+            // Iniciar UI WPF em STA antes da detecção
             var t = new Thread(() =>
             {
                 try
                 {
                     var app = new Application();
-                    var win = new MainWindow();
-                    app.Run(win);
+                    _window = new MainWindow();
+                    app.Run(_window);
                 }
                 catch { /* ignore */ }
             });
             t.SetApartmentState(ApartmentState.STA);
             t.Start();
-            t.Join();
 
-            // Opcional: abrir ERP diretamente também
+            Engine.Detect();
+        }
+
+        private void OnApplyComplete(object sender, ApplyCompleteEventArgs e)
+        {
+            UpdateUi("Instalação concluída com sucesso!", "Atalhos criados. Você pode abrir o ERP agora.");
+            if (_window != null) { _window.Dispatcher.Invoke(() => _window.ShowOpenErp(true)); }
+
             try { Process.Start("http://localhost:8080/erp/login"); } catch { }
 
+            QuitSuccess();
+        }
+
+        private void UpdateUi(string header, string body)
+        {
+            try
+            {
+                if (_window != null)
+                {
+                    _window.Dispatcher.Invoke(() =>
+                    {
+                        _window.SetHeader(header);
+                        _window.SetBody(body);
+                    });
+                }
+            }
+            catch { /* ignore */ }
+        }
+
+        private void QuitSuccess()
+        {
+            try
+            {
+                if (_window != null) { _window.Dispatcher.Invoke(() => _window.Close()); }
+            }
+            catch { /* ignore */ }
             Engine.Quit(0);
         }
     }

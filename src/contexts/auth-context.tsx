@@ -97,8 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const tenantId = localStorage.getItem('tenant_id');
       console.log('🏢 Tenant ID:', tenantId);
       
-      // SEMPRE limpar estado antes de nova consulta
-      setLicenseStatus(null);
+      // Não limpar imediatamente para evitar flicker; atualize ao final
       
       // Consulta direta ao client-local (8081). Evita HTML do ERP em produção.
       let statusResponse: Response = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
@@ -178,11 +177,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🔧 Install data from client-local:', installData);
       
       const newLicenseStatus = {
-        isValid: statusData.valid || false,
-        isInstalled: installData.isInstalled || false,
-        plan: installData.planKey, // USAR install-status que tem dados mais confiáveis
+        isValid: Boolean(statusData.valid),
+        // Considera instalado se qualquer fonte indicar instalação
+        isInstalled: Boolean(installData.isInstalled) || Boolean(statusData.canStart),
+        // Prefira o planKey do status (após avaliação), com fallback para install-status
+        plan: statusData.planKey || installData.planKey,
         expiresAt: installData.expiresAt || statusData.expiresAt
-      };
+      } as LicenseStatus;
       
       console.log('✅ Novo license status:', newLicenseStatus);
       setLicenseStatus(newLicenseStatus);
@@ -200,9 +201,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('🔄 Forçando atualização do status da licença...', forceUpdate ? '(FORCE UPDATE)' : '');
     
     if (forceUpdate) {
-      // Limpar cache local antes de fazer nova consulta
-      console.log('🧹 Limpando cache local de licença...');
-      setLicenseStatus(null);
+      // Limpar com cuidado para evitar flapping visual
+      console.log('🧹 Preparando atualização do cache de licença...');
     }
     
     await checkLicenseStatus();
@@ -216,10 +216,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ETAPA 1: Tentar autenticação no Hub (verificar cadastro + licenças)
       console.log('📡 ETAPA 1: Tentando autenticação no Hub...');
       let hubResponse;
-      // Se Hub não estiver configurado (ou estiver apontando para localhost padrão), considerar como offline
+      // Considerar Hub disponível sempre que houver configuração explícita
       const hubConfigured = Boolean(import.meta.env.VITE_HUB_API_URL);
-      const isDefaultLocalHub = API_URLS.HUB.includes('localhost:3001');
-      let hubAvailable = hubConfigured && !isDefaultLocalHub;
+      let hubAvailable = hubConfigured;
       
       if (hubAvailable) {
         try {
@@ -685,8 +684,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkHubConnectivity = useCallback(async (): Promise<boolean> => {
     // Evitar requisição ao Hub se não houver configuração explícita
     const hubConfigured = Boolean(import.meta.env.VITE_HUB_API_URL);
-    const isDefaultLocalHub = API_URLS.HUB.includes('localhost:3001');
-    if (!hubConfigured || isDefaultLocalHub) {
+    if (!hubConfigured) {
       setIsHubOnline(false);
       return false;
     }

@@ -725,24 +725,36 @@ export class LicensingService implements OnModuleInit {
   /**
    * Atualiza o cache de licença com novos dados
    */
-  async updateLicenseCache(updateData: { tenantId: string; planKey: string; lastChecked: string; updatedAt: string }) {
+  async updateLicenseCache(updateData: { tenantId: string; planKey: string; lastChecked?: string; updatedAt?: string; expiresAt?: string; graceDays?: number }) {
     this.logger.log(`Updating license cache for tenant ${updateData.tenantId}: ${updateData.planKey}`);
-    
+
     try {
+      const now = new Date();
+      const lastChecked = updateData.lastChecked ? new Date(updateData.lastChecked) : now;
+      const updatedAt = updateData.updatedAt ? new Date(updateData.updatedAt) : now;
+      const expiresAt = updateData.expiresAt ? new Date(updateData.expiresAt) : undefined;
+      const graceDays = typeof updateData.graceDays === 'number' ? updateData.graceDays : undefined;
+
       const updatedCache = await this.prisma.licenseCache.upsert({
         where: { tenantId: updateData.tenantId },
         update: {
           planKey: updateData.planKey,
-          lastChecked: new Date(updateData.lastChecked),
-          updatedAt: new Date(updateData.updatedAt)
+          ...(expiresAt ? { expiresAt } : {}),
+          ...(typeof graceDays === 'number' ? { graceDays } : {}),
+          lastChecked,
+          updatedAt,
         },
         create: {
           tenantId: updateData.tenantId,
           planKey: updateData.planKey,
-          status: 'active', // Campo obrigatório
-          lastChecked: new Date(updateData.lastChecked),
-          updatedAt: new Date(updateData.updatedAt),
-          createdAt: new Date()
+          status: 'active',
+          ...(expiresAt ? { expiresAt } : {}),
+          ...(typeof graceDays === 'number' ? { graceDays } : { graceDays: 7 }),
+          lastChecked,
+          updatedAt,
+          createdAt: now,
+          licensed: true,
+          registered: true,
         }
       });
 

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FflowBootstrapperApp")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+88980830827df926ba64691f4694f8215796fa33")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+85131c2ec6a92bd9d36fa118fa58166f401660fb")]
 [assembly: System.Reflection.AssemblyProductAttribute("FflowBootstrapperApp")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FflowBootstrapperApp")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

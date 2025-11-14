@@ -38,7 +38,7 @@ export default function ErpLayout() {
   const [requiredPlan, setRequiredPlan] = useState('');
   const location = useLocation();
   const { entitlements, currentPlan } = useEntitlements();
-  const { logout, licenseStatus, isHubOnline, hubLastCheck, checkHubConnectivity, syncLicenseWithHub, user, offlineDaysLeft, licenseCacheUpdatedAt } = useAuth();
+  const { logout, licenseStatus, isHubOnline, hubLastCheck, checkHubConnectivity, syncLicenseWithHub, refreshLicenseStatus, user, offlineDaysLeft, licenseCacheUpdatedAt } = useAuth();
   const queryClient = useQueryClient();
 
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -73,6 +73,11 @@ export default function ErpLayout() {
     const online = await checkHubConnectivity();
     if (online) {
       await syncLicenseWithHub();
+      // Após sincronizar com o Hub, também atualize o status local
+      await refreshLicenseStatus(true);
+    } else {
+      // Mesmo offline, atualize a visão do status local para refletir cache
+      await refreshLicenseStatus(true);
     }
   };
 

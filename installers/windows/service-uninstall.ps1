@@ -19,7 +19,7 @@ function Resolve-Nssm {
   if (Test-Path $local) { return (Resolve-Path $local).Path }
   $global = "C:\Program Files\nssm\nssm.exe"
   if (Test-Path $global) { return (Resolve-Path $global).Path }
-  Write-Error "nssm.exe não encontrado. Coloque 'nssm.exe' em '$local' ou instale-o em '$global'."
+  return $null
 }
 
 Require-Admin
@@ -27,10 +27,71 @@ $NSSM = Resolve-Nssm -PathHint $NssmPath
 
 Write-Host "Parando e removendo serviços..." -ForegroundColor Cyan
 
-foreach ($svc in @($ServiceNameErp, $ServiceNameApi)) {
-  try { & $NSSM stop $svc } catch {}
-  try { & $NSSM remove $svc confirm } catch {}
-  Write-Host "Removido: $svc" -ForegroundColor Green
+# Parar o app de monitor da bandeja se estiver rodando
+Get-Process -Name ServiceTrayMonitor -ErrorAction SilentlyContinue | Stop-Process -Force
+
+# Finalizar processos node relacionados (client-local/ERP) para evitar reativação por wrappers
+try {
+  $procs = Get-CimInstance Win32_Process | Where-Object {
+    ($_.Name -eq 'node.exe') -and (
+      ($_.CommandLine -match 'client-local\\main.js') -or ($_.CommandLine -match '--erp-service')
+    )
+  }
+  foreach ($p in $procs) {
+    try { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue } catch {}
+  }
+} catch {}
+
+function Remove-ServiceSafe {
+  param([string]$Name)
+  Write-Host "Removendo serviço: $Name" -ForegroundColor Yellow
+  # Tenta via NSSM, se disponível
+  if ($NSSM) {
+    try { & $NSSM stop $Name } catch {}
+    try { & $NSSM remove $Name confirm } catch {}
+  }
+  # Tenta via SC (funciona para serviços registrados por WinSW ou outros)
+  try { sc.exe stop $Name | Out-Null } catch {}
+  Start-Sleep -Milliseconds 500
+  try { sc.exe delete $Name | Out-Null } catch {}
 }
 
-Write-Host "Serviços removidos. Agora você pode desinstalar o MSI com segurança." -ForegroundColor Green
+foreach ($svc in @($ServiceNameErp, $ServiceNameApi)) {
+  Remove-ServiceSafe -Name $svc
+}
+
+# Limpeza de artefatos do WinSW (se usados como fallback)
+$ProgramDataRoot = Join-Path $env:ProgramData "FFlow"
+$ServiceRoot = Join-Path $ProgramDataRoot "service"
+if (Test-Path $ServiceRoot) {
+  Write-Host "Limpando configuração do WinSW em: $ServiceRoot" -ForegroundColor Yellow
+  try { Remove-Item -Path $ServiceRoot -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+}
+
+function Invoke-WinSWUninstallIfPresent {
+  param([string]$ServiceName)
+  try {
+    $svcInfo = sc.exe qc $ServiceName 2>$null | Out-String
+    if ($svcInfo -match 'NOME_DO_CAMINHO_BINÁRIO\s*:\s*"([^"]+)"') {
+      $binPath = $Matches[1]
+      # Detecta wrapper WinSW pelo caminho em ProgramData
+      if ($binPath -like (Join-Path $env:ProgramData 'FFlow\service\*')) {
+        if (Test-Path $binPath) {
+          Write-Host "Detectado WinSW para '$ServiceName'. Executando stop/uninstall no wrapper." -ForegroundColor Yellow
+          try { Start-Process -FilePath $binPath -ArgumentList 'stop' -NoNewWindow -Wait -ErrorAction SilentlyContinue } catch {}
+          Start-Sleep -Milliseconds 500
+          try { Start-Process -FilePath $binPath -ArgumentList 'uninstall' -NoNewWindow -Wait -ErrorAction SilentlyContinue } catch {}
+        }
+      }
+    }
+  } catch {}
+}
+
+# Se os serviços ainda existirem, tenta desinstalar via WinSW wrapper explicitamente
+foreach ($svc in @($ServiceNameErp, $ServiceNameApi)) {
+  Invoke-WinSWUninstallIfPresent -ServiceName $svc
+  # Verifica novamente e força remoção
+  Remove-ServiceSafe -Name $svc
+}
+
+Write-Host "Serviços removidos e wrappers WinSW desinstalados (se presentes)." -ForegroundColor Green

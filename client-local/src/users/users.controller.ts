@@ -12,6 +12,18 @@ export class UsersController {
     return this.usersService.findAll(isActive);
   }
 
+  @Get('lookup/by-email')
+  async findByEmail(@Query('email') email: string) {
+    if (!email) {
+      return { error: 'email query param is required' };
+    }
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      return { error: 'User not found' };
+    }
+    return user;
+  }
+
   @Get('roles/list')
   async getRoles() {
     return this.usersService.getRoles();

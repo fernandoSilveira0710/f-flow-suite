@@ -3,7 +3,8 @@ param(
   [string]$NodePath = "C:\Program Files\nodejs\node.exe",
   [string]$ServiceNameApi = "F-Flow-Client-Local",
   [string]$ServiceNameErp = "F-Flow-ERP-Static",
-  [string]$NssmPath = ""
+  [string]$NssmPath = "",
+  [string]$AppVersion = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,6 +42,10 @@ function Install-Service-WithNssm {
   & $script:NSSM set $SvcName AppThrottle 5000
   & $script:NSSM set $SvcName AppStdout "C:\ProgramData\FFlow\logs\$SvcName.out.log"
   & $script:NSSM set $SvcName AppStderr "C:\ProgramData\FFlow\logs\$SvcName.err.log"
+  if (-not [string]::IsNullOrWhiteSpace($AppVersion)) {
+    # Injeta variáveis de ambiente para propagação da versão ao serviço
+    & $script:NSSM set $SvcName AppEnvironmentExtra "APP_VERSION=$AppVersion;VITE_APP_VERSION=$AppVersion"
+  }
   & $script:NSSM start $SvcName
 }
 
@@ -75,6 +80,21 @@ $ErpRoot = Join-Path $InstallRoot "erp\dist"
 if (-not (Test-Path $ApiScript)) { throw "Script da API não encontrado: $ApiScript" }
 if (-not (Test-Path $ErpRoot)) { throw "Build do ERP não encontrado: $ErpRoot" }
 
+# Criar .env com a versão (ConfigModule padrão lê '.env'; manter compatível criando também '.env.production')
+try {
+  $dir = (Split-Path $ApiScript -Parent)
+  $envFile = Join-Path $dir ".env"
+  $envProdFile = Join-Path $dir ".env.production"
+  if (-not [string]::IsNullOrWhiteSpace($AppVersion)) {
+    "APP_VERSION=$AppVersion`nVITE_APP_VERSION=$AppVersion" | Set-Content -Path $envFile -Encoding UTF8
+    "APP_VERSION=$AppVersion`nVITE_APP_VERSION=$AppVersion" | Set-Content -Path $envProdFile -Encoding UTF8
+  } else {
+    # Fallback: se não vier AppVersion, não criar ou criar vazio para evitar sobrescrever configs do usuário
+    if (-not (Test-Path $envFile)) { "# APP_VERSION não definido pelo instalador" | Set-Content -Path $envFile -Encoding UTF8 }
+    if (-not (Test-Path $envProdFile)) { "# APP_VERSION não definido pelo instalador" | Set-Content -Path $envProdFile -Encoding UTF8 }
+  }
+} catch { Write-Warning "Falha ao gravar .env: $($_.Exception.Message)" }
+
 # Tentar NSSM; se não houver, usar WinSW embutido
 $script:NSSM = Resolve-Nssm -PathHint $NssmPath
 if ($script:NSSM) {
@@ -104,6 +124,7 @@ if ($script:NSSM) {
   <arguments>`"$ApiScript`" --service</arguments>
   <workingdirectory>$(Split-Path $ApiScript -Parent)</workingdirectory>
   <logpath>C:\ProgramData\FFlow\logs\client-local</logpath>
+  $(if (-not [string]::IsNullOrWhiteSpace($AppVersion)) { "<env name=\"APP_VERSION\" value=\"$AppVersion\" />`n  <env name=\"VITE_APP_VERSION\" value=\"$AppVersion\" />" } )
   <startmode>Automatic</startmode>
   <stoptimeout>15000</stoptimeout>
   <resetfailure>86400</resetfailure>
@@ -121,6 +142,7 @@ if ($script:NSSM) {
   <executable>$NodePath</executable>
   <arguments>`"$ApiScript`" --erp-service --root `"$ErpRoot`" --port 8080</arguments>
   <logpath>C:\ProgramData\FFlow\logs\erp</logpath>
+  $(if (-not [string]::IsNullOrWhiteSpace($AppVersion)) { "<env name=\"APP_VERSION\" value=\"$AppVersion\" />`n  <env name=\"VITE_APP_VERSION\" value=\"$AppVersion\" />" } )
   <startmode>Automatic</startmode>
   <stoptimeout>15000</stoptimeout>
   <resetfailure>86400</resetfailure>

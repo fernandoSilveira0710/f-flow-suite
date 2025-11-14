@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Logger, HttpException, HttpStatus, HttpCode } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 export interface OfflineLoginRequest {
@@ -30,19 +30,21 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('offline-login')
+  @HttpCode(HttpStatus.OK)
   async offlineLogin(@Body() body: OfflineLoginRequest): Promise<OfflineLoginResponse> {
     try {
       this.logger.log(`🔐 Tentativa de login offline para: ${body.email}`);
       
       const result = await this.authService.authenticateOffline(body.email, body.password);
-      
+
       if (result.success) {
         this.logger.log(`✅ Login offline bem-sucedido para: ${body.email}`);
-      } else {
-        this.logger.warn(`❌ Login offline falhou para: ${body.email} - ${result.message}`);
+        return result;
       }
-      
-      return result;
+
+      this.logger.warn(`❌ Login offline falhou para: ${body.email} - ${result.message}`);
+      // Retornar sem sucesso como 401 para alinhar semântica HTTP e evitar falsos "OK"
+      throw new HttpException(result.message || 'Falha na autenticação offline', HttpStatus.UNAUTHORIZED);
     } catch (error: any) {
       this.logger.error(`💥 Erro no login offline para ${body.email}:`, error);
       throw new HttpException(

@@ -15,9 +15,10 @@ export function ProtectedRoute({
   requireAuth = true, 
   requireLicense = true 
 }: ProtectedRouteProps) {
-  const { user, licenseStatus, isLoading, isFirstInstallation } = useAuth();
+  const { user, licenseStatus, isLoading, isFirstInstallation, isHubOnline, checkHubConnectivity, syncLicenseWithHub, refreshLicenseStatus } = useAuth();
   const location = useLocation();
   const [checkingInstallation, setCheckingInstallation] = useState(false);
+  const [syncingLicense, setSyncingLicense] = useState(false);
 
   console.log('🛡️ PROTECTED ROUTE - Estado atual:', {
     pathname: location.pathname,
@@ -155,9 +156,33 @@ export function ProtectedRoute({
         handleRedirect();
         return null;
       } else {
-        console.log('🔄 PROTECTED ROUTE - Sistema instalado mas licença inválida - redirecionando para login');
-        // Sistema instalado mas licença inválida - redirecionar para login (que mostrará modal de planos)
-        return <Navigate to="/erp/login" replace />;
+        // Sistema instalado mas licença inválida
+        // Se Hub está online ou ficar online, tentar sincronizar antes de qualquer redirecionamento
+        if (!syncingLicense) {
+          setSyncingLicense(true);
+          (async () => {
+            const online = isHubOnline || await checkHubConnectivity();
+            if (online) {
+              console.log('🔄 PROTECTED ROUTE - Hub online detectado, sincronizando licença antes de decidir redirecionamento...');
+              try {
+                await syncLicenseWithHub();
+                await refreshLicenseStatus(true);
+              } catch (e) {
+                console.warn('⚠️ PROTECTED ROUTE - Falha na sincronização automática da licença', e);
+              }
+            }
+            setSyncingLicense(false);
+          })();
+        }
+
+        // Manter usuário na página e mostrar aviso, sem deslogar automaticamente
+        toast({
+          title: "Licença inválida",
+          description: "Tentando sincronizar com o Hub. Você continuará logado.",
+          variant: "default",
+        });
+        console.log('🔄 PROTECTED ROUTE - Mantendo usuário na rota enquanto tenta sincronizar licença');
+        return <>{children}</>;
       }
     }
   }
