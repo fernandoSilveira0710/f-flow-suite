@@ -33,20 +33,44 @@ function Install-Service-WithNssm {
     [string]$Args,
     [string]$WorkDir
   )
-  Write-Host "Instalando serviço '$SvcName'..." -ForegroundColor Cyan
-  & $script:NSSM install $SvcName $Exe $Args
-  & $script:NSSM set $SvcName DisplayName $DisplayName
-  & $script:NSSM set $SvcName AppDirectory $WorkDir
-  & $script:NSSM set $SvcName Start SERVICE_AUTO_START
-  & $script:NSSM set $SvcName AppStopMethodConsole 2000
-  & $script:NSSM set $SvcName AppThrottle 5000
-  & $script:NSSM set $SvcName AppStdout "C:\ProgramData\FFlow\logs\$SvcName.out.log"
-  & $script:NSSM set $SvcName AppStderr "C:\ProgramData\FFlow\logs\$SvcName.err.log"
-  if (-not [string]::IsNullOrWhiteSpace($AppVersion)) {
-    # Injeta variáveis de ambiente para propagação da versão ao serviço
-    & $script:NSSM set $SvcName AppEnvironmentExtra "APP_VERSION=$AppVersion;VITE_APP_VERSION=$AppVersion"
+  # Detectar se serviço já existe
+  $existing = Get-Service -Name $SvcName -ErrorAction SilentlyContinue
+  if ($existing) {
+    Write-Host "Atualizando serviço existente '$SvcName'..." -ForegroundColor Yellow
+    try { Stop-Service -Name $SvcName -ErrorAction SilentlyContinue } catch {}
+    # Atualizar binário/argumentos/diretório
+    & $script:NSSM set $SvcName Application $Exe
+    & $script:NSSM set $SvcName AppParameters $Args
+    & $script:NSSM set $SvcName AppDirectory $WorkDir
+    & $script:NSSM set $SvcName DisplayName $DisplayName
+    & $script:NSSM set $SvcName Start SERVICE_AUTO_START
+    & $script:NSSM set $SvcName AppStopMethodConsole 2000
+    & $script:NSSM set $SvcName AppThrottle 5000
+    & $script:NSSM set $SvcName AppStdout "C:\ProgramData\FFlow\logs\$SvcName.out.log"
+    & $script:NSSM set $SvcName AppStderr "C:\ProgramData\FFlow\logs\$SvcName.err.log"
+    # Atualizar variáveis de ambiente (sempre garantir PORT e SKIP_MIGRATIONS)
+    $envExtra = "PORT=8081;CLIENT_HTTP_PORT=8081;SKIP_MIGRATIONS=true"
+    if (-not [string]::IsNullOrWhiteSpace($AppVersion)) { $envExtra = "APP_VERSION=$AppVersion;VITE_APP_VERSION=$AppVersion;" + $envExtra }
+    & $script:NSSM set $SvcName AppEnvironmentExtra $envExtra
+    & $script:NSSM restart $SvcName
+  } else {
+    Write-Host "Instalando serviço '$SvcName'..." -ForegroundColor Cyan
+    & $script:NSSM install $SvcName $Exe $Args
+    & $script:NSSM set $SvcName DisplayName $DisplayName
+    & $script:NSSM set $SvcName AppDirectory $WorkDir
+    & $script:NSSM set $SvcName Start SERVICE_AUTO_START
+    & $script:NSSM set $SvcName AppStopMethodConsole 2000
+    & $script:NSSM set $SvcName AppThrottle 5000
+    & $script:NSSM set $SvcName AppStdout "C:\ProgramData\FFlow\logs\$SvcName.out.log"
+    & $script:NSSM set $SvcName AppStderr "C:\ProgramData\FFlow\logs\$SvcName.err.log"
+    if (-not [string]::IsNullOrWhiteSpace($AppVersion)) {
+      # Injeta variáveis de ambiente para propagação da versão ao serviço
+      & $script:NSSM set $SvcName AppEnvironmentExtra "APP_VERSION=$AppVersion;VITE_APP_VERSION=$AppVersion;PORT=8081;CLIENT_HTTP_PORT=8081;SKIP_MIGRATIONS=true"
+    } else {
+      & $script:NSSM set $SvcName AppEnvironmentExtra "PORT=8081;CLIENT_HTTP_PORT=8081;SKIP_MIGRATIONS=true"
+    }
+    & $script:NSSM start $SvcName
   }
-  & $script:NSSM start $SvcName
 }
 
 function Ensure-WinSW {
@@ -58,6 +82,17 @@ function Ensure-WinSW {
   $url = "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe"
   Invoke-WebRequest -Uri $url -OutFile $WinSwExe -UseBasicParsing
   return $WinSwExe
+}
+
+# Garante que nenhum processo esteja segurando o arquivo especificado
+function Ensure-FileUnlocked {
+  param([string]$FilePath)
+  for ($i = 0; $i -lt 20; $i++) {
+    $procs = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $FilePath }
+    if (-not $procs) { return }
+    foreach ($p in $procs) { try { Stop-Process -Id $p.Id -Force } catch {} }
+    Start-Sleep -Milliseconds 250
+  }
 }
 
 Require-Admin
@@ -73,12 +108,58 @@ if (-not (Test-Path $NodePath)) {
 # Criar diretórios de logs
 New-Item -ItemType Directory -Force -Path "C:\ProgramData\FFlow\logs" | Out-Null
 
+# Resolver diretório do repositório para NODE_PATH e fallback do script
+# Em PowerShell, não é permitido usar '-Parent' duas vezes; faça aninhado.
+$RepoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$RepoClient = Join-Path $RepoRoot "client-local"
+$RepoNodeModules = Join-Path $RepoClient "node_modules"
+
 # Caminhos da aplicação
-$ApiScript = Join-Path $InstallRoot "client-local\main.js"
-$ErpRoot = Join-Path $InstallRoot "erp\dist"
+# Determinar o script da API (preferir InstallRoot; fallback para repositório)
+    $ApiScriptCandidate1Dist = Join-Path $InstallRoot "client-local\dist\main.js"
+    $ApiScriptCandidate1Flat = Join-Path $InstallRoot "client-local\main.js"
+$ApiScriptCandidate2 = Join-Path $RepoClient "dist\main.js"
+
+    if (Test-Path $ApiScriptCandidate1Dist) {
+      $ApiScript = $ApiScriptCandidate1Dist
+    } elseif (Test-Path $ApiScriptCandidate1Flat) {
+      $ApiScript = $ApiScriptCandidate1Flat
+    } elseif (Test-Path $ApiScriptCandidate2) {
+      $ApiScript = $ApiScriptCandidate2
+    } else {
+      throw "Script da API não encontrado em '$ApiScriptCandidate1Dist', '$ApiScriptCandidate1Flat' ou '$ApiScriptCandidate2'"
+    }
+
+# Detectar raiz válida do ERP: alguns builds geram 'dist\\dist\\index.html'
+$ErpRootCandidate1 = Join-Path $InstallRoot "erp\dist"
+$ErpRootCandidate2 = Join-Path $InstallRoot "erp\dist\dist"
+if (Test-Path (Join-Path $ErpRootCandidate1 'index.html')) {
+  $ErpRoot = $ErpRootCandidate1
+} elseif (Test-Path (Join-Path $ErpRootCandidate2 'index.html')) {
+  $ErpRoot = $ErpRootCandidate2
+} else {
+  $ErpRoot = $ErpRootCandidate1
+}
 
 if (-not (Test-Path $ApiScript)) { throw "Script da API não encontrado: $ApiScript" }
-if (-not (Test-Path $ErpRoot)) { throw "Build do ERP não encontrado: $ErpRoot" }
+# Validar que exista um index.html na raiz detectada do ERP
+if (-not (Test-Path (Join-Path $ErpRoot 'index.html'))) { throw "Build do ERP não encontrado (index.html ausente): $ErpRoot" }
+
+# Pré-gerar Prisma Client no repositório client-local para evitar geração no startup
+try {
+  Write-Host "Gerando Prisma Client em: $RepoClient" -ForegroundColor Cyan
+  Push-Location $RepoClient
+  # Use o script npm se existir, senão chame npx diretamente
+  if (Test-Path (Join-Path $RepoClient 'package.json')) {
+    try { npm run prisma:generate } catch { npx prisma generate }
+  } else {
+    npx prisma generate
+  }
+} catch {
+  Write-Warning "Falha ao gerar Prisma Client (o serviço pode tentar gerar no startup): $($_.Exception.Message)"
+} finally {
+  Pop-Location
+}
 
 # Criar .env com a versão (ConfigModule padrão lê '.env'; manter compatível criando também '.env.production')
 try {
@@ -99,7 +180,7 @@ try {
 $script:NSSM = Resolve-Nssm -PathHint $NssmPath
 if ($script:NSSM) {
   # Instalar serviço da API local (8081)
-  $apiArgs = "`"$ApiScript`" --service"
+  $apiArgs = "`"$ApiScript`" --service --org `"Local`" --port 8081"
   Install-Service-WithNssm -SvcName $ServiceNameApi -DisplayName "F-Flow Client Local" -Exe $NodePath -Args $apiArgs -WorkDir (Split-Path $ApiScript -Parent)
 
   # Instalar serviço do ERP estático (8080)
@@ -112,6 +193,25 @@ if ($script:NSSM) {
   New-Item -ItemType Directory -Path $ServiceRoot -Force | Out-Null
 
   $WinSwExe = Ensure-WinSW
+  # Copiar WinSW para o diretório do serviço com o mesmo nome-base do XML (compatível com CLI v2)
+  $ApiExe = Join-Path $ServiceRoot ("$ServiceNameApi.exe")
+  $ErpExe = Join-Path $ServiceRoot ("$ServiceNameErp.exe")
+  # Se já existir, parar e desinstalar serviços antes de sobrescrever o executável
+  try { Stop-Service -Name $ServiceNameApi -ErrorAction SilentlyContinue } catch {}
+  try { Stop-Service -Name $ServiceNameErp -ErrorAction SilentlyContinue } catch {}
+  if (Test-Path $ApiExe) {
+    try { & $ApiExe stop } catch {}
+    try { & $ApiExe uninstall } catch {}
+    Ensure-FileUnlocked -FilePath $ApiExe
+  }
+  if (Test-Path $ErpExe) {
+    try { & $ErpExe stop } catch {}
+    try { & $ErpExe uninstall } catch {}
+    Ensure-FileUnlocked -FilePath $ErpExe
+  }
+  Start-Sleep -Milliseconds 500
+  Copy-Item -Path $WinSwExe -Destination $ApiExe -Force
+  Copy-Item -Path $WinSwExe -Destination $ErpExe -Force
 
   # API Service
   $ApiXml = Join-Path $ServiceRoot "$ServiceNameApi.xml"
@@ -121,10 +221,14 @@ if ($script:NSSM) {
   <name>F-Flow Client Local Service</name>
   <description>F-Flow Suite Client Local Server</description>
   <executable>$NodePath</executable>
-  <arguments>`"$ApiScript`" --service</arguments>
+  <arguments>`"$ApiScript`" --service --org `"Local`" --port 8081</arguments>
   <workingdirectory>$(Split-Path $ApiScript -Parent)</workingdirectory>
   <logpath>C:\ProgramData\FFlow\logs\client-local</logpath>
-  $(if (-not [string]::IsNullOrWhiteSpace($AppVersion)) { "<env name=\"APP_VERSION\" value=\"$AppVersion\" />`n  <env name=\"VITE_APP_VERSION\" value=\"$AppVersion\" />" } )
+  $(if (-not [string]::IsNullOrWhiteSpace($AppVersion)) { "<env name=`"APP_VERSION`" value=`"$AppVersion`" />`n  <env name=`"VITE_APP_VERSION`" value=`"$AppVersion`" />" } )
+  <env name="PORT" value="8081" />
+  <env name="CLIENT_HTTP_PORT" value="8081" />
+  <env name="SKIP_MIGRATIONS" value="true" />
+  <env name="NODE_PATH" value="$RepoNodeModules" />
   <startmode>Automatic</startmode>
   <stoptimeout>15000</stoptimeout>
   <resetfailure>86400</resetfailure>
@@ -141,8 +245,10 @@ if ($script:NSSM) {
   <description>Serves local ERP build with static server</description>
   <executable>$NodePath</executable>
   <arguments>`"$ApiScript`" --erp-service --root `"$ErpRoot`" --port 8080</arguments>
+  <workingdirectory>$(Split-Path $ApiScript -Parent)</workingdirectory>
   <logpath>C:\ProgramData\FFlow\logs\erp</logpath>
-  $(if (-not [string]::IsNullOrWhiteSpace($AppVersion)) { "<env name=\"APP_VERSION\" value=\"$AppVersion\" />`n  <env name=\"VITE_APP_VERSION\" value=\"$AppVersion\" />" } )
+  $(if (-not [string]::IsNullOrWhiteSpace($AppVersion)) { "<env name=`"APP_VERSION`" value=`"$AppVersion`" />`n  <env name=`"VITE_APP_VERSION`" value=`"$AppVersion`" />" } )
+  <env name="NODE_PATH" value="$RepoNodeModules" />
   <startmode>Automatic</startmode>
   <stoptimeout>15000</stoptimeout>
   <resetfailure>86400</resetfailure>
@@ -150,13 +256,13 @@ if ($script:NSSM) {
 </service>
 "@ | Set-Content -Path $ErpXml -Encoding UTF8
 
-  & $WinSwExe uninstall $ApiXml 2>$null
-  & $WinSwExe install $ApiXml
-  & $WinSwExe start $ApiXml
+  & $ApiExe uninstall 2>$null
+  & $ApiExe install
+  & $ApiExe start
 
-  & $WinSwExe uninstall $ErpXml 2>$null
-  & $WinSwExe install $ErpXml
-  & $WinSwExe start $ErpXml
+  & $ErpExe uninstall 2>$null
+  & $ErpExe install
+  & $ErpExe start
 }
 
 Write-Host "Serviços instalados e iniciados:" -ForegroundColor Green

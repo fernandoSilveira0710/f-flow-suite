@@ -3,24 +3,24 @@
     <Fragment>
         <DirectoryRef Id="ErpDistDir">
             <Directory Id="dir644B0D45CC16B3AD6B825FAE275DB8EA" Name="dist">
-                <Component Id="cmp1AC56BCBC2ADDA096B5AAB331D8EBCC4" Guid="{17264508-F2B6-4BA4-85E9-23E1089A7488}">
+                <Component Id="cmp1AC56BCBC2ADDA096B5AAB331D8EBCC4" Guid="{E230E7FE-F30D-40C0-B8E2-757997470366}">
                     <File Id="filE9500F3E8A2BAC3C587CCB59445E4E15" KeyPath="yes" Source="$(var.ErpDistSource)\favicon.ico" />
                 </Component>
-                <Component Id="cmp8A81726D7E022F9CAAEF63536E30A573" Guid="{22835B06-B32B-4B0F-8FE3-987E49C9F8DD}">
+                <Component Id="cmp8A81726D7E022F9CAAEF63536E30A573" Guid="{D8E1429C-395F-4811-97D3-49C57BF97388}">
                     <File Id="filCB27E1A79DB2C099E3848518AFBF8547" KeyPath="yes" Source="$(var.ErpDistSource)\index.html" />
                 </Component>
-                <Component Id="cmp4FCBCA9F0214A51C1CDB4B1254D419C2" Guid="{BEDC8D00-D6E0-429E-975A-B19D3ACB23EC}">
+                <Component Id="cmp4FCBCA9F0214A51C1CDB4B1254D419C2" Guid="{6C7EDA34-21AE-45A8-9DD2-53D46ED8E8CB}">
                     <File Id="filBE905ECC02D10DF2D09619C905850DA4" KeyPath="yes" Source="$(var.ErpDistSource)\placeholder.svg" />
                 </Component>
-                <Component Id="cmpD9C77B136618D6AE30C53FA7E943E5B0" Guid="{9D917F53-A363-4145-8B66-33E12632D519}">
+                <Component Id="cmpD9C77B136618D6AE30C53FA7E943E5B0" Guid="{3FB280DC-2C31-4222-A1BF-604DE1F6BDB8}">
                     <File Id="filCBA4CB70593E734DAB2502B813CDA148" KeyPath="yes" Source="$(var.ErpDistSource)\robots.txt" />
                 </Component>
                 <Directory Id="dir377A4FCBB76635F3B2DB4C89FB166E3F" Name="assets">
-                    <Component Id="cmpB3B7513D9FBB99125908358C8B3A610D" Guid="{C14A17FF-692A-4B4D-9C0C-69B007011599}">
-                        <File Id="filA08665A5DAA60BE299EEC6BB1A394E21" KeyPath="yes" Source="$(var.ErpDistSource)\assets\index-BRRKrZ-I.js" />
-                    </Component>
-                    <Component Id="cmpEF892998C757A3C4F97A25C916166F36" Guid="{FB979D16-F637-411D-A0F5-E35B31BC1228}">
+                    <Component Id="cmpEF892998C757A3C4F97A25C916166F36" Guid="{8188E0AB-37E6-4D7D-8903-28C053F029DE}">
                         <File Id="fil3AEA9DA8B344EE33C08BD048CA0300E0" KeyPath="yes" Source="$(var.ErpDistSource)\assets\index-BUbX6r-t.css" />
+                    </Component>
+                    <Component Id="cmp22D29565A33B75B32E2142E3F1E357F2" Guid="{98925083-7794-4DA1-840D-6269EDD5FD66}">
+                        <File Id="filB9B492C623B860C7E0BAEDA7C31D43CD" KeyPath="yes" Source="$(var.ErpDistSource)\assets\index-D56PhNUz.js" />
                     </Component>
                 </Directory>
             </Directory>
@@ -32,8 +32,8 @@
             <ComponentRef Id="cmp8A81726D7E022F9CAAEF63536E30A573" />
             <ComponentRef Id="cmp4FCBCA9F0214A51C1CDB4B1254D419C2" />
             <ComponentRef Id="cmpD9C77B136618D6AE30C53FA7E943E5B0" />
-            <ComponentRef Id="cmpB3B7513D9FBB99125908358C8B3A610D" />
             <ComponentRef Id="cmpEF892998C757A3C4F97A25C916166F36" />
+            <ComponentRef Id="cmp22D29565A33B75B32E2142E3F1E357F2" />
         </ComponentGroup>
     </Fragment>
 </Wix>

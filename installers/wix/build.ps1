@@ -100,6 +100,21 @@ function Generate-ErpDistFragment() {
   }
 }
 
+# Gerar fragmento para incluir todo o conteúdo de 'client-local/dist' via heat
+function Generate-ClientLocalDistFragment() {
+  Ensure-Tool 'heat'
+  Write-Host "Gerando fragmento ClientLocalDist.wxs com heat (conteúdo de client-local/dist/)" -ForegroundColor Cyan
+  $distPath = "..\\..\\client-local\\dist"
+  if (Test-Path $distPath) {
+    $absDist = (Resolve-Path $distPath).Path
+    & heat dir $absDist -gg -sfrag -sreg -dr ClientLocalDistDir -cg ClientLocalDistComponents -var var.ClientLocalDistSource -out ClientLocalDist.wxs
+    return $true
+  } else {
+    Write-Warning "Pasta 'client-local\\dist' não encontrada; pulando geração de ClientLocalDist.wxs e cópia da API local no MSI."
+    return $false
+  }
+}
+
 # Preferir WiX v4 (wix CLI), mas dar fallback para candle/light (v3)
 # Forçar fallback para WiX v3 enquanto os .wxs usam o esquema v3 (2006)
 $hasWixCli = $false
@@ -113,8 +128,9 @@ if ($hasWixCli) {
   Ensure-Tool 'candle'
   Ensure-Tool 'light'
   $erpReady = Generate-ErpDistFragment
+  $clientReady = Generate-ClientLocalDistFragment
   $msiPath = Join-Path $OutDir 'FFlowSuite.msi'
-  if ($erpReady) {
+  if ($erpReady -and $clientReady) {
     # Compilar app de bandeja (monitor de serviços) antes do MSI para garantir que o arquivo exista
     $trayProj = '..\tray-monitor\ServiceTrayMonitor.csproj'
     if (Test-Path $trayProj) {
@@ -130,8 +146,8 @@ if ($hasWixCli) {
     }
 
     $absDist = (Resolve-Path "..\\..\\dist").Path
-  candle -ext WixUtilExtension -dProductVersion=$Version -dVersion=$Version -dProductName="$ProductName" -dManufacturer="$Manufacturer" -dErpDistSource="$absDist" -dAppVersion="$AppVersion" -arch x64 Product.wxs ErpDist.wxs
-  light -ext WixUtilExtension Product.wixobj ErpDist.wixobj -o $msiPath
+  candle -ext WixUtilExtension -dProductVersion=$Version -dVersion=$Version -dProductName="$ProductName" -dManufacturer="$Manufacturer" -dErpDistSource="$absDist" -dClientLocalDistSource="$((Resolve-Path "..\..\client-local\dist").Path)" -dAppVersion="$AppVersion" -arch x64 Product.wxs ErpDist.wxs ClientLocalDist.wxs
+  light -ext WixUtilExtension Product.wixobj ErpDist.wixobj ClientLocalDist.wixobj -o $msiPath
   # Não sobrescrever o MSI gerado em out-wpf com um artefato antigo da pasta atual
   # Mantemos apenas o arquivo em $msiPath como fonte de verdade
   } else {
@@ -139,7 +155,7 @@ if ($hasWixCli) {
       if (Test-Path 'FFlowSuite.msi') { Copy-Item 'FFlowSuite.msi' $msiPath -Force }
     }
     if (-not (Test-Path $msiPath)) {
-      Write-Warning "FFlowSuite.msi não encontrado em '$msiPath' e 'installers/wix'. O build do bundle pode falhar."
+      Write-Warning "FFlowSuite.msi não encontrado em '$msiPath' e 'installers/wix'. O build do bundle pode falhar (erpReady=$erpReady, clientReady=$clientReady)."
     }
   }
 

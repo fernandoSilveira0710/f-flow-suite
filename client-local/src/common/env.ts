@@ -1,4 +1,4 @@
-﻿import { config as loadDotenv } from 'dotenv';
+import { config as loadDotenv } from 'dotenv';
 import { Logger } from '@nestjs/common';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,7 +19,7 @@ export function loadEnvConfig(): void {
     // 1) Try current working directory
     const cwdPath = join(process.cwd(), candidate);
     if (existsSync(cwdPath)) {
-      loadDotenv({ path: cwdPath });
+      loadDotenv({ path: cwdPath, override: true });
       logger.log(`Loaded environment variables from ${candidate} (cwd)`);
       envLoaded = true;
       return;
@@ -28,7 +28,7 @@ export function loadEnvConfig(): void {
     // 2) Try next to compiled dist (service mode safety)
     const distSiblingPath = join(__dirname, '..', candidate);
     if (existsSync(distSiblingPath)) {
-      loadDotenv({ path: distSiblingPath });
+      loadDotenv({ path: distSiblingPath, override: true });
       logger.log(`Loaded environment variables from ${candidate} (dist sibling)`);
       envLoaded = true;
       return;

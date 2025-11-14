@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:bal="http://schemas.microsoft.com/wix/BalExtension" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <!-- Bootstrapper (Burn) com UI customizada via ManagedBootstrapperApplicationHost -->
-  <Bundle Name="$(var.ProductName)" Version="1.0.0.0" Manufacturer="$(var.Manufacturer)" UpgradeCode="B58A4A15-6F3B-4F74-9E3D-9C3ACB9F3A11" Compressed="yes">
+  <Bundle Name="$(var.ProductName)" Version="$(var.Version)" Manufacturer="$(var.Manufacturer)" UpgradeCode="B58A4A15-6F3B-4F74-9E3D-9C3ACB9F3A11" Compressed="yes">
     <BootstrapperApplicationRef Id="ManagedBootstrapperApplicationHost">
       <Payload Name="FflowBootstrapperApp.dll" SourceFile="..\bootstrapper-app\bin\Release\net48\FflowBootstrapperApp.dll" />
     </BootstrapperApplicationRef>

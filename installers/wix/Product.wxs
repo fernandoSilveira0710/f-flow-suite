@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
   <!-- Fixar ProductCode para permitir que o bundle desinstale versões anteriores -->
-  <Product Id="*" Name="F-Flow Suite" Language="1046" Version="1.0.6.0" Manufacturer="2F Solutions" UpgradeCode="516A7E52-8F5D-4636-9F4E-8A73B2D6E1C4">
+    <Product Id="*" Name="F-Flow Suite" Language="1046" Version="1.0.12.0" Manufacturer="2F Solutions" UpgradeCode="516A7E52-8F5D-4636-9F4E-8A73B2D6E1C4">
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
     <MajorUpgrade AllowDowngrades="no" DowngradeErrorMessage="Uma versao mais recente do F-Flow Suite ja esta instalada." />
     <MediaTemplate EmbedCab="yes" />
@@ -23,7 +23,9 @@
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
         <Directory Id="INSTALLDIR" Name="F-Flow Suite">
-          <Directory Id="ClientLocalDir" Name="client-local" />
+          <Directory Id="ClientLocalDir" Name="client-local">
+            <Directory Id="ClientLocalDistDir" Name="dist" />
+          </Directory>
           <Directory Id="ErpDir" Name="erp">
             <Directory Id="ErpDistDir" Name="dist" />
           </Directory>
@@ -45,12 +47,8 @@
   <Fragment>
     <!-- Componentes principais: instalam os artefatos gerados (client-local/dist e web/dist) e scripts -->
     <ComponentGroup Id="AppFiles">
-      <!-- Copiar client-local/dist (API) -->
-      <Component Id="ClientLocalDist" Guid="*" Directory="ClientLocalDir">
-        <CreateFolder />
-        <!-- Espera que os arquivos sejam colocados antes do build do MSI -->
-        <File Source="..\..\client-local\dist\main.js" KeyPath="yes" Name="main.js" />
-      </Component>
+      <!-- Copiar client-local/dist (API): conteúdo completo via heat -->
+      <ComponentGroupRef Id="ClientLocalDistComponents" />
 
       <!-- Copiar ERP build (web/dist) -->
       <!-- Conteúdo completo da pasta dist será incluído via harvest (ErpDist.wxs) -->

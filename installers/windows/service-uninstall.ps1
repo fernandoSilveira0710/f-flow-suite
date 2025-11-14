@@ -34,13 +34,28 @@ Get-Process -Name ServiceTrayMonitor -ErrorAction SilentlyContinue | Stop-Proces
 try {
   $procs = Get-CimInstance Win32_Process | Where-Object {
     ($_.Name -eq 'node.exe') -and (
-      ($_.CommandLine -match 'client-local\\main.js') -or ($_.CommandLine -match '--erp-service')
+      ($_.CommandLine -match 'client-local\\dist\\main.js') -or
+      ($_.CommandLine -match 'client-local\\main.js') -or
+      ($_.CommandLine -match '--erp-service')
     )
   }
   foreach ($p in $procs) {
     try { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue } catch {}
   }
 } catch {}
+
+# Também tentar encerrar processos pelos PIDs dos serviços, se estiverem rodando
+function Stop-ServiceProcessByName {
+  param([string]$Name)
+  try {
+    $svc = Get-CimInstance Win32_Service -Filter "Name='$Name'" -ErrorAction SilentlyContinue
+    if ($svc -and $svc.ProcessId -gt 0) {
+      try { Stop-Process -Id $svc.ProcessId -Force -ErrorAction SilentlyContinue } catch {}
+    }
+  } catch {}
+}
+Stop-ServiceProcessByName -Name $ServiceNameApi
+Stop-ServiceProcessByName -Name $ServiceNameErp
 
 function Remove-ServiceSafe {
   param([string]$Name)
@@ -56,13 +71,25 @@ function Remove-ServiceSafe {
   try { sc.exe delete $Name | Out-Null } catch {}
 }
 
+# Primeiro, tentar desinstalar wrappers WinSW diretamente se presentes
+$ProgramDataRoot = Join-Path $env:ProgramData "FFlow"
+$ServiceRoot = Join-Path $ProgramDataRoot "service"
+foreach ($svc in @($ServiceNameErp, $ServiceNameApi)) {
+  $svcExe = Join-Path $ServiceRoot ("$svc.exe")
+  if (Test-Path $svcExe) {
+    Write-Host "Parando/uninstall via WinSW: $svcExe" -ForegroundColor Yellow
+    try { Start-Process -FilePath $svcExe -ArgumentList 'stop' -NoNewWindow -Wait -ErrorAction SilentlyContinue } catch {}
+    Start-Sleep -Milliseconds 300
+    try { Start-Process -FilePath $svcExe -ArgumentList 'uninstall' -NoNewWindow -Wait -ErrorAction SilentlyContinue } catch {}
+  }
+}
+
+# Em seguida, remover serviços via NSSM/SC
 foreach ($svc in @($ServiceNameErp, $ServiceNameApi)) {
   Remove-ServiceSafe -Name $svc
 }
 
 # Limpeza de artefatos do WinSW (se usados como fallback)
-$ProgramDataRoot = Join-Path $env:ProgramData "FFlow"
-$ServiceRoot = Join-Path $ProgramDataRoot "service"
 if (Test-Path $ServiceRoot) {
   Write-Host "Limpando configuração do WinSW em: $ServiceRoot" -ForegroundColor Yellow
   try { Remove-Item -Path $ServiceRoot -Recurse -Force -ErrorAction SilentlyContinue } catch {}
@@ -72,8 +99,13 @@ function Invoke-WinSWUninstallIfPresent {
   param([string]$ServiceName)
   try {
     $svcInfo = sc.exe qc $ServiceName 2>$null | Out-String
-    if ($svcInfo -match 'NOME_DO_CAMINHO_BINÁRIO\s*:\s*"([^"]+)"') {
-      $binPath = $Matches[1]
+    $binPath = $null
+    if ($svcInfo -match 'NOME_DO_CAMINHO BINÁRIO\s*:\s*"([^"]+)"') { $binPath = $Matches[1] }
+    elseif ($svcInfo -match 'NOME_DO CAMINHO BINÁRIO\s*:\s*"([^"]+)"') { $binPath = $Matches[1] }
+    elseif ($svcInfo -match 'NOME_DO_CAMINHO_BINÁRIO\s*:\s*"([^"]+)"') { $binPath = $Matches[1] }
+    elseif ($svcInfo -match 'BINARY_PATH_NAME\s*:\s*"([^"]+)"') { $binPath = $Matches[1] }
+
+    if ($binPath) {
       # Detecta wrapper WinSW pelo caminho em ProgramData
       if ($binPath -like (Join-Path $env:ProgramData 'FFlow\service\*')) {
         if (Test-Path $binPath) {

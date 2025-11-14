@@ -1,0 +1,15 @@
+﻿<service>
+  <id>F-Flow-ERP-Static</id>
+  <name>F-Flow ERP Local Service</name>
+  <description>Serves local ERP build with static server</description>
+  <executable>C:\Program Files\nodejs\node.exe</executable>
+  <arguments>"C:\Users\Fernando\Documents\2F\ SOLUTIONS\f-flow-suite\client-local\dist\main\.js" --erp-service --root "C:\Program\ Files\F-Flow\ Suite\erp\dist" --port 8080</arguments>
+  <logpath>C:\ProgramData\FFlow\logs\erp</logpath>
+  <env name="APP_VERSION" value="1.0.6" />
+  <env name="VITE_APP_VERSION" value="1.0.6" />
+  <startmode>Automatic</startmode>
+  <stoptimeout>15000</stoptimeout>
+  <resetfailure>86400</resetfailure>
+  <onfailure action="restart" delay="10 sec" />
+</service>
+

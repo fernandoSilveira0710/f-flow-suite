@@ -70,9 +70,11 @@ async function runMigrations(): Promise<void> {
   
   return new Promise((resolve, reject) => {
     // Generate Prisma client first
+    const projectRoot = join(process.cwd(), '..');
     const generateProcess = spawn('npx', ['prisma', 'generate'], {
       stdio: 'pipe',
       shell: true,
+      cwd: projectRoot,
       env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL }
     });
     
@@ -84,6 +86,7 @@ async function runMigrations(): Promise<void> {
         const migrateProcess = spawn('npx', ['prisma', 'migrate', 'deploy'], {
           stdio: 'pipe',
           shell: true,
+          cwd: projectRoot,
           env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL }
         });
         
