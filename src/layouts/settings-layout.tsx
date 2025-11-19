@@ -74,16 +74,11 @@ export default function SettingsLayout() {
     },
     // Agenda removida (não visível para nenhum plano)
     // Banho & Tosa removido (não visível para nenhum plano)
+    
     {
       label: 'Unidades de Medida',
       icon: Package,
       path: '/erp/settings/units',
-      requiresPlan: null,
-    },
-    {
-      label: 'Produtos',
-      icon: Package,
-      path: '/erp/settings/products',
       requiresPlan: null,
     },
     {

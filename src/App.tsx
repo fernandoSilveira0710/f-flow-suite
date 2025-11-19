@@ -78,6 +78,9 @@ import PlanoPage from "./pages/erp/configuracoes/plano";
 import LicencasPage from "./pages/erp/configuracoes/licencas";
 // Settings pages inexistentes removidos do build
 import NovoPagamento from "./pages/erp/configuracoes/pagamentos/novo";
+import PaymentsIndex from "./pages/erp/configuracoes/pagamentos/index";
+import NovaUnidade from "./pages/erp/configuracoes/unidades/novo";
+import UnitsIndex from "./pages/erp/configuracoes/unidades/index";
 import ConfiguracoesRedirect from "./pages/erp/configuracoes/index";
 import ConfiguracoesAlias from "./pages/erp/configuracoes/[...alias]";
 
@@ -231,18 +234,25 @@ function App() {
           {/* Fallback interno do ERP */}
           <Route path="*" element={<SimpleNotFound />} />
           
-          {/* Settings Routes (EN - canonical) */}
-            <Route path="settings" element={<SettingsLayout />}>
-              <Route index element={<Navigate to="/erp/settings/organization" replace />} />
-              <Route path="organization" element={<OrganizacaoPage />} />
-              <Route path="users" element={<UsuariosPage />} />
-              <Route path="roles" element={<PapeisPage />} />
-              <Route path="billing" element={<PlanoPage />} />
-              <Route path="licenses" element={<LicencasPage />} />
-              <Route path="payments/new" element={<NovoPagamento />} />
-              <Route path="payments/:id/edit" element={<NovoPagamento />} />
-              <Route path="notifications" element={<Navigate to="/erp/settings/organization" replace />} />
-              </Route>
+              {/* Settings Routes (EN - canonical) */}
+                <Route path="settings" element={<SettingsLayout />}>
+                  <Route index element={<Navigate to="/erp/settings/organization" replace />} />
+                  <Route path="organization" element={<OrganizacaoPage />} />
+                  <Route path="users" element={<UsuariosPage />} />
+                  <Route path="roles" element={<PapeisPage />} />
+                  <Route path="billing" element={<PlanoPage />} />
+                  <Route path="licenses" element={<LicencasPage />} />
+                  {/* Payments index */}
+                  <Route path="payments" element={<PaymentsIndex />} />
+                  <Route path="payments/new" element={<NovoPagamento />} />
+                  <Route path="payments/:id/edit" element={<NovoPagamento />} />
+                  {/* Units of Measure */}
+                  <Route path="units" element={<UnitsIndex />} />
+                  <Route path="units/new" element={<NovaUnidade />} />
+                  <Route path="units/:id/edit" element={<NovaUnidade />} />
+            {/* Products (Settings) - removido */}
+                  <Route path="notifications" element={<Navigate to="/erp/settings/organization" replace />} />
+                </Route>
 
               {/* PT-BR Aliases (redirect to EN canonical) */}
               <Route path="configuracoes" element={<ConfiguracoesRedirect />} />

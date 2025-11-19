@@ -198,4 +198,69 @@ export class InventoryService {
 
     this.logger.debug(`Generated inventory.adjusted.v1 event for adjustment ${inventoryAdjustment.id}`);
   }
+
+  // Lista todos os ajustes de inventário
+  async getAllAdjustments(): Promise<InventoryAdjustmentResponseDto[]> {
+    try {
+      const adjustments = await this.prisma.inventoryAdjustment.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          product: { select: { name: true, sku: true } },
+        },
+      });
+
+      return adjustments.map((adj) => ({
+        id: adj.id,
+        productId: adj.productId,
+        delta: adj.delta,
+        reason: adj.reason,
+        notes: adj.notes ?? undefined,
+        document: adj.document ?? undefined,
+        unitCost: adj.unitCost !== null && adj.unitCost !== undefined ? Number(adj.unitCost) : undefined,
+        createdAt: adj.createdAt,
+        // Campos extras para enriquecer resposta
+        productName: adj.product?.name ?? undefined,
+        productSku: adj.product?.sku ?? undefined,
+      } as any));
+    } catch (err) {
+      this.wrapPrismaError(err, 'getAllAdjustments');
+    }
+  }
+
+  // Lista ajustes de inventário por produto
+  async getAdjustmentsByProduct(productId: string): Promise<InventoryAdjustmentResponseDto[]> {
+    try {
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+        select: { id: true },
+      });
+      if (!product) {
+        throw new NotFoundException(`Product with ID ${productId} not found`);
+      }
+
+      const adjustments = await this.prisma.inventoryAdjustment.findMany({
+        where: { productId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          product: { select: { name: true, sku: true } },
+        },
+      });
+
+      return adjustments.map((adj) => ({
+        id: adj.id,
+        productId: adj.productId,
+        delta: adj.delta,
+        reason: adj.reason,
+        notes: adj.notes ?? undefined,
+        document: adj.document ?? undefined,
+        unitCost: adj.unitCost !== null && adj.unitCost !== undefined ? Number(adj.unitCost) : undefined,
+        createdAt: adj.createdAt,
+        // Campos extras para enriquecer resposta
+        productName: adj.product?.name ?? undefined,
+        productSku: adj.product?.sku ?? undefined,
+      } as any));
+    } catch (err) {
+      this.wrapPrismaError(err, 'getAdjustmentsByProduct');
+    }
+  }
 }

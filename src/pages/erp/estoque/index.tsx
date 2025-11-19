@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { getProducts as getMockProducts, getStockPrefs, adjustStock } from '@/lib/stock-api';
+import { getProducts as getMockProducts, getStockPrefs, adjustStock, getStockMovements, type StockMovement } from '@/lib/stock-api';
 import { getProducts as fetchProductsApi, updateProduct, type ProductResponse } from '@/lib/products-api';
 import { useToast } from '@/hooks/use-toast';
 import { useEntitlements } from '@/hooks/use-entitlements';
@@ -74,6 +74,11 @@ export default function StockPositionPage() {
   const { filters, setFilters, clearFilters, activeFiltersCount } = useUrlFilters(defaultFilters);
   const [movementDialog, setMovementDialog] = useState<MovementDialogType>(null);
   const [selectedProduct, setSelectedProduct] = useState<UIProduct | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsProduct, setDetailsProduct] = useState<UIProduct | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsMovements, setDetailsMovements] = useState<StockMovement[]>([]);
+  const [recentMovements, setRecentMovements] = useState<Record<string, StockMovement[]>>({});
   const [quantity, setQuantity] = useState('');
   const [cost, setCost] = useState('');
   const [document, setDocument] = useState('');
@@ -178,6 +183,25 @@ export default function StockPositionPage() {
     setMinStock(product.estoqueMinimo?.toString() || '');
     setAlterarSaldo(false);
     setAlterarMinimo(false);
+  };
+
+  const openDetailsDialog = async (product: UIProduct) => {
+    setDetailsProduct(product);
+    setDetailsOpen(true);
+    setDetailsLoading(true);
+    try {
+      const movements = await getStockMovements(product.id);
+      const recent = recentMovements[product.id] || [];
+      const merged = [...recent, ...movements];
+      setDetailsMovements(merged);
+    } catch (error) {
+      const recent = recentMovements[product.id] || [];
+      setDetailsMovements(recent);
+      console.warn('Falha ao carregar histórico de movimentos:', error);
+      toast({ title: 'Aviso', description: 'Não foi possível carregar o histórico. Tente novamente mais tarde.' });
+    } finally {
+      setDetailsLoading(false);
+    }
   };
 
   // Sanitização e formatação de custo com 2 casas decimais
@@ -324,6 +348,33 @@ export default function StockPositionPage() {
       await Promise.all(ops);
 
       await refreshProducts();
+      // Registrar movimento recente localmente para refletir imediatamente no histórico
+      if (movementDialog !== 'AJUSTE' || alterarSaldo) {
+        const tipo: 'ENTRADA' | 'SAIDA' | 'AJUSTE' = movementDialog === 'ENTRADA' ? 'ENTRADA' : movementDialog === 'SAIDA' ? 'SAIDA' : 'AJUSTE';
+        const quantidade = Math.abs(delta || 0);
+        const origem = tipo === 'ENTRADA' ? 'COMPRA' : tipo === 'SAIDA' ? 'VENDA' : 'INVENTARIO';
+        const nowIso = new Date().toISOString();
+        const localMovement: StockMovement = {
+          id: `local-${Date.now()}`,
+          tipo,
+          produtoId: selectedProduct.id,
+          produtoNome: selectedProduct.nome,
+          sku: selectedProduct.sku || '',
+          quantidade,
+          custoUnit: movementDialog === 'ENTRADA' && cost ? parseFloat(cost) : undefined,
+          valorTotal: movementDialog === 'ENTRADA' && cost ? (parseFloat(cost) * quantidade) : undefined,
+          origem,
+          motivo: reason,
+          documento: undefined,
+          data: nowIso,
+          usuario: 'Você',
+          observacao: notes || undefined,
+        };
+        setRecentMovements((prev) => ({
+          ...prev,
+          [selectedProduct.id]: [localMovement, ...(prev[selectedProduct.id] || [])],
+        }));
+      }
       setMovementDialog(null);
       setAlterarSaldo(false);
       setAlterarMinimo(false);
@@ -350,6 +401,12 @@ export default function StockPositionPage() {
       return <Badge className="bg-amber-500">Abaixo do mínimo</Badge>;
     }
     return <Badge className="bg-green-500">Normal</Badge>;
+  };
+
+  const getTypeBadge = (type: 'ENTRADA' | 'SAIDA' | 'AJUSTE') => {
+    if (type === 'ENTRADA') return <Badge className="bg-green-500">Entrada</Badge>;
+    if (type === 'SAIDA') return <Badge className="bg-red-500">Saída</Badge>;
+    return <Badge variant="secondary">Ajuste</Badge>;
   };
 
   const handleExportCSV = () => {
@@ -476,6 +533,14 @@ export default function StockPositionPage() {
                       >
                         Ajuste
                       </Button>
+                      <Badge
+                        variant="outline"
+                        className="cursor-pointer px-3 py-1 inline-flex items-center"
+                        onClick={() => openDetailsDialog(product)}
+                        title="Ver histórico de entradas, saídas e ajustes"
+                      >
+                        Detalhes
+                      </Badge>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -491,6 +556,55 @@ export default function StockPositionPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Details Dialog */}
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Histórico de Estoque</DialogTitle>
+            <DialogDescription>
+              {detailsProduct?.nome} ({detailsProduct?.sku})
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {detailsLoading ? (
+              <div className="text-sm text-muted-foreground">Carregando histórico...</div>
+            ) : detailsMovements.length === 0 ? (
+              <div className="text-sm text-muted-foreground">Nenhum movimento encontrado para este produto.</div>
+            ) : (
+              <div className="border rounded-lg overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Quantidade</TableHead>
+                      <TableHead>Documento</TableHead>
+                      <TableHead>Motivo/Obs.</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detailsMovements.map((m) => (
+                      <TableRow key={m.id}>
+                        <TableCell>{new Date(m.data).toLocaleString('pt-BR')}</TableCell>
+                        <TableCell>{getTypeBadge(m.tipo)}</TableCell>
+                        <TableCell>{m.quantidade}</TableCell>
+                        <TableCell>{m.documento || '-'}</TableCell>
+                        <TableCell className="max-w-[280px] truncate" title={m.observacao || m.motivo || ''}>
+                          {m.motivo || m.observacao || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailsOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Movement Dialog */}
       <Dialog open={!!movementDialog} onOpenChange={() => setMovementDialog(null)}>
@@ -529,6 +643,14 @@ export default function StockPositionPage() {
                     <span className="text-sm text-muted-foreground">Novo estoque:</span>
                     <span className="text-sm font-medium text-green-600">
                       {selectedProduct.estoqueAtual + (parseFloat(quantity) || 0)} {selectedProduct.unidade}
+                    </span>
+                  </div>
+                )}
+                {movementDialog === 'SAIDA' && quantity && (
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                    <span className="text-sm text-muted-foreground">Novo estoque:</span>
+                    <span className="text-sm font-medium text-red-600">
+                      {selectedProduct.estoqueAtual - (parseFloat(quantity) || 0)} {selectedProduct.unidade}
                     </span>
                   </div>
                 )}
@@ -638,18 +760,9 @@ export default function StockPositionPage() {
               </div>
             )}
 
-            <div>
-              <Label htmlFor="document">Documento (opcional)</Label>
-              <Input
-                id="document"
-                value={document}
-                onChange={(e) => setDocument(e.target.value)}
-                placeholder="Nº do documento"
-              />
-            </div>
+            {/* Campo de documento removido conforme solicitado */}
 
             <div>
-              <Label htmlFor="notes">Observações (opcional)</Label>
               <Textarea
                 id="notes"
                 value={notes}

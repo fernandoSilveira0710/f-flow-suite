@@ -122,8 +122,14 @@ function mapToHubPayload(data: Partial<PaymentMethod>): any {
 
 export const getPaymentMethods = async (): Promise<PaymentMethod[]> => {
   const tenantId = getTenantId();
-  const list = await apiClientLocal<any[]>(`${endpointBase(tenantId)}`, { method: 'GET' });
-  return (list || []).map(mapFromHub).sort((a, b) => a.ordem - b.ordem);
+  try {
+    const list = await apiClientLocal<any[]>(`${endpointBase(tenantId)}`, { method: 'GET' });
+    return (list || []).map(mapFromHub).sort((a, b) => a.ordem - b.ordem);
+  } catch (error) {
+    console.warn('[Payments] Falha ao buscar métodos no client-local; usando presets.', error);
+    const presets = await getPresets();
+    return presets.sort((a, b) => a.ordem - b.ordem);
+  }
 };
 
 export const getPaymentMethod = async (id: string): Promise<PaymentMethod | null> => {

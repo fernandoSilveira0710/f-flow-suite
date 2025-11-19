@@ -205,30 +205,27 @@ export const getLowStockItems = async (): Promise<StockItem[]> => {
 
 export const getStockMovements = async (productId?: string): Promise<StockMovement[]> => {
   try {
-    const tenantId = getTenantId();
     const endpoint = productId
-      ? `/tenants/${tenantId}/inventory/adjustments/product/${productId}`
-      : `/tenants/${tenantId}/inventory/adjustments`;
+      ? `/inventory/adjustments/product/${productId}`
+      : `/inventory/adjustments`;
 
-    type HubAdjustment = {
+    type LocalAdjustment = {
       id: string;
-      tenantId: string;
       productId: string;
-      productName: string;
-      productSku: string | null;
       delta: number;
-      reason: string | null;
-      previousStock: number | null;
-      newStock: number | null;
-      adjustedAt: string;
+      reason: string;
+      notes?: string;
+      document?: string;
+      unitCost?: number;
       createdAt: string;
-      updatedAt: string;
+      // Campos extras do backend local
+      productName?: string;
+      productSku?: string;
     };
 
-    const adjustments = await apiClient<HubAdjustment[]>(endpoint, { method: 'GET' });
+    const adjustments = await apiCall<LocalAdjustment[]>(endpoint, { method: 'GET' });
 
     return adjustments.map((adj) => {
-      // Determine UI movement type
       let tipo: 'ENTRADA' | 'SAIDA' | 'AJUSTE';
       const reasonUpper = (adj.reason || '').toUpperCase();
       if (['AJUSTE', 'ADJUSTMENT', 'INVENTARIO', 'INVENTORY'].includes(reasonUpper)) {
@@ -245,19 +242,21 @@ export const getStockMovements = async (productId?: string): Promise<StockMoveme
         id: adj.id,
         tipo,
         produtoId: adj.productId,
-        produtoNome: adj.productName,
+        produtoNome: adj.productName || '',
         sku: adj.productSku || '',
         quantidade,
         origem: tipo === 'ENTRADA' ? 'COMPRA' : tipo === 'SAIDA' ? 'VENDA' : 'INVENTARIO',
         motivo: adj.reason || undefined,
-        documento: undefined,
-        observacao: adj.reason || undefined,
-        data: adj.adjustedAt,
+        documento: adj.document || undefined,
+        observacao: adj.notes || undefined,
+        data: adj.createdAt,
         usuario: 'Sistema',
+        custoUnit: adj.unitCost,
+        valorTotal: adj.unitCost ? adj.unitCost * quantidade : undefined,
       } as StockMovement;
     });
   } catch (error) {
-    console.error('Error fetching stock movements from Hub:', error);
+    console.error('Error fetching stock movements from client-local:', error);
     return [];
   }
 };

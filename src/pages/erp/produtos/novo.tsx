@@ -63,6 +63,9 @@ export default function ProdutosNovo() {
     expiryDate: '',
   });
 
+  // Controle de modo de precificação: null (nada decidido), 'margin' ou 'cost'
+  const [pricingMode, setPricingMode] = useState<'margin' | 'price' | null>(null);
+
   // Máscara de moeda a partir de dígitos (centavos)
   const applyMoneyMask = (raw: string): string => {
     if (!raw) return '';
@@ -79,15 +82,61 @@ export default function ProdutosNovo() {
 
   const handleMoneyInputChange = (field: 'price' | 'cost', raw: string) => {
     const formatted = applyMoneyMask(raw);
-    setFormData({ ...formData, [field]: formatted });
+    const next = { ...formData, [field]: formatted } as typeof formData;
+
+    // Se custo muda e estamos no modo preço: recalcular margem se houver preço
+    if (field === 'cost') {
+      const costVal = next.cost ? parseFloat(next.cost.replace(',', '.')) : undefined;
+      if (pricingMode === 'price') {
+        const priceVal = next.price ? parseFloat(next.price.replace(',', '.')) : undefined;
+        if (costVal !== undefined && !isNaN(costVal) && priceVal !== undefined && !isNaN(priceVal) && costVal > 0) {
+          const marginPct = ((priceVal - costVal) / costVal) * 100;
+          next.marginPct = marginPct.toFixed(2);
+        }
+      } else if (pricingMode === 'margin') {
+        const marginVal = next.marginPct ? parseFloat(next.marginPct.replace(',', '.')) : undefined;
+        if (costVal !== undefined && !isNaN(costVal) && marginVal !== undefined && !isNaN(marginVal)) {
+          const price = costVal * (1 + marginVal / 100);
+          next.price = price.toFixed(2);
+        }
+      }
+    }
+
+    // Se preço muda e estamos no modo preço: calcula margem
+    if (field === 'price' && pricingMode === 'price') {
+      const costVal = next.cost ? parseFloat(next.cost.replace(',', '.')) : undefined;
+      const priceVal = next.price ? parseFloat(next.price.replace(',', '.')) : undefined;
+      if (costVal !== undefined && !isNaN(costVal) && priceVal !== undefined && !isNaN(priceVal) && costVal > 0) {
+        const marginPct = ((priceVal - costVal) / costVal) * 100;
+        next.marginPct = marginPct.toFixed(2);
+      }
+    }
+
+    // Ao editar preço, assume modo 'price' para que a margem seja derivada
+    if (field === 'price') {
+      const priceVal = next.price ? parseFloat(next.price.replace(',', '.')) : undefined;
+      if (priceVal !== undefined && !isNaN(priceVal)) {
+        setPricingMode('price');
+      }
+    }
+
+    setFormData(next);
   };
 
-  // Sugestão de preço a partir da margem (%)
-  const getSuggestedPrice = (): number | undefined => {
+  // Preço a partir da margem (%)
+  const getPriceFromMargin = (): number | undefined => {
     const cost = formData.cost ? parseFloat(formData.cost.replace(',', '.')) : undefined;
     const margin = formData.marginPct ? parseFloat(formData.marginPct.replace(',', '.')) : undefined;
     if (cost === undefined || isNaN(cost) || margin === undefined || isNaN(margin)) return undefined;
     return cost * (1 + margin / 100);
+  };
+
+  // Margem (%) a partir do preço
+  const getMarginFromPrice = (): number | undefined => {
+    const cost = formData.cost ? parseFloat(formData.cost.replace(',', '.')) : undefined;
+    const price = formData.price ? parseFloat(formData.price.replace(',', '.')) : undefined;
+    if (cost === undefined || isNaN(cost) || price === undefined || isNaN(price) || cost === 0) return undefined;
+    return ((price - cost) / cost) * 100;
   };
 
   const formatBRL = (value: number): string =>
@@ -96,14 +145,11 @@ export default function ProdutosNovo() {
   // Diálogo de nova categoria
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [newCategoryDescription, setNewCategoryDescription] = useState('');
   const [newCategoryActive, setNewCategoryActive] = useState(true);
 
   // Diálogo de nova unidade
   const [unitDialogOpen, setUnitDialogOpen] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
-  const [newUnitAbbreviation, setNewUnitAbbreviation] = useState('');
-  const [newUnitType, setNewUnitType] = useState<'weight' | 'volume' | 'length' | 'unit'>('unit');
   const [newUnitActive, setNewUnitActive] = useState(true);
 
   const handleCreateCategoryInline = async () => {
@@ -118,7 +164,7 @@ export default function ProdutosNovo() {
     try {
       const created = await createCategory({
         name: newCategoryName.trim(),
-        description: newCategoryDescription || undefined,
+        description: undefined,
         active: newCategoryActive,
       });
       const updated = await fetchCategories();
@@ -137,18 +183,29 @@ export default function ProdutosNovo() {
   };
 
   const handleCreateUnitInline = () => {
-    if (!newUnitName.trim() || !newUnitAbbreviation.trim()) {
+    if (!newUnitName.trim()) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Informe nome e abreviação da unidade.',
+        description: 'Informe o nome da unidade.',
         variant: 'destructive',
       });
       return;
     }
+    const defaultAbbr = (() => {
+      const n = newUnitName.trim().toLowerCase();
+      if (n === 'unidade') return 'un';
+      if (n === 'litro') return 'l';
+      if (n === 'mililitro') return 'ml';
+      if (n === 'quilograma') return 'kg';
+      if (n === 'grama') return 'g';
+      if (n === 'metro') return 'm';
+      if (n === 'centímetro' || n === 'centimetro') return 'cm';
+      return n.slice(0, 3) || 'un';
+    })();
     const created = mockAPI.createUnitOfMeasure({
       name: newUnitName.trim(),
-      abbreviation: newUnitAbbreviation.trim(),
-      type: newUnitType,
+      abbreviation: defaultAbbr,
+      type: 'unit',
       active: newUnitActive,
     });
     setUnitsOfMeasure(mockAPI.getUnitsOfMeasure());
@@ -255,9 +312,8 @@ export default function ProdutosNovo() {
                     className="w-full mt-2"
                     onClick={() => {
                       setNewCategoryName('');
-                      setNewCategoryDescription('');
-                      setNewCategoryActive(true);
-                      setCategoryDialogOpen(true);
+      setNewCategoryActive(true);
+      setCategoryDialogOpen(true);
                     }}
                   >
                     <Plus className="h-4 w-4 mr-2" /> Adicionar Categoria
@@ -285,8 +341,6 @@ export default function ProdutosNovo() {
                     className="w-full mt-2"
                     onClick={() => {
                       setNewUnitName('');
-                      setNewUnitAbbreviation('');
-                      setNewUnitType('unit');
                       setNewUnitActive(true);
                       setUnitDialogOpen(true);
                     }}
@@ -306,10 +360,6 @@ export default function ProdutosNovo() {
                     <div>
                       <Label>Nome *</Label>
                       <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Descrição</Label>
-                      <Input value={newCategoryDescription} onChange={(e) => setNewCategoryDescription(e.target.value)} />
                     </div>
                     <div className="flex items-center justify-between">
                       <Label>Ativa</Label>
@@ -335,24 +385,6 @@ export default function ProdutosNovo() {
                     <div>
                       <Label>Nome *</Label>
                       <Input value={newUnitName} onChange={(e) => setNewUnitName(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Abreviação *</Label>
-                      <Input value={newUnitAbbreviation} onChange={(e) => setNewUnitAbbreviation(e.target.value)} placeholder="Ex: kg, L, un" />
-                    </div>
-                    <div>
-                      <Label>Tipo</Label>
-                      <Select value={newUnitType} onValueChange={(v) => setNewUnitType(v as 'weight' | 'volume' | 'length' | 'unit')}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unit">Unidade</SelectItem>
-                          <SelectItem value="weight">Peso</SelectItem>
-                          <SelectItem value="volume">Volume</SelectItem>
-                          <SelectItem value="length">Comprimento</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
                     <div className="flex items-center justify-between">
                       <Label>Ativa</Label>
@@ -395,23 +427,66 @@ export default function ProdutosNovo() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="price">Preço de Venda *</Label>
-                  <Input id="price" type="text" inputMode="decimal" pattern={/^\d+(\.\d{0,2})?$/.source} value={formData.price} onChange={(e) => handleMoneyInputChange('price', e.target.value)} required />
-                </div>
-
+                {/* 1) Custo */}
                 <div>
                   <Label htmlFor="cost">Custo</Label>
-                  <Input id="cost" type="text" inputMode="decimal" pattern={/^\d+(\.\d{0,2})?$/.source} value={formData.cost} onChange={(e) => handleMoneyInputChange('cost', e.target.value)} />
+                  <Input
+                    id="cost"
+                    type="text"
+                    inputMode="decimal"
+                    pattern={/^\d+(\.\d{0,2})?$/.source}
+                    value={formData.cost}
+                    onChange={(e) => {
+                      handleMoneyInputChange('cost', e.target.value);
+                    }}
+                  />
                 </div>
 
+                {/* 2) Margem (%) */}
                 <div>
                   <Label htmlFor="marginPct">Margem (%)</Label>
-                  <Input id="marginPct" type="text" inputMode="decimal" placeholder="ex.: 30" value={formData.marginPct} onChange={(e) => setFormData({ ...formData, marginPct: e.target.value })} />
+                  <Input
+                    id="marginPct"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="ex.: 30"
+                    value={formData.marginPct}
+                    disabled={!formData.cost}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const next = { ...formData, marginPct: v };
+                      setPricingMode('margin');
+                      const costVal = next.cost ? parseFloat(next.cost.replace(',', '.')) : undefined;
+                      const marginVal = next.marginPct ? parseFloat(next.marginPct.replace(',', '.')) : undefined;
+                      if (costVal !== undefined && !isNaN(costVal) && marginVal !== undefined && !isNaN(marginVal)) {
+                        const price = costVal * (1 + marginVal / 100);
+                        next.price = price.toFixed(2);
+                      }
+                      setFormData(next);
+                    }}
+                  />
+                </div>
+
+                {/* 3) Preço de Venda */}
+                <div>
+                  <Label htmlFor="price">Preço de Venda *</Label>
+                  <Input
+                    id="price"
+                    type="text"
+                    inputMode="decimal"
+                    pattern={/^\d+(\.\d{0,2})?$/.source}
+                    value={formData.price}
+                    disabled={!formData.cost}
+                    onChange={(e) => {
+                      setPricingMode('price');
+                      handleMoneyInputChange('price', e.target.value);
+                    }}
+                    required
+                  />
                   {(() => {
-                    const s = getSuggestedPrice();
-                    return s ? (
-                      <p className="text-xs text-muted-foreground mt-1">Preço sugerido: {formatBRL(s)}</p>
+                    const m = getMarginFromPrice();
+                    return m !== undefined ? (
+                      <p className="text-xs text-muted-foreground mt-1">Margem calculada: {m.toFixed(2)}%</p>
                     ) : null;
                   })()}
                 </div>

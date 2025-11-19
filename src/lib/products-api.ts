@@ -1,4 +1,5 @@
 import { API_URLS } from './env';
+import { getTenantId, apiClientLocal } from './api-client';
 
 // Tipos alinhados com o DTO/resposta do client-local
 export interface CreateProductPayload {
@@ -87,17 +88,22 @@ const API_BASE_URL = API_URLS.CLIENT_LOCAL;
 const apiCall = async <T>(
   endpoint: string,
   options?: RequestInit,
-  timeoutMs: number = 10000,
+  timeoutMs: number = 20000,
 ): Promise<T> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;
   try {
+    // Monta headers evitando Content-Type quando não há corpo, reduzindo preflight
+    const hasBody = options && 'body' in options && options.body !== undefined && options.body !== null;
+    const headers: HeadersInit = {
+      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+      'X-Tenant-Id': getTenantId?.() || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b',
+      ...options?.headers,
+    };
+
     response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+      headers,
       ...options,
       signal: controller.signal,
     });
@@ -218,8 +224,15 @@ export const updateProduct = async (
   }).then(normalizeProduct);
 };
 
-export const deleteProduct = async (id: string): Promise<void> => {
-  await apiCall<void>(`/products/${id}`, {
-    method: 'DELETE',
-  });
+export const deleteProduct = async (id: string, options?: { hard?: boolean }): Promise<void> => {
+  const query = options?.hard ? '?hard=true' : '';
+  await apiClientLocal<void>(`/products/${id}${query}`, { method: 'DELETE' });
+};
+
+export const getProductDependencies = async (id: string): Promise<{
+  blocking: { saleItems: number; stockMovements: number; inventoryAdjustments: number };
+  nonBlocking: { groomingItems: number };
+  canHardDelete: boolean;
+}> => {
+  return apiClientLocal(`/products/${id}/dependencies`, { method: 'GET' });
 };

@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getProducts as getProductsAPI, deleteProduct as deleteProductAPI, type ProductResponse } from '@/lib/products-api';
+import { getProducts as getProductsAPI, deleteProduct as deleteProductAPI, getProductDependencies, type ProductResponse } from '@/lib/products-api';
 import { toast } from '@/hooks/use-toast';
 import {
   Table,
@@ -56,7 +56,7 @@ interface ProductFilters {
 
 const defaultFilters: ProductFilters = {
   q: '',
-  status: 'all',
+  status: 'active',
   category: [],
   withImage: false,
   expiringSoon: false,
@@ -70,6 +70,8 @@ export default function ProdutosIndex() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<ProductResponse[]>([]);
   const [productToDelete, setProductToDelete] = useState<ProductResponse | null>(null);
+  const [hardDelete, setHardDelete] = useState(false);
+  const [deps, setDeps] = useState<{ blocking: { saleItems: number; stockMovements: number; inventoryAdjustments: number }; nonBlocking: { groomingItems: number }; canHardDelete: boolean } | null>(null);
   const { filters, setFilters, clearFilters, activeFiltersCount } = useUrlFilters(defaultFilters);
 
   useEffect(() => {
@@ -82,6 +84,21 @@ export default function ProdutosIndex() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      if (productToDelete) {
+        try {
+          const d = await getProductDependencies(productToDelete.id);
+          setDeps(d);
+        } catch (e) {
+          setDeps(null);
+        }
+      } else {
+        setDeps(null);
+      }
+    })();
+  }, [productToDelete]);
 
   // Categorias únicas para filtros
   const allCategories = useMemo(() => {
@@ -146,14 +163,15 @@ export default function ProdutosIndex() {
     return result;
   }, [products, filters]);
 
-  const handleDelete = async (product: ProductResponse) => {
+  const handleDelete = async (product: ProductResponse, opts?: { hard?: boolean }) => {
     try {
-      await deleteProductAPI(product.id);
+      await deleteProductAPI(product.id, { hard: opts?.hard });
       setProducts(products.filter(p => p.id !== product.id));
       setProductToDelete(null);
+      setHardDelete(false);
       toast({
         title: 'Produto excluído',
-        description: 'O produto foi removido (inativado) com sucesso.',
+        description: opts?.hard ? 'O produto foi excluído permanentemente.' : 'O produto foi removido (inativado) com sucesso.',
       });
     } catch (error) {
       console.error('Erro ao excluir produto:', error);
@@ -171,7 +189,7 @@ export default function ProdutosIndex() {
 
       const isConflict = message.includes('409') || message.toLowerCase().includes('conflict');
       toast({
-        title: isConflict ? 'Não foi possível excluir' : 'Erro ao excluir produto',
+        title: isConflict ? 'Não foi possível excluir permanentemente' : 'Erro ao excluir produto',
         description: serverMsg || 'Ocorreu um erro inesperado ao excluir o produto.',
         variant: 'destructive',
       });
@@ -547,7 +565,7 @@ export default function ProdutosIndex() {
       )}
 
       {/* Delete confirmation */}
-      <AlertDialog open={!!productToDelete} onOpenChange={() => setProductToDelete(null)}>
+      <AlertDialog open={!!productToDelete} onOpenChange={() => { setProductToDelete(null); setHardDelete(false); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Produto</AlertDialogTitle>
@@ -555,10 +573,36 @@ export default function ProdutosIndex() {
               Tem certeza que deseja excluir "{productToDelete?.name}"? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            <div className="flex items-center gap-2">
+              <Checkbox id="hard-delete" checked={hardDelete} onCheckedChange={(v) => setHardDelete(Boolean(v))} disabled={deps ? !deps.canHardDelete : false} />
+              <Label htmlFor="hard-delete" className="font-normal">Excluir permanentemente</Label>
+            </div>
+            {deps && (
+              <div className="text-sm text-muted-foreground">
+                {deps.canHardDelete ? (
+                  <span>Sem vínculos bloqueantes. A exclusão permanente está disponível.</span>
+                ) : (
+                  <div>
+                    <div className="font-medium text-destructive">Não é possível excluir permanentemente:</div>
+                    <ul className="list-disc pl-5">
+                      {deps.blocking.saleItems > 0 && <li>{deps.blocking.saleItems} registro(s) em vendas</li>}
+                      {deps.blocking.stockMovements > 0 && <li>{deps.blocking.stockMovements} movimentação(ões) de estoque</li>}
+                      {deps.blocking.inventoryAdjustments > 0 && <li>{deps.blocking.inventoryAdjustments} ajuste(s) de inventário</li>}
+                    </ul>
+                    <div className="mt-1">Inative o produto ou remova estes vínculos para prosseguir.</div>
+                  </div>
+                )}
+                {deps.nonBlocking.groomingItems > 0 && (
+                  <div className="mt-2">Observação: {deps.nonBlocking.groomingItems} vínculo(s) em serviços de grooming não impedem a exclusão (serão desvinculados).</div>
+                )}
+              </div>
+            )}
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => productToDelete && handleDelete(productToDelete)}
+              onClick={() => productToDelete && handleDelete(productToDelete, { hard: hardDelete })}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Excluir

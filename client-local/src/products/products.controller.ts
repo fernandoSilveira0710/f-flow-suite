@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   ValidationPipe,
+  Query,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto, ProductResponseDto } from './dto';
@@ -53,7 +54,12 @@ export class ProductsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string): Promise<void> {
-    return this.productsService.remove(id);
+  async remove(@Param('id') id: string, @Query('hard') hard?: string): Promise<void> {
+    return this.productsService.remove(id, hard === 'true');
+  }
+
+  @Get(':id/dependencies')
+  async getDependencies(@Param('id') id: string) {
+    return this.productsService.getDependencies(id);
   }
 }

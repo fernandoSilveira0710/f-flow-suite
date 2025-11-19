@@ -565,13 +565,43 @@ export class ProductsService {
     return this.mapToResponseDto(product);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, hard = false): Promise<void> {
     const existingProduct = await this.prisma.product.findUnique({
       where: { id },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        barcode: true,
+        active: true,
+        salePrice: true,
+        costPrice: true,
+        category: true,
+        imageUrl: true,
+        createdAt: true,
+        updatedAt: true,
+      }
     });
 
     if (!existingProduct) {
       throw new NotFoundException(`Product with ID ${id} not found`);
+    }
+
+    if (hard) {
+      try {
+        await this.prisma.product.delete({ where: { id } });
+        // Evento de sincronização para deleção definitiva
+        await this.generateProductEvent({ ...existingProduct, active: false }, 'product.deleted.v1');
+        return;
+      } catch (error: any) {
+        const msg = String(error?.message || '').toLowerCase();
+        const isFkConstraint = error?.code === 'P2003' || msg.includes('foreign key') || msg.includes('constraint');
+        if (isFkConstraint) {
+          // Existem vínculos (vendas/movimentações/ajustes). Orienta inativação.
+          throw new ConflictException('Não é possível excluir permanentemente: o produto possui registros vinculados (vendas, estoque ou ajustes). Inative o produto ou remova os vínculos antes.');
+        }
+        throw error;
+      }
     }
 
     // Soft delete: marca o registro como inativo
@@ -582,6 +612,32 @@ export class ProductsService {
 
     // Gerar evento de sincronização (alinha com Hub)
     await this.generateProductEvent(updated, 'product.deleted.v1');
+  }
+
+  async getDependencies(id: string): Promise<{
+    blocking: {
+      saleItems: number;
+      stockMovements: number;
+      inventoryAdjustments: number;
+    };
+    nonBlocking: {
+      groomingItems: number;
+    };
+    canHardDelete: boolean;
+  }> {
+    const [saleItems, stockMovements, inventoryAdjustments, groomingItems] = await Promise.all([
+      this.prisma.saleItem.count({ where: { productId: id } }),
+      this.prisma.stockMovement.count({ where: { productId: id } }),
+      this.prisma.inventoryAdjustment.count({ where: { productId: id } }),
+      this.prisma.groomingItem.count({ where: { productId: id } }),
+    ]);
+
+    const blockingTotal = saleItems + stockMovements + inventoryAdjustments;
+    return {
+      blocking: { saleItems, stockMovements, inventoryAdjustments },
+      nonBlocking: { groomingItems },
+      canHardDelete: blockingTotal === 0,
+    };
   }
 
   private async generateProductEvent(product: any, eventType: string): Promise<void> {

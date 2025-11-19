@@ -47,7 +47,7 @@ export default function StockMovementsPage() {
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState('');
   const [cost, setCost] = useState('');
-  const [document, setDocument] = useState('');
+  // Campo de documento removido conforme padronização
   const [notes, setNotes] = useState('');
   const [motivo, setMotivo] = useState('');
 
@@ -56,8 +56,25 @@ export default function StockMovementsPage() {
 
   useEffect(() => {
     const load = async () => {
-      const data = await getStockMovements();
-      setMovements(data);
+      try {
+        const data = await getStockMovements();
+        if (data && data.length > 0) {
+          setMovements(data);
+          return;
+        }
+        // Fallback: carregar do cache local caso API não retorne dados
+        const cached = localStorage.getItem('stock_movements');
+        if (cached) {
+          setMovements(JSON.parse(cached));
+        }
+      } catch {
+        const cached = localStorage.getItem('stock_movements');
+        if (cached) {
+          setMovements(JSON.parse(cached));
+        } else {
+          setMovements([]);
+        }
+      }
     };
     load();
   }, []);
@@ -124,7 +141,6 @@ export default function StockMovementsPage() {
     setSelectedProductId('');
     setQuantity('');
     setCost('');
-    setDocument('');
     setNotes('');
     setMotivo('');
   };
@@ -161,7 +177,6 @@ export default function StockMovementsPage() {
         delta,
         reason: dialogType === 'ENTRADA' ? 'COMPRA' : dialogType === 'SAIDA' ? (motivo || 'SAIDA') : 'AJUSTE',
         notes: notes || undefined,
-        document: document || undefined,
         unitCost: cost ? parseFloat(cost) : undefined,
       });
 
@@ -355,15 +370,7 @@ export default function StockMovementsPage() {
               </div>
             )}
 
-            <div>
-              <Label htmlFor="document">Documento (opcional)</Label>
-              <Input
-                id="document"
-                value={document}
-                onChange={(e) => setDocument(e.target.value)}
-                placeholder="Nº do documento"
-              />
-            </div>
+            {/* Campo de documento removido */}
 
             <div>
               <Label htmlFor="notes">Observações (opcional)</Label>
