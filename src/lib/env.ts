@@ -37,6 +37,7 @@ export const ENDPOINTS = {
   CLIENT_LICENSING_VALIDATE_OFFLINE: `${API_URLS.CLIENT_LOCAL}/licensing/validate-offline`,
   CLIENT_LICENSING_CURRENT: `${API_URLS.CLIENT_LOCAL}/licensing/plan/current`,
   CLIENT_LICENSING_SYNC_PLAN: `${API_URLS.CLIENT_LOCAL}/licensing/sync-plan`,
+  CLIENT_AUTH_PERSIST: `${API_URLS.CLIENT_LOCAL}/auth/persist`,
   CLIENT_AUTH_OFFLINE_LOGIN: `${API_URLS.CLIENT_LOCAL}/auth/offline-login`,
   CLIENT_PLANS_SUBSCRIPTION: (tenantId: string) => `${API_URLS.CLIENT_LOCAL}/plans/tenants/${tenantId}/subscription`,
   CLIENT_PLANS_INVOICES: (tenantId: string) => `${API_URLS.CLIENT_LOCAL}/plans/tenants/${tenantId}/invoices`,

@@ -1,6 +1,6 @@
 {
   "name": "f-flow-suite-site",
-  "version": "1.0.0",
+  "version": "1.0.30",
   "description": "Site institucional do F-Flow Suite",
   "type": "module",
   "scripts": {

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { PlanSyncService } from '@/services/plan-sync.service';
 import { API_URLS, ENDPOINTS } from '../lib/env';
+// Limite de dias offline configurável via env; padrão 5
+const OFFLINE_MAX_DAYS = Math.max(0, Number(import.meta.env.VITE_OFFLINE_MAX_DAYS ?? 5));
 
 interface User {
   id: string;
@@ -130,8 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (ts) {
           const last = new Date(ts).getTime();
           const days = Math.floor((Date.now() - last) / (24 * 60 * 60 * 1000));
-          const LIMIT = 5;
-          setOfflineDaysLeft(Math.max(0, LIMIT - days));
+          setOfflineDaysLeft(Math.max(0, OFFLINE_MAX_DAYS - days));
         } else {
           setOfflineDaysLeft(null);
         }
@@ -308,6 +309,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setUser(userData);
                 localStorage.setItem('auth_user', JSON.stringify(userData));
                 localStorage.setItem('tenant_id', result.user.tenant.id);
+
+                // Persistir credenciais para uso offline
+                try {
+                  console.log('💾 Persistindo credenciais offline no client-local...');
+                  const persistAuthRes = await fetch(ENDPOINTS.CLIENT_AUTH_PERSIST, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      email: result.user.email,
+                      password: password,
+                      tenantId: result.user.tenant.id,
+                      displayName: result.user.displayName,
+                      hubUserId: result.user.id,
+                    }),
+                  });
+                  if (persistAuthRes.ok) {
+                    const persistJson = await persistAuthRes.json();
+                    console.log('💾 Credenciais offline persistidas:', persistJson);
+                  } else {
+                    console.warn('⚠️ Falha ao persistir credenciais offline:', persistAuthRes.status);
+                  }
+                } catch (persistErr) {
+                  console.warn('⚠️ Erro ao persistir credenciais offline:', persistErr);
+                }
                 
                 // Ativar licença no client-local para gerar e persistir JWT token
                 try {
@@ -418,16 +443,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // ETAPA 3: Hub offline ou com problema - verificar client-local
+      // Curto-circuito: se Hub respondeu 401, tratar como credenciais inválidas e não seguir para offline
+      if (hubAvailable && hubResponse && !hubResponse.ok && hubResponse.status === 401) {
+        console.log('🔒 Credenciais inválidas (401) - abortando fluxo offline');
+        toast({
+          title: "Credenciais inválidas",
+          description: "Email ou senha incorretos.",
+          variant: "destructive",
+        });
+        console.log('❌ LOGIN FALHOU - retornando false');
+        return false;
+      }
+
+      // ETAPA 3: Hub offline ou erro de servidor - verificar client-local
       console.log('🔄 ETAPA 3: Hub offline ou com problema - verificando client-local...');
-      if (!hubAvailable || !hubResponse?.ok) {
-        console.log('💻 Verificando restrição de login offline (máximo 5 dias sem Hub)...');
+      if (!hubAvailable || (hubResponse && !hubResponse.ok && hubResponse.status >= 500)) {
+        console.log(`💻 Verificando restrição de login offline (máximo ${OFFLINE_MAX_DAYS} dias sem Hub)...`);
 
         // Buscar timestamps do cache para calcular dias sem Hub
-        let offlineDaysExceeded = false;
         let offlineDaysLeft: number | null = null;
         try {
-          const tenantId = localStorage.getItem('tenant_id') || localStorage.getItem('2f.tenantId') || '';
+          let tenantId = localStorage.getItem('tenant_id') || localStorage.getItem('2f.tenantId') || '';
+
+          // Se não houver tenantId, tentar resolver via lookup por e-mail no client-local
+          if (!tenantId) {
+            try {
+              const lookupUrl = `${API_URLS.CLIENT_LOCAL}/users/lookup/by-email?email=${encodeURIComponent(email)}`;
+              console.log('🔎 Resolvendo tenantId via lookup de usuário:', lookupUrl);
+              const lookupRes = await fetch(lookupUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+              });
+              if (lookupRes.ok) {
+                const userJson = await lookupRes.json();
+                if (userJson?.tenantId) {
+                  tenantId = String(userJson.tenantId);
+                  console.log('🔎 tenantId resolvido via lookup:', tenantId);
+                } else {
+                  console.warn('⚠️ Lookup de usuário não retornou tenantId');
+                }
+              } else {
+                console.warn('⚠️ Falha no lookup de usuário por email', lookupRes.status);
+              }
+            } catch (lookupErr) {
+              console.warn('⚠️ Erro ao resolver tenantId via lookup:', lookupErr);
+            }
+          }
+
           const statusRes = await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
             method: 'GET',
             headers: {
@@ -443,9 +505,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               const last = new Date(ts).getTime();
               const now = Date.now();
               const days = Math.floor((now - last) / (24 * 60 * 60 * 1000));
-              const LIMIT = 5;
-              offlineDaysExceeded = days >= LIMIT;
-              offlineDaysLeft = Math.max(0, LIMIT - days);
+              offlineDaysLeft = Math.max(0, OFFLINE_MAX_DAYS - days);
               console.log(`📉 Dias sem Hub desde última atualização: ${days}d (restam ${offlineDaysLeft}d)`);
             } else {
               console.warn('⚠️ Não há timestamps no status da licença (updatedAt/lastChecked)');
@@ -455,16 +515,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } catch (e) {
           console.warn('⚠️ Erro ao calcular dias offline permitidos', e);
-        }
-
-        if (offlineDaysExceeded) {
-          toast({
-            title: 'Modo offline bloqueado',
-            description: 'Sem comunicação com o Hub por mais de 5 dias. Conecte-se ao Hub para continuar.',
-            variant: 'destructive',
-          });
-          console.log('⛔ Bloqueando login offline - limite de 5 dias excedido');
-          return false;
         }
 
         console.log('💻 Tentando login offline no client-local...');
@@ -492,6 +542,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               
               setUser(userData);
               localStorage.setItem('auth_user', JSON.stringify(userData));
+              if (offlineResult.user?.tenantId) {
+                localStorage.setItem('tenant_id', String(offlineResult.user.tenantId));
+              }
               
               // Definir status de licença offline
               setLicenseStatus({
@@ -503,7 +556,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               
               toast({
                 title: 'Login offline realizado',
-                description: offlineDaysLeft != null ? `Conectado usando cache. Restam ${offlineDaysLeft} dias sem Hub.` : 'Conectado usando dados em cache. Funcionalidade limitada.',
+                description: offlineDaysLeft != null ? `Conectado usando cache. Restam ${offlineDaysLeft} dias sem Hub (máximo ${OFFLINE_MAX_DAYS}).` : 'Conectado usando dados em cache. Funcionalidade limitada.',
                 variant: 'default',
               });
               
@@ -560,14 +613,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('❌ ETAPA 4: Login falhou em todas as tentativas');
       if (hubAvailable && hubResponse && !hubResponse.ok) {
         console.log('❌ Hub disponível mas resposta não OK - Status:', hubResponse.status);
-        if (hubResponse.status === 401) {
-          console.log('🔒 Credenciais inválidas (401)');
-          toast({
-            title: "Credenciais inválidas",
-            description: "Email ou senha incorretos.",
-            variant: "destructive",
-          });
-        } else {
+        if (hubResponse.status !== 401) {
           console.log('👤 Usuário não encontrado - marcando flag');
           // Usuário não encontrado - permitir login mas marcar para mostrar aviso
           localStorage.setItem('user_not_found', 'true');
@@ -725,7 +771,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const nowIso = new Date().toISOString();
       setHubLastCheck(nowIso);
       setLicenseCacheUpdatedAt(nowIso);
-      setOfflineDaysLeft(5);
+      setOfflineDaysLeft(OFFLINE_MAX_DAYS);
 
       try {
         await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/update-cache`, {

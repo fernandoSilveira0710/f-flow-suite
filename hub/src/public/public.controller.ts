@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post } from '@nestjs/common';
 import { PublicService } from './public.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { LoginDto } from './dto/login.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('public')
 export class PublicController {
@@ -15,6 +16,11 @@ export class PublicController {
   @Post('login')
   async login(@Body() loginDto: LoginDto) {
     return this.publicService.login(loginDto);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.publicService.resetPassword(dto);
   }
 
   @Get('plans')

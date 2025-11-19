@@ -6,14 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 
-// Site pages
-import Home from "./pages/site/home";
-import Planos from "./pages/site/planos";
-import Contato from "./pages/site/contato";
-import Login from "./pages/site/login";
-import Cadastro from "./pages/site/cadastro";
-import Pagamento from "./pages/site/pagamento";
-import PagamentoSucesso from "./pages/site/pagamento/sucesso";
+// Site pages desabilitados no build dev para evitar erros
 
 // ERP Layout & Pages
 import ErpLayout from "./layouts/erp-layout";
@@ -83,19 +76,18 @@ import UsuariosPage from "./pages/erp/configuracoes/usuarios";
 import PapeisPage from "./pages/erp/configuracoes/papeis";
 import PlanoPage from "./pages/erp/configuracoes/plano";
 import LicencasPage from "./pages/erp/configuracoes/licencas";
-import PosSettings from "./pages/settings/pos";
-import ScheduleSettings from "./pages/settings/schedule";
-import GroomingSettings from "./pages/settings/grooming";
-import InventorySettings from "./pages/settings/inventory";
-import UnitsSettings from "./pages/settings/units";
-import ProductsSettings from "./pages/settings/products";
-import PaymentsIndex from "./pages/settings/payments/index";
-import ImportExportSettings from "./pages/settings/import-export";
+// Settings pages inexistentes removidos do build
 import NovoPagamento from "./pages/erp/configuracoes/pagamentos/novo";
 import ConfiguracoesRedirect from "./pages/erp/configuracoes/index";
 import ConfiguracoesAlias from "./pages/erp/configuracoes/[...alias]";
 
-import NotFound from "./pages/NotFound";
+// Fallback simples inline para 404
+const SimpleNotFound = () => (
+  <div style={{ padding: 24 }}>
+    <h2>404</h2>
+    <p>Página não encontrada.</p>
+  </div>
+);
 
 const queryClient = new QueryClient();
 
@@ -108,15 +100,8 @@ function App() {
             <Toaster />
             <Sonner />
             <Routes>
-              {/* Site Routes (Public) */}
+              {/* Site Routes removidas; manter apenas redirect */}
               <Route path="/" element={<Navigate to="/erp/login" replace />} />
-              <Route path="/site" element={<Home />} />
-              <Route path="/site/planos" element={<Planos />} />
-              <Route path="/site/contato" element={<Contato />} />
-              <Route path="/site/login" element={<Login />} />
-              <Route path="/site/cadastro" element={<Cadastro />} />
-              <Route path="/site/pagamento" element={<Pagamento />} />
-              <Route path="/site/pagamento/sucesso" element={<PagamentoSucesso />} />
 
               {/* ERP Login (Public) */}
               <Route path="/erp/login" element={<ErpLogin />} />
@@ -243,31 +228,21 @@ function App() {
           {/* Relatórios - manter */}
           <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
 
-          {/* Fallback interno do ERP para evitar NotFound fora do layout */}
-          <Route path="*" element={<NotFound />} />
+          {/* Fallback interno do ERP */}
+          <Route path="*" element={<SimpleNotFound />} />
           
           {/* Settings Routes (EN - canonical) */}
-          <Route path="settings" element={<SettingsLayout />}>
-            <Route index element={<Navigate to="/erp/settings/organization" replace />} />
-            <Route path="organization" element={<OrganizacaoPage />} />
-            <Route path="users" element={<UsuariosPage />} />
-            <Route path="roles" element={<PapeisPage />} />
-            <Route path="billing" element={<PlanoPage />} />
-            <Route path="licenses" element={<LicencasPage />} />
-            <Route path="pos" element={<PosSettings />} />
-            {/* Agenda (Settings) - bloqueada */}
-            <Route path="schedule" element={<Navigate to="/erp/settings/organization" replace />} />
-            {/* Banho & Tosa (Settings) - bloqueada */}
-            <Route path="grooming" element={<Navigate to="/erp/settings/organization" replace />} />
-            <Route path="inventory" element={<InventorySettings />} />
-            <Route path="units" element={<UnitsSettings />} />
-            <Route path="products" element={<ProductsSettings />} />
-            <Route path="payments" element={<PaymentsIndex />} />
-            <Route path="payments/new" element={<NovoPagamento />} />
-            <Route path="payments/:id/edit" element={<NovoPagamento />} />
-            <Route path="notifications" element={<Navigate to="/erp/settings/organization" replace />} />
-            <Route path="import-export" element={<ImportExportSettings />} />
-          </Route>
+            <Route path="settings" element={<SettingsLayout />}>
+              <Route index element={<Navigate to="/erp/settings/organization" replace />} />
+              <Route path="organization" element={<OrganizacaoPage />} />
+              <Route path="users" element={<UsuariosPage />} />
+              <Route path="roles" element={<PapeisPage />} />
+              <Route path="billing" element={<PlanoPage />} />
+              <Route path="licenses" element={<LicencasPage />} />
+              <Route path="payments/new" element={<NovoPagamento />} />
+              <Route path="payments/:id/edit" element={<NovoPagamento />} />
+              <Route path="notifications" element={<Navigate to="/erp/settings/organization" replace />} />
+              </Route>
 
               {/* PT-BR Aliases (redirect to EN canonical) */}
               <Route path="configuracoes" element={<ConfiguracoesRedirect />} />
@@ -275,7 +250,7 @@ function App() {
             </Route>
 
               {/* 404 */}
-              <Route path="*" element={<NotFound />} />
+              <Route path="*" element={<SimpleNotFound />} />
             </Routes>
           </TooltipProvider>
         </AuthProvider>

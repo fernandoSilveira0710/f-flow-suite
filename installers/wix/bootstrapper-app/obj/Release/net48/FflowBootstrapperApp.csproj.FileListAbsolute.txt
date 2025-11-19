@@ -1,1 +1,0 @@
-C:\Users\Fernando\Documents\2F SOLUTIONS\f-flow-suite\installers\wix\bootstrapper-app\obj\Release\net48\FflowBootstrapperApp.csproj.AssemblyReference.cache

@@ -48,8 +48,10 @@ function Install-Service-WithNssm {
     & $script:NSSM set $SvcName AppThrottle 5000
     & $script:NSSM set $SvcName AppStdout "C:\ProgramData\FFlow\logs\$SvcName.out.log"
     & $script:NSSM set $SvcName AppStderr "C:\ProgramData\FFlow\logs\$SvcName.err.log"
-    # Atualizar variáveis de ambiente (sempre garantir PORT e SKIP_MIGRATIONS)
-    $envExtra = "PORT=8081;CLIENT_HTTP_PORT=8081;SKIP_MIGRATIONS=true"
+    # Atualizar variáveis de ambiente (sempre garantir PORT e SKIP_MIGRATIONS). Incluir NODE_PATH para resolver dependências do dist.
+    $envExtra = "PORT=8081;CLIENT_HTTP_PORT=8081;SKIP_MIGRATIONS=false"
+    # Garantir NODE_PATH apontando para node_modules do repositório (fallback) se existir
+    if (Test-Path $RepoNodeModules) { $envExtra = "NODE_PATH=$RepoNodeModules;" + $envExtra }
     if (-not [string]::IsNullOrWhiteSpace($AppVersion)) { $envExtra = "APP_VERSION=$AppVersion;VITE_APP_VERSION=$AppVersion;" + $envExtra }
     & $script:NSSM set $SvcName AppEnvironmentExtra $envExtra
     & $script:NSSM restart $SvcName
@@ -63,12 +65,12 @@ function Install-Service-WithNssm {
     & $script:NSSM set $SvcName AppThrottle 5000
     & $script:NSSM set $SvcName AppStdout "C:\ProgramData\FFlow\logs\$SvcName.out.log"
     & $script:NSSM set $SvcName AppStderr "C:\ProgramData\FFlow\logs\$SvcName.err.log"
-    if (-not [string]::IsNullOrWhiteSpace($AppVersion)) {
-      # Injeta variáveis de ambiente para propagação da versão ao serviço
-      & $script:NSSM set $SvcName AppEnvironmentExtra "APP_VERSION=$AppVersion;VITE_APP_VERSION=$AppVersion;PORT=8081;CLIENT_HTTP_PORT=8081;SKIP_MIGRATIONS=true"
-    } else {
-      & $script:NSSM set $SvcName AppEnvironmentExtra "PORT=8081;CLIENT_HTTP_PORT=8081;SKIP_MIGRATIONS=true"
-    }
+    # Injeta variáveis de ambiente para propagação da versão e resolução de módulos
+    $envInstall = @()
+    if (Test-Path $RepoNodeModules) { $envInstall += "NODE_PATH=$RepoNodeModules" }
+    if (-not [string]::IsNullOrWhiteSpace($AppVersion)) { $envInstall += "APP_VERSION=$AppVersion"; $envInstall += "VITE_APP_VERSION=$AppVersion" }
+    $envInstall += "PORT=8081"; $envInstall += "CLIENT_HTTP_PORT=8081"; $envInstall += "SKIP_MIGRATIONS=false"
+    & $script:NSSM set $SvcName AppEnvironmentExtra ([string]::Join(';', $envInstall))
     & $script:NSSM start $SvcName
   }
 }
@@ -133,10 +135,17 @@ $ApiScriptCandidate2 = Join-Path $RepoClient "dist\main.js"
 # Detectar raiz válida do ERP: alguns builds geram 'dist\\dist\\index.html'
 $ErpRootCandidate1 = Join-Path $InstallRoot "erp\dist"
 $ErpRootCandidate2 = Join-Path $InstallRoot "erp\dist\dist"
+# Fallbacks para repositório (site/dist ou dist na raiz)
+$RepoErpCandidate1 = Join-Path $RepoRoot "dist"
+$RepoErpCandidate2 = Join-Path $RepoRoot "site\dist"
 if (Test-Path (Join-Path $ErpRootCandidate1 'index.html')) {
   $ErpRoot = $ErpRootCandidate1
 } elseif (Test-Path (Join-Path $ErpRootCandidate2 'index.html')) {
   $ErpRoot = $ErpRootCandidate2
+} elseif (Test-Path (Join-Path $RepoErpCandidate2 'index.html')) {
+  $ErpRoot = $RepoErpCandidate2
+} elseif (Test-Path (Join-Path $RepoErpCandidate1 'index.html')) {
+  $ErpRoot = $RepoErpCandidate1
 } else {
   $ErpRoot = $ErpRootCandidate1
 }
@@ -227,7 +236,7 @@ if ($script:NSSM) {
   $(if (-not [string]::IsNullOrWhiteSpace($AppVersion)) { "<env name=`"APP_VERSION`" value=`"$AppVersion`" />`n  <env name=`"VITE_APP_VERSION`" value=`"$AppVersion`" />" } )
   <env name="PORT" value="8081" />
   <env name="CLIENT_HTTP_PORT" value="8081" />
-  <env name="SKIP_MIGRATIONS" value="true" />
+  <env name="SKIP_MIGRATIONS" value="false" />
   <env name="NODE_PATH" value="$RepoNodeModules" />
   <startmode>Automatic</startmode>
   <stoptimeout>15000</stoptimeout>

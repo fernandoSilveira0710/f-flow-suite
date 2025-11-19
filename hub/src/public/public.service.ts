@@ -1,8 +1,9 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { PlansService } from '../plans/plans.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { LoginDto } from './dto/login.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 
@@ -120,5 +121,26 @@ export class PublicService {
 
   async getPlans() {
     return this.plansService.findAllPlans(true); // Only active plans for public endpoint
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    if (process.env.NODE_ENV !== 'development') {
+      throw new ForbiddenException('Password reset not allowed in current environment');
+    }
+
+    const { email, newPassword } = dto;
+
+    const user = await this.prisma.user.findFirst({ where: { email } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+    return { message: 'Password updated successfully' };
   }
 }

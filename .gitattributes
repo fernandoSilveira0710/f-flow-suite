@@ -1,4 +1,1 @@
-installers/wix/*.exe filter=lfs diff=lfs merge=lfs -text
-installers/wix/out-wpf/*.exe filter=lfs diff=lfs merge=lfs -text
-out-wpf/*.exe filter=lfs diff=lfs merge=lfs -text
-*.msi filter=lfs diff=lfs merge=lfs -text
+# Removido suporte LFS para artefatos WiX/MSI após migração para Electron

@@ -85,7 +85,7 @@ const InstallationPage = () => {
                     <p className="text-sm text-gray-600">
                       <strong>Arquivo:</strong> f-flow-suite-installer.exe<br />
                       <strong>Tamanho:</strong> ~150MB<br />
-                      <strong>Versão:</strong> 1.0.0
+                      <strong>Versão:</strong> {import.meta.env.VITE_APP_VERSION ?? 'dev'}
                     </p>
                   </div>
                 </div>

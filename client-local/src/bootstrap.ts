@@ -65,31 +65,60 @@ function setupDatabase(dataDir: string): string {
 
 async function runMigrations(): Promise<void> {
   const logger = new Logger('Bootstrap');
-  
-  logger.log('Running Prisma migrations...');
-  
+
+  // Resolve possíveis raízes para migrações SQL instaladas
+  const clientRoot = join(__dirname, '..');
+  const candidateRoots = [
+    // Instalação: {InstallRoot}\prisma\migrations
+    join(clientRoot, '..', 'prisma', 'migrations'),
+    // Repositório: client-local\prisma\migrations
+    join(clientRoot, 'prisma', 'migrations'),
+  ];
+
+  for (const root of candidateRoots) {
+    try {
+      if (existsSync(root)) {
+        logger.log(`Applying SQL migrations from: ${root}`);
+        const { runPackagedMigrations } = await import('./common/migrations/migration-runner');
+        await runPackagedMigrations({ migrationsRoot: root });
+        logger.log('Database migrations completed successfully');
+        return;
+      }
+    } catch (e) {
+      logger.warn(`Failed to apply SQL migrations at '${root}': ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  // Fallback: tentar Prisma CLI quando disponível (apenas em ambiente de desenvolvimento com schema/package.json)
+  const projectRoot = clientRoot;
+  const hasSchema = existsSync(join(projectRoot, 'prisma', 'schema.prisma'));
+  const hasPackage = existsSync(join(projectRoot, 'package.json'));
+  if (!hasSchema || !hasPackage) {
+    logger.warn('No migrations source found and Prisma CLI not available; skipping migration step');
+    return;
+  }
+
+  logger.log('Running Prisma CLI migrations...');
+
   return new Promise((resolve, reject) => {
-    // Generate Prisma client first
-    const projectRoot = join(process.cwd(), '..');
     const generateProcess = spawn('npx', ['prisma', 'generate'], {
       stdio: 'pipe',
       shell: true,
       cwd: projectRoot,
-      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL }
+      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
     });
-    
+
     generateProcess.on('close', (code) => {
       if (code === 0) {
         logger.log('Prisma client generated successfully');
-        
-        // Run migrations
+
         const migrateProcess = spawn('npx', ['prisma', 'migrate', 'deploy'], {
           stdio: 'pipe',
           shell: true,
           cwd: projectRoot,
-          env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL }
+          env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
         });
-        
+
         migrateProcess.on('close', (migrateCode) => {
           if (migrateCode === 0) {
             logger.log('Database migrations completed successfully');
@@ -98,7 +127,7 @@ async function runMigrations(): Promise<void> {
             reject(new Error(`Migration failed with code ${migrateCode}`));
           }
         });
-        
+
         migrateProcess.on('error', (error) => {
           reject(error);
         });
@@ -106,7 +135,7 @@ async function runMigrations(): Promise<void> {
         reject(new Error(`Prisma generate failed with code ${code}`));
       }
     });
-    
+
     generateProcess.on('error', (error) => {
       reject(error);
     });

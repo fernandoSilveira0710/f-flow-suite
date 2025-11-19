@@ -9,6 +9,92 @@ export class AuthService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  async persistOfflineCredentials(params: {
+    email: string;
+    password: string;
+    tenantId?: string;
+    displayName?: string;
+    role?: string;
+    hubUserId?: string;
+  }): Promise<{ success: boolean; message: string; userId?: string }> {
+    const { email, password, tenantId, displayName, role, hubUserId } = params;
+    try {
+      this.logger.log(`💾 Persistindo credenciais offline para ${email}`);
+
+      // 1) Garantir existência/atualização do usuário local
+      let user = await this.prisma.user.findUnique({ where: { email } });
+      if (!user) {
+        user = await this.prisma.user.create({
+          data: {
+            email,
+            displayName: displayName || email.split('@')[0],
+            role: role || 'user',
+            active: true,
+            tenantId: tenantId,
+            hubUserId: hubUserId,
+          }
+        });
+        this.logger.log(`👤 Usuário criado localmente: ${user.id}`);
+      } else {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            ...(displayName ? { displayName } : {}),
+            ...(role ? { role } : {}),
+            ...(typeof tenantId !== 'undefined' ? { tenantId } : {}),
+            ...(hubUserId ? { hubUserId } : {}),
+            active: true,
+          }
+        });
+        this.logger.log(`👤 Usuário atualizado localmente: ${user.id}`);
+      }
+
+      // 2) Gerar hash seguro da senha fornecida no login do Hub
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // 3) Persistir/atualizar AuthCache com o hash e timestamp
+      await this.prisma.authCache.upsert({
+        where: { userId: user.id },
+        update: {
+          email: user.email,
+          passwordHash,
+          lastHubAuthAt: new Date(),
+        },
+        create: {
+          userId: user.id,
+          email: user.email,
+          passwordHash,
+          lastHubAuthAt: new Date(),
+        }
+      });
+
+      // 4) Atualizar contador de última verificação da licença (preferindo tenantId efetivo)
+      const effectiveTenantId = tenantId ?? user.tenantId ?? undefined;
+      if (effectiveTenantId) {
+        await this.prisma.licenseCache.upsert({
+          where: { tenantId: effectiveTenantId },
+          update: { lastChecked: new Date(), updatedAt: new Date() },
+          create: {
+            tenantId: effectiveTenantId,
+            status: 'active',
+            registered: true,
+            licensed: true,
+            planKey: 'starter',
+            graceDays: 7,
+            lastChecked: new Date(),
+            createdAt: new Date(),
+          }
+        });
+        this.logger.log(`⏱️ lastChecked da licença atualizado para tenant ${effectiveTenantId}`);
+      }
+
+      return { success: true, message: 'Credenciais offline persistidas com sucesso', userId: user.id };
+    } catch (error: any) {
+      this.logger.error('❌ Falha ao persistir credenciais offline', error);
+      return { success: false, message: error?.message || 'Erro ao persistir credenciais offline' };
+    }
+  }
+
   async authenticateOffline(email: string, password: string): Promise<OfflineLoginResponse> {
     try {
       // 1. Buscar usuário no banco local
@@ -66,9 +152,9 @@ export class AuthService {
         }
       }
 
-      // 4. Bloqueio após X dias sem comunicação com o Hub (regra: 5 dias)
+      // 4. Bloqueio após X dias sem comunicação com o Hub (configurável via env OFFLINE_MAX_DAYS, padrão 5)
       const lastChecked: Date | null = licenseCache.lastChecked ?? null;
-      const OFFLINE_MAX_DAYS = 5;
+      const OFFLINE_MAX_DAYS = Math.max(0, Number(process.env.OFFLINE_MAX_DAYS ?? 5));
       if (lastChecked) {
         const msSinceLastCheck = now.getTime() - new Date(lastChecked).getTime();
         const daysSinceLastCheck = Math.floor(msSinceLastCheck / (24 * 60 * 60 * 1000));
@@ -77,7 +163,7 @@ export class AuthService {
             success: false,
             message: `Acesso offline bloqueado: mais de ${OFFLINE_MAX_DAYS} dias sem contato com o Hub. Faça login online para revalidar.`,
           };
-        }
+      }
       }
 
       // 5. Validar senha offline usando hash persistido (AuthCache)

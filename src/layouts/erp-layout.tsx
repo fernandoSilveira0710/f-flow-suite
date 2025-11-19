@@ -300,7 +300,7 @@ export default function ErpLayout() {
                         <>
                           <p><strong>Hub Offline</strong>: sistema usa dados em cache.</p>
                           <p>Última atualização: {formatDate(licenseCacheUpdatedAt || undefined)}</p>
-                          <p>Modo offline permite até 5 dias. {typeof offlineDaysLeft === 'number' ? ` Restam ${offlineDaysLeft} dias.` : ''}</p>
+                          <p>Modo offline permite até {import.meta.env.VITE_OFFLINE_MAX_DAYS ?? 5} dias. {typeof offlineDaysLeft === 'number' ? ` Restam ${offlineDaysLeft} dias.` : ''}</p>
                           <p>Conecte ao Hub para renovar sincronização e licença.</p>
                         </>
                       )}

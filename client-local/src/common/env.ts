@@ -11,7 +11,11 @@ export function loadEnvConfig(): void {
   }
 
   const logger = new Logger('Env');
-  const candidates = [process.env.NODE_ENV && `.env.${process.env.NODE_ENV}`, '.env'];
+  const candidates = [
+    process.env.NODE_ENV && `.env.${process.env.NODE_ENV}`,
+    '.env.production',
+    '.env',
+  ];
 
   for (const candidate of candidates) {
     if (!candidate) continue;
@@ -19,7 +23,8 @@ export function loadEnvConfig(): void {
     // 1) Try current working directory
     const cwdPath = join(process.cwd(), candidate);
     if (existsSync(cwdPath)) {
-      loadDotenv({ path: cwdPath, override: true });
+      // Do not override existing environment variables injected by Electron
+      loadDotenv({ path: cwdPath, override: false });
       logger.log(`Loaded environment variables from ${candidate} (cwd)`);
       envLoaded = true;
       return;
@@ -28,7 +33,8 @@ export function loadEnvConfig(): void {
     // 2) Try next to compiled dist (service mode safety)
     const distSiblingPath = join(__dirname, '..', candidate);
     if (existsSync(distSiblingPath)) {
-      loadDotenv({ path: distSiblingPath, override: true });
+      // Do not override existing environment variables injected by Electron
+      loadDotenv({ path: distSiblingPath, override: false });
       logger.log(`Loaded environment variables from ${candidate} (dist sibling)`);
       envLoaded = true;
       return;

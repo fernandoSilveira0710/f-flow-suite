@@ -68,9 +68,18 @@ npm run build
 
 ### Distribuição (Windows)
 
-- A distribuição é feita via instalador MSI gerado com WiX.
-- Artefatos e scripts estão em `installers/wix/`. Use `build.ps1` para compilar.
-- Para instalar, execute o `FFlowSuite.msi` como Administrador.
+- A distribuição agora é feita via instalador Electron (NSIS one-click).
+- Gere os builds locais antes de empacotar:
+  - `client-local`: `npm run build` → `client-local/dist/main.js`
+  - `ERP (raiz do projeto)`: `npm run build` → `dist/`
+- Em seguida, no diretório `desktop`:
+  ```bash
+  cd desktop
+  npm i
+  npm run dist
+  ```
+- O instalador será gerado em `desktop/dist/FFlowSuite_Setup_<versao>.exe`.
+- Para instalar, execute o `FFlowSuite_Setup_<versao>.exe` normalmente.
 
 ## 🔧 Configuração
 
@@ -112,14 +121,14 @@ MAINTENANCE_TOKEN=change-me-strong-token
 
 ### Windows
 
-Instalação via MSI (WiX):
+Instalação via Electron (NSIS):
 
 ```powershell
-# Executar como Administrador
-Start-Process installers\wix\FFlowSuite.msi -Verb RunAs
+# Executar o instalador gerado
+Start-Process desktop\dist\FFlowSuite_Setup_1.0.30.exe
 ```
 
-O MSI registra os serviços e chama os scripts necessários (ex.: service-install). Não é mais necessário usar WinSW/nssm ou instaladores Inno Setup.
+O instalador Electron unifica a inicialização do Client‑Local e do ERP, dispensando serviços do Windows e ações elevadas.
 
 ### macOS
 
@@ -824,12 +833,11 @@ Para voltar ao modo de desenvolvimento:
 
 ## 📋 Critérios de Aceite
 
-- ✅ Instalador MSI (WiX) gera pacote para Windows
+- ✅ Instalador Electron (NSIS) gera pacote para Windows
 - ✅ Primeira execução cria diretórios e executa migrations
 - ✅ `GET /health` retorna `{ status: 'ok' }`
-- ✅ Instalação como serviço via `installers/wix/service-install.ps1` funciona no Windows
 - ✅ Logs estruturados com rotação
-- ✅ Desinstalação limpa via `installers/wix/service-uninstall.ps1` sem afetar dados do usuário
+- ✅ Desinstalação limpa via desinstalador do NSIS sem afetar dados do usuário
 
 ## 🤝 Contribuição
 

@@ -29,6 +29,33 @@ export class AuthController {
 
   constructor(private readonly authService: AuthService) {}
 
+  @Post('persist')
+  async persist(@Body() body: { email: string; password: string; tenantId?: string; displayName?: string; role?: string; hubUserId?: string }) {
+    try {
+      this.logger.log(`💾 Persistência de credenciais offline para: ${body.email}`);
+      const result = await this.authService.persistOfflineCredentials({
+        email: body.email,
+        password: body.password,
+        tenantId: body.tenantId,
+        displayName: body.displayName,
+        role: body.role,
+        hubUserId: body.hubUserId,
+      });
+
+      if (!result.success) {
+        throw new HttpException(result.message || 'Falha ao persistir credenciais', HttpStatus.BAD_REQUEST);
+      }
+
+      return { success: true, message: 'Credenciais persistidas', userId: result.userId };
+    } catch (error: any) {
+      this.logger.error(`❌ Erro na persistência de credenciais para ${body.email}:`, error);
+      throw new HttpException(
+        `Falha ao persistir credenciais: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
   @Post('offline-login')
   @HttpCode(HttpStatus.OK)
   async offlineLogin(@Body() body: OfflineLoginRequest): Promise<OfflineLoginResponse> {
