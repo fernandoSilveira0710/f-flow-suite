@@ -3,6 +3,7 @@ import { PublicService } from './public.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ContactDto } from './dto/contact.dto';
 
 @Controller('public')
 export class PublicController {
@@ -26,5 +27,10 @@ export class PublicController {
   @Get('plans')
   async getPlans() {
     return this.publicService.getPlans();
+  }
+
+  @Post('contact')
+  async contact(@Body() dto: ContactDto) {
+    return this.publicService.contact(dto);
   }
 }

@@ -25,6 +25,7 @@ export class MailerService {
   private readonly provider: 'resend' | 'none';
   private readonly fromEmail: string;
   private readonly resendApiKey?: string;
+  private readonly contactEmail: string;
   private readonly defaultDownloadUrl?: string;
 
   constructor(private readonly config: ConfigService) {
@@ -33,6 +34,7 @@ export class MailerService {
     this.provider = provider === 'resend' ? 'resend' : 'none';
     this.fromEmail = this.config.get<string>('MAIL_FROM') || 'no-reply@fflow.local';
     this.resendApiKey = this.config.get<string>('RESEND_API_KEY');
+    this.contactEmail = this.config.get<string>('CONTACT_EMAIL') || 'contato@2fsolution.online';
     this.defaultDownloadUrl = this.config.get<string>('DOWNLOAD_URL');
   }
 
@@ -49,6 +51,41 @@ export class MailerService {
     this.logger.log(`[Mailer] Preparando envio de boas-vindas: to=${data.to} tenantId=${data.tenantId} provider=${this.provider} from=${this.fromEmail}`);
 
     await this.send({ to: data.to, subject, html });
+  }
+
+  async sendContactEmail(data: {
+    fromName?: string;
+    fromEmail: string;
+    phone?: string;
+    subject?: string;
+    message: string;
+  }): Promise<void> {
+    if (!this.enabled) {
+      this.logger.log('[Mailer] MAIL_ENABLE=false, pulando envio de email de contato.');
+      return;
+    }
+
+    const subject = `[Contato] ${escapeHtml(data.subject || 'Mensagem do site')}`;
+    const html = `
+      <div style="font-family:Arial, Helvetica, sans-serif; color:#111;">
+        <h2>Nova mensagem de contato</h2>
+        <p>Você recebeu uma nova mensagem pelo site.</p>
+        <h3>Detalhes</h3>
+        <ul>
+          ${data.fromName ? `<li><strong>Nome:</strong> ${escapeHtml(data.fromName)}</li>` : ''}
+          <li><strong>Email:</strong> ${escapeHtml(data.fromEmail)}</li>
+          ${data.phone ? `<li><strong>Telefone:</strong> ${escapeHtml(data.phone)}</li>` : ''}
+          ${data.subject ? `<li><strong>Assunto:</strong> ${escapeHtml(data.subject)}</li>` : ''}
+        </ul>
+        <h3>Mensagem</h3>
+        <div style="white-space:pre-wrap;">${escapeHtml(data.message)}</div>
+        <hr />
+        <p style="font-size:12px;color:#555;">Este email foi enviado automaticamente pelo site (formulário de contato).</p>
+      </div>
+    `;
+
+    this.logger.log(`[Mailer] Preparando envio de contato: to=${this.contactEmail} from=${this.fromEmail}`);
+    await this.send({ to: this.contactEmail, subject, html });
   }
 
   private renderWelcomeTemplate(data: WelcomeEmailData): string {

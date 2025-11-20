@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, ForbiddenException, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { PlansService } from '../plans/plans.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
@@ -7,6 +7,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { MailerService } from '../mailer/mailer.service';
+import { ContactDto } from './dto/contact.dto';
 
 @Injectable()
 export class PublicService {
@@ -177,5 +178,24 @@ export class PublicService {
     });
 
     return { message: 'Password updated successfully' };
+  }
+
+  async contact(dto: ContactDto) {
+    const { firstName, lastName, email, phone, subject, message } = dto;
+    if (!email || !message) {
+      throw new BadRequestException('Email e mensagem são obrigatórios');
+    }
+    const fromName = [firstName, lastName].filter(Boolean).join(' ').trim() || undefined;
+
+    this.logger.log(`[PublicService] Recebida mensagem de contato de ${email}${fromName ? ` (${fromName})` : ''}.`);
+    await this.mailer.sendContactEmail({
+      fromName,
+      fromEmail: email,
+      phone,
+      subject,
+      message,
+    });
+
+    return { status: 'ok' };
   }
 }

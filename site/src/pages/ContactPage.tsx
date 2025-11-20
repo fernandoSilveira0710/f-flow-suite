@@ -1,6 +1,7 @@
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { 
   Mail, 
   Phone, 
@@ -11,8 +12,13 @@ import {
 } from 'lucide-react'
 
 const ContactPage = () => {
-  const handleContactSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const [sendStatus, setSendStatus] = useState<'idle'|'sending'|'sent'|'error'>('idle')
+  const [feedback, setFeedback] = useState<string>('')
+
+  const handleContactSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    setSendStatus('sending')
+    setFeedback('')
     const form = e.currentTarget
     const data = new FormData(form)
     const firstName = (data.get('firstName') || '') as string
@@ -22,10 +28,21 @@ const ContactPage = () => {
     const subject = (data.get('subject') || 'Contato') as string
     const message = (data.get('message') || '') as string
 
-    const composedSubject = `Contato - ${subject}`
-    const body = `Nome: ${firstName} ${lastName}\nEmail: ${email}\nTelefone: ${phone}\nAssunto: ${subject}\n\nMensagem:\n${message}`
-    const mailto = `mailto:contato@2fsolution.online?subject=${encodeURIComponent(composedSubject)}&body=${encodeURIComponent(body)}`
-    window.location.href = mailto
+    try {
+      const res = await fetch(`${import.meta.env.VITE_HUB_API_URL}/public/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstName, lastName, email, phone, subject, message })
+      })
+      if (!res.ok) throw new Error(await res.text())
+      setSendStatus('sent')
+      setFeedback('Mensagem enviada! Vamos responder em até 24 horas.')
+      form.reset()
+    } catch (err) {
+      console.error('Falha ao enviar contato:', err)
+      setSendStatus('error')
+      setFeedback('Não foi possível enviar sua mensagem agora. Tente novamente mais tarde ou envie um email para contato@2fsolution.online.')
+    }
   }
   const contactInfo = [
     {
@@ -214,11 +231,18 @@ const ContactPage = () => {
 
                 <button
                   type="submit"
-                  className="w-full btn-primary flex items-center justify-center"
+                  className="w-full btn-primary flex items-center justify-center disabled:opacity-60"
+                  disabled={sendStatus === 'sending'}
                 >
                   <Send className="mr-2 h-4 w-4" />
-                  Enviar Mensagem
+                  {sendStatus === 'sending' ? 'Enviando...' : 'Enviar Mensagem'}
                 </button>
+
+                {feedback && (
+                  <p className={`text-sm mt-3 ${sendStatus === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                    {feedback}
+                  </p>
+                )}
               </form>
             </div>
 
