@@ -1,5 +1,6 @@
 import Header from '../components/Header'
 import Footer from '../components/Footer'
+import { Link } from 'react-router-dom'
 import { 
   Mail, 
   Phone, 
@@ -10,11 +11,27 @@ import {
 } from 'lucide-react'
 
 const ContactPage = () => {
+  const handleContactSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const form = e.currentTarget
+    const data = new FormData(form)
+    const firstName = (data.get('firstName') || '') as string
+    const lastName = (data.get('lastName') || '') as string
+    const email = (data.get('email') || '') as string
+    const phone = (data.get('phone') || '') as string
+    const subject = (data.get('subject') || 'Contato') as string
+    const message = (data.get('message') || '') as string
+
+    const composedSubject = `Contato - ${subject}`
+    const body = `Nome: ${firstName} ${lastName}\nEmail: ${email}\nTelefone: ${phone}\nAssunto: ${subject}\n\nMensagem:\n${message}`
+    const mailto = `mailto:contato@2fsolution.online?subject=${encodeURIComponent(composedSubject)}&body=${encodeURIComponent(body)}`
+    window.location.href = mailto
+  }
   const contactInfo = [
     {
       icon: Mail,
       title: 'Email',
-      value: 'contato@fflowsuite.com',
+      value: 'contato@2fsolution.online',
       description: 'Resposta em até 24 horas'
     },
     {
@@ -42,19 +59,19 @@ const ContactPage = () => {
       icon: MessageSquare,
       title: 'Suporte Técnico',
       description: 'Problemas com instalação, configuração ou uso do sistema',
-      email: 'suporte@fflowsuite.com'
+      email: 'contato@2fsolution.online'
     },
     {
       icon: Mail,
       title: 'Vendas',
       description: 'Informações sobre planos, preços e licenças',
-      email: 'vendas@fflowsuite.com'
+      email: 'contato@2fsolution.online'
     },
     {
       icon: Phone,
       title: 'Comercial',
       description: 'Parcerias, integrações e soluções personalizadas',
-      email: 'comercial@fflowsuite.com'
+      email: 'contato@2fsolution.online'
     }
   ]
 
@@ -111,7 +128,7 @@ const ContactPage = () => {
                 Envie uma Mensagem
               </h2>
               
-              <form className="space-y-6">
+              <form className="space-y-6" onSubmit={handleContactSubmit}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
@@ -245,12 +262,12 @@ const ContactPage = () => {
                 <p className="text-gray-600 mb-4">
                   Antes de entrar em contato, verifique se sua dúvida já foi respondida em nossa seção de FAQ.
                 </p>
-                <a
-                  href="/docs#faq"
+                <Link
+                  to="/docs#faq"
                   className="text-primary-600 hover:text-primary-700 font-medium"
                 >
                   Ver FAQ →
-                </a>
+                </Link>
               </div>
             </div>
           </div>
@@ -279,7 +296,7 @@ const ContactPage = () => {
                 Ligar Agora: (11) 9999-9999
               </a>
               <a
-                href="mailto:emergencia@fflowsuite.com"
+                href="mailto:contato@2fsolution.online"
                 className="bg-white text-red-600 border border-red-600 hover:bg-red-50 px-6 py-3 rounded-md font-semibold transition-colors"
               >
                 Email de Emergência
