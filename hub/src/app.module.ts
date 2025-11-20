@@ -27,6 +27,7 @@ import { PublicModule } from './public/public.module';
 import { HealthController } from './health/health.controller';
 import { JwksController } from './auth/jwks.controller';
 import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
+import { RootController } from './root.controller';
 
 @Module({
   imports: [
@@ -55,7 +56,7 @@ import { PrismaTenantMiddleware } from './prisma-tenant.middleware';
     PlansModule,
     PublicModule,
   ],
-  controllers: [HealthController, JwksController],
+  controllers: [HealthController, JwksController, RootController],
   providers: [PrismaService],
 })
 export class AppModule implements NestModule {
