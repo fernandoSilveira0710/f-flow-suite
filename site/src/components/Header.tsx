@@ -25,7 +25,7 @@ const Header = () => {
               <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">F</span>
               </div>
-              <span className="text-xl font-bold text-gray-900">F-Flow Suite</span>
+              <span className="text-xl font-bold text-gray-900">2F Solutions</span>
             </Link>
           </div>
 

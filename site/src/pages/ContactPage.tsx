@@ -70,8 +70,8 @@ const ContactPage = () => {
               Entre em Contato
             </h1>
             <p className="mt-6 text-lg leading-8 text-gray-600 max-w-3xl mx-auto">
-              Estamos aqui para ajudar você. Entre em contato conosco para suporte técnico, 
-              informações comerciais ou qualquer dúvida sobre o F-Flow Suite.
+              Estamos aqui para ajudar você. Entre em contato para suporte técnico, 
+              informações comerciais ou qualquer dúvida. A 2F Solutions atende você.
             </p>
           </div>
         </div>

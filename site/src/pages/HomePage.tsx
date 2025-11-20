@@ -96,7 +96,7 @@ const HomePage = () => {
               Tudo que você precisa em um só lugar
             </h2>
             <p className="mt-4 text-lg text-gray-600">
-              Recursos completos para modernizar a gestão do seu pet shop
+              Recursos completos para modernizar a gestão do seu comércio
             </p>
           </div>
 
@@ -126,7 +126,7 @@ const HomePage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl mb-6">
-                Por que escolher o F-Flow Suite?
+                Por que escolher a 2F Solutions?
               </h2>
               <div className="space-y-4">
                 {benefits.map((benefit, index) => (
@@ -142,7 +142,7 @@ const HomePage = () => {
                 Pronto para começar?
               </h3>
               <p className="text-gray-600 mb-6">
-                Experimente gratuitamente por 30 dias e veja como o F-Flow Suite 
+                Experimente gratuitamente por 30 dias e veja como a 2F Solutions 
                 pode transformar a gestão do seu comércio.
               </p>
               <div className="space-y-4">

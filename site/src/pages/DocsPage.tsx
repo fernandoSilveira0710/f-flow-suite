@@ -16,7 +16,7 @@ const DocsPage = () => {
     {
       icon: Download,
       title: 'Instalação',
-      description: 'Guia completo para instalar o F-Flow Suite no seu computador',
+      description: 'Guia completo para instalar o sistema da 2F Solutions no seu computador',
       link: '/docs/instalacao',
       items: [
         'Requisitos do sistema',
@@ -96,7 +96,7 @@ const DocsPage = () => {
               Documentação
             </h1>
             <p className="mt-6 text-lg leading-8 text-gray-600 max-w-3xl mx-auto">
-              Tudo que você precisa saber para usar o F-Flow Suite de forma eficiente. 
+              Tudo que você precisa saber para usar o sistema da 2F Solutions de forma eficiente. 
               Guias, tutoriais e documentação completa.
             </p>
           </div>
@@ -182,7 +182,7 @@ const DocsPage = () => {
               Primeiros Passos
             </h2>
             <p className="mt-4 text-lg text-gray-600">
-              Siga este roteiro para começar a usar o F-Flow Suite
+              Siga este roteiro para começar a usar o sistema da 2F Solutions
             </p>
           </div>
 
@@ -210,7 +210,7 @@ const DocsPage = () => {
                   Instale o Sistema
                 </h3>
                 <p className="text-gray-600">
-                  Baixe e instale o F-Flow Suite seguindo nosso guia de instalação.
+                  Baixe e instale o sistema da 2F Solutions seguindo nosso guia de instalação.
                 </p>
               </div>
             </div>

@@ -98,7 +98,7 @@ const FeaturesPage = () => {
               Recursos para Comércios
             </h1>
             <p className="mt-6 text-lg leading-8 text-gray-600 max-w-3xl mx-auto">
-              Descubra as funcionalidades essenciais do F-Flow Suite para a gestão 
+              Descubra as funcionalidades essenciais da 2F Solutions para a gestão 
               do seu comércio.
             </p>
           </div>
@@ -189,7 +189,7 @@ const FeaturesPage = () => {
               Pronto para experimentar?
             </h2>
             <p className="mt-4 text-lg text-primary-100">
-              Teste gratuitamente por 30 dias e veja como o F-Flow Suite 
+              Teste gratuitamente por 30 dias e veja como a 2F Solutions 
               pode transformar seu negócio.
             </p>
             <div className="mt-8">

@@ -28,7 +28,7 @@ const PricingPage = () => {
       name: 'Básico',
       price: 19.99,
       currency: 'BRL',
-      description: 'Ideal para pet shops pequenos',
+      description: 'Ideal para comércios pequenos',
       maxSeats: 2,
       maxDevices: 1,
       featuresEnabled: JSON.stringify([
@@ -48,7 +48,7 @@ const PricingPage = () => {
       name: 'Profissional',
       price: 59.99,
       currency: 'BRL',
-      description: 'Para pet shops em crescimento',
+      description: 'Para comércios em crescimento',
       maxSeats: 5,
       maxDevices: 2,
       featuresEnabled: JSON.stringify([
