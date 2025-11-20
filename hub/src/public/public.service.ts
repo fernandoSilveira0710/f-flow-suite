@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { PlansService } from '../plans/plans.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
@@ -16,6 +16,8 @@ export class PublicService {
     private readonly jwtService: JwtService,
     private readonly mailer: MailerService,
   ) {}
+
+  private readonly logger = new Logger(PublicService.name);
 
   async registerTenant(registerTenantDto: RegisterTenantDto) {
     const { name, email, password, planId } = registerTenantDto;
@@ -83,6 +85,7 @@ export class PublicService {
     }
 
     // Fire-and-forget welcome email (non-blocking)
+    this.logger.log(`[PublicService] Cadastro concluído. Agendando envio de boas-vindas para ${email} (tenantId=${result.tenant.id}).`);
     this.mailer
       .sendWelcomeEmail({
         to: email,
@@ -93,7 +96,12 @@ export class PublicService {
         planPrice,
         planCurrency,
       })
-      .catch(() => {});
+      .then(() => {
+        this.logger.log(`[PublicService] Envio de boas-vindas disparado para ${email}.`);
+      })
+      .catch((err) => {
+        this.logger.error('[PublicService] Falha ao disparar email de boas-vindas', err as any);
+      });
 
     return {
       message: 'Tenant registered successfully',

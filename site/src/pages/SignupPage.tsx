@@ -118,8 +118,33 @@ const SignupPage = () => {
       })
 
       if (!registerResponse.ok) {
-        const errorData = await registerResponse.json()
-        throw new Error(errorData.message || 'Erro ao criar conta')
+        let errMsg = 'Não foi possível criar a conta. Tente novamente.'
+        let serverMsg = ''
+        try {
+          const errorData = await registerResponse.json()
+          serverMsg = errorData?.message || ''
+        } catch {
+          // ignore JSON parse errors
+        }
+
+        switch (registerResponse.status) {
+          case 409:
+            errMsg = 'Este e-mail já está cadastrado. Se você já criou a conta, faça login no aplicativo após a instalação ou recupere a senha. Se não reconhece este cadastro, fale com nosso suporte.'
+            break
+          case 400:
+          case 422:
+            errMsg = 'Dados inválidos. Verifique os campos e tente novamente.'
+            break
+          case 401:
+          case 403:
+            errMsg = 'Permissão negada. Verifique suas credenciais e tente novamente.'
+            break
+          default:
+            // Se o servidor trouxe uma mensagem útil, aproveitamos; caso contrário, mantemos uma genérica em pt-BR
+            errMsg = serverMsg ? `Erro: ${serverMsg}` : 'Erro no servidor. Tente novamente em alguns minutos.'
+        }
+
+        throw new Error(errMsg)
       }
 
       const registerData = await registerResponse.json()
@@ -231,6 +256,9 @@ Você será redirecionado para a página de instalação.`)
                   {error && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                       <p className="text-red-800 text-sm">{error}</p>
+                      <p className="text-red-700 text-xs mt-2">
+                        Precisa de ajuda? Entre em contato: <a href="mailto:suporte@fflowsuite.com" className="underline">suporte@fflowsuite.com</a>
+                      </p>
                     </div>
                   )}
 

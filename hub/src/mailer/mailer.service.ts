@@ -46,6 +46,8 @@ export class MailerService {
     const subject = 'Bem-vindo ao F-Flow Suite - Download e detalhes da conta';
     const html = this.renderWelcomeTemplate({ ...data, downloadUrl });
 
+    this.logger.log(`[Mailer] Preparando envio de boas-vindas: to=${data.to} tenantId=${data.tenantId} provider=${this.provider} from=${this.fromEmail}`);
+
     await this.send({ to: data.to, subject, html });
   }
 
@@ -95,7 +97,11 @@ export class MailerService {
       this.logger.warn('[Mailer] RESEND_API_KEY não definido. Email não foi enviado.');
       return;
     }
-    try {
+    const fallbackFrom = 'onboarding@resend.dev';
+    const primaryFrom = this.fromEmail;
+
+    const sendWithFrom = async (fromAddr: string) => {
+      this.logger.log(`[Mailer] Resend: tentando envio. from=${fromAddr} to=${payload.to}`);
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -103,17 +109,46 @@ export class MailerService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: this.fromEmail,
+          from: fromAddr,
           to: payload.to,
           subject: payload.subject,
           html: payload.html,
         }),
       });
-      if (!res.ok) {
-        const text = await res.text();
-        this.logger.error(`[Mailer] Falha ao enviar via Resend: ${res.status} - ${text}`);
-      } else {
-        this.logger.log('[Mailer] Email enviado via Resend.');
+      return res;
+    };
+
+    try {
+      // Primeiro tenta com MAIL_FROM
+      const resPrimary = await sendWithFrom(primaryFrom);
+      if (resPrimary.ok) {
+        let id: string | undefined;
+        try {
+          const json = await resPrimary.json();
+          id = json?.id;
+        } catch {}
+        this.logger.log(`[Mailer] Email enviado via Resend com sucesso${id ? ` (id=${id})` : ''}. to=${payload.to} from=${primaryFrom}`);
+        return;
+      }
+
+      const primaryText = await resPrimary.text();
+      this.logger.error(`[Mailer] Falha ao enviar via Resend com from=${primaryFrom}: status=${resPrimary.status} response=${primaryText}`);
+
+      // Se falhou e não estamos usando o domínio padrão, tenta fallback
+      if (primaryFrom.toLowerCase() !== fallbackFrom) {
+        this.logger.warn(`[Mailer] Tentando fallback de remetente via Resend: from=${fallbackFrom}`);
+        const resFallback = await sendWithFrom(fallbackFrom);
+        if (resFallback.ok) {
+          let fid: string | undefined;
+          try {
+            const json = await resFallback.json();
+            fid = json?.id;
+          } catch {}
+          this.logger.log(`[Mailer] Fallback bem-sucedido via Resend${fid ? ` (id=${fid})` : ''}. to=${payload.to} from=${fallbackFrom}`);
+          return;
+        }
+        const fbText = await resFallback.text();
+        this.logger.error(`[Mailer] Fallback falhou via Resend: status=${resFallback.status} response=${fbText}`);
       }
     } catch (err) {
       this.logger.error('[Mailer] Erro ao enviar via Resend', err as any);
