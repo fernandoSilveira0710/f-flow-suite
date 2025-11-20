@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -193,7 +194,30 @@ async function main() {
     });
   }
 
+  // Criar/atualizar usuário de teste
+  const testEmail = 'teste@teste3.com';
+  const testPasswordPlain = 'SIM';
+  const existingTestUser = await prisma.user.findFirst({ where: { email: testEmail } });
+  const hashed = await bcrypt.hash(testPasswordPlain, 10);
+  if (existingTestUser) {
+    await prisma.user.update({
+      where: { id: existingTestUser.id },
+      data: { password: hashed, active: true, tenantId: tenant.id },
+    });
+  } else {
+    await prisma.user.create({
+      data: {
+        email: testEmail,
+        password: hashed,
+        displayName: 'Teste 3',
+        tenantId: tenant.id,
+        active: true,
+      },
+    });
+  }
+
   console.log('Seed concluído. tenant.slug=demo, tenant.id=', tenant.id);
+  console.log('Usuário de teste criado/atualizado:', testEmail, 'senha=SIM');
 }
 
 main()
