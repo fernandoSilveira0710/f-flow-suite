@@ -6,6 +6,7 @@ import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { MailerService } from '../mailer/mailer.service';
 
 @Injectable()
 export class PublicService {
@@ -13,6 +14,7 @@ export class PublicService {
     private readonly prisma: PrismaService,
     private readonly plansService: PlansService,
     private readonly jwtService: JwtService,
+    private readonly mailer: MailerService,
   ) {}
 
   async registerTenant(registerTenantDto: RegisterTenantDto) {
@@ -67,6 +69,31 @@ export class PublicService {
 
       return { tenant, user };
     });
+    // Try to enrich email with plan details
+    let planName: string | undefined;
+    let planPrice: number | undefined;
+    let planCurrency: string | undefined;
+    if (planId) {
+      try {
+        const plan = await this.plansService.findPlanById(planId);
+        planName = plan?.name;
+        planPrice = (plan as any)?.price;
+        planCurrency = (plan as any)?.currency || 'BRL';
+      } catch {}
+    }
+
+    // Fire-and-forget welcome email (non-blocking)
+    this.mailer
+      .sendWelcomeEmail({
+        to: email,
+        name: name || email.split('@')[0],
+        email,
+        tenantId: result.tenant.id,
+        planName,
+        planPrice,
+        planCurrency,
+      })
+      .catch(() => {});
 
     return {
       message: 'Tenant registered successfully',

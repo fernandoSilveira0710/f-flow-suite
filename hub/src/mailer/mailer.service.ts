@@ -1,0 +1,136 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
+interface SendEmailPayload {
+  to: string;
+  subject: string;
+  html: string;
+}
+
+interface WelcomeEmailData {
+  to: string;
+  name: string;
+  email: string;
+  tenantId: string;
+  planName?: string;
+  planPrice?: number;
+  planCurrency?: string;
+  downloadUrl?: string;
+}
+
+@Injectable()
+export class MailerService {
+  private readonly logger = new Logger(MailerService.name);
+  private readonly enabled: boolean;
+  private readonly provider: 'resend' | 'none';
+  private readonly fromEmail: string;
+  private readonly resendApiKey?: string;
+  private readonly defaultDownloadUrl?: string;
+
+  constructor(private readonly config: ConfigService) {
+    this.enabled = this.config.get<boolean>('MAIL_ENABLE') ?? false;
+    const provider = (this.config.get<string>('MAIL_PROVIDER') || 'none').toLowerCase();
+    this.provider = provider === 'resend' ? 'resend' : 'none';
+    this.fromEmail = this.config.get<string>('MAIL_FROM') || 'no-reply@fflow.local';
+    this.resendApiKey = this.config.get<string>('RESEND_API_KEY');
+    this.defaultDownloadUrl = this.config.get<string>('DOWNLOAD_URL');
+  }
+
+  async sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
+    if (!this.enabled) {
+      this.logger.log('[Mailer] MAIL_ENABLE=false, pulando envio de email.');
+      return;
+    }
+
+    const downloadUrl = data.downloadUrl || this.defaultDownloadUrl;
+    const subject = 'Bem-vindo ao F-Flow Suite - Download e detalhes da conta';
+    const html = this.renderWelcomeTemplate({ ...data, downloadUrl });
+
+    await this.send({ to: data.to, subject, html });
+  }
+
+  private renderWelcomeTemplate(data: WelcomeEmailData): string {
+    const priceText = data.planPrice && data.planCurrency
+      ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: data.planCurrency }).format(data.planPrice)
+      : undefined;
+
+    return `
+      <div style="font-family:Arial, Helvetica, sans-serif; color:#111;">
+        <h2>Olá, ${escapeHtml(data.name || data.email)}!</h2>
+        <p>Seu cadastro no <strong>F-Flow Suite</strong> foi concluído com sucesso.</p>
+        <h3>Detalhes da Conta</h3>
+        <ul>
+          <li><strong>Email:</strong> ${escapeHtml(data.email)}</li>
+          <li><strong>Tenant ID:</strong> ${escapeHtml(data.tenantId)}</li>
+          ${data.planName ? `<li><strong>Plano:</strong> ${escapeHtml(data.planName)}${priceText ? ` (${priceText}/mês)` : ''}</li>` : ''}
+        </ul>
+        ${data.downloadUrl ? `
+        <p>
+          Baixe o sistema desktop pelo link abaixo:
+        </p>
+        <p>
+          <a href="${escapeAttr(data.downloadUrl)}" style="display:inline-block;padding:10px 16px;background:#0ea5e9;color:#fff;text-decoration:none;border-radius:6px;">Baixar F-Flow Client</a>
+        </p>
+        <p>Se o botão não funcionar, copie e cole este link no navegador:<br />
+          <code>${escapeHtml(data.downloadUrl)}</code>
+        </p>
+        ` : ''}
+        <hr />
+        <p style="font-size:12px;color:#555;">Este email foi enviado automaticamente. Não responda.</p>
+      </div>
+    `;
+  }
+
+  private async send(payload: SendEmailPayload): Promise<void> {
+    if (this.provider === 'resend') {
+      await this.sendViaResend(payload);
+      return;
+    }
+
+    this.logger.warn('[Mailer] Nenhum provider configurado (MAIL_PROVIDER=none). Email não foi enviado.');
+  }
+
+  private async sendViaResend(payload: SendEmailPayload): Promise<void> {
+    if (!this.resendApiKey) {
+      this.logger.warn('[Mailer] RESEND_API_KEY não definido. Email não foi enviado.');
+      return;
+    }
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: this.fromEmail,
+          to: payload.to,
+          subject: payload.subject,
+          html: payload.html,
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        this.logger.error(`[Mailer] Falha ao enviar via Resend: ${res.status} - ${text}`);
+      } else {
+        this.logger.log('[Mailer] Email enviado via Resend.');
+      }
+    } catch (err) {
+      this.logger.error('[Mailer] Erro ao enviar via Resend', err as any);
+    }
+  }
+}
+
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function escapeAttr(input: string): string {
+  // basic attribute escaping
+  return escapeHtml(input).replace(/`/g, '&#x60;');
+}
