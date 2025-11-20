@@ -26,7 +26,7 @@ async function main() {
     create: {
       id: 'starter',
       name: 'Básico',
-      description: 'Ideal para pet shops pequenos',
+      description: 'Ideal para comércios pequenos',
       price: 19.99,
       currency: 'BRL',
       maxSeats: 2,
@@ -49,7 +49,7 @@ async function main() {
     create: {
       id: 'pro',
       name: 'Profissional',
-      description: 'Para pet shops em crescimento',
+      description: 'Para comércios em crescimento',
       price: 59.99,
       currency: 'BRL',
       maxSeats: 5,
