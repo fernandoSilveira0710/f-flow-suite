@@ -2,12 +2,11 @@ import Header from '../components/Header'
 import Footer from '../components/Footer'
 import { Link } from 'react-router-dom'
 import { 
-  Calendar, 
   ShoppingCart, 
-  BarChart3, 
   Users, 
   Package, 
   Smartphone,
+  Shield,
   CheckCircle,
   ArrowRight
 } from 'lucide-react'
@@ -15,34 +14,34 @@ import {
 const HomePage = () => {
   const features = [
     {
-      icon: Calendar,
-      title: 'Agendamento Inteligente',
-      description: 'Sistema completo de agendamentos com notificações automáticas e gestão de horários.'
-    },
-    {
       icon: ShoppingCart,
-      title: 'PDV Integrado',
-      description: 'Ponto de venda completo com controle de estoque e relatórios de vendas em tempo real.'
+      title: 'PDV Básico',
+      description: 'Ponto de venda simples para operações do dia a dia.'
     },
     {
       icon: Package,
       title: 'Gestão de Estoque',
-      description: 'Controle total do seu estoque com alertas de produtos em falta e relatórios detalhados.'
+      description: 'Controle de produtos, entradas e saídas, com alertas de estoque baixo.'
+    },
+    {
+      icon: Package,
+      title: 'Produtos e Categorias',
+      description: 'Organize seu catálogo com cadastro de produtos e categorias.'
     },
     {
       icon: Users,
-      title: 'CRM Completo',
-      description: 'Gerencie clientes e pets com histórico completo de atendimentos e preferências.'
-    },
-    {
-      icon: BarChart3,
-      title: 'Relatórios Avançados',
-      description: 'Dashboard com métricas importantes e relatórios personalizáveis para seu negócio.'
+      title: 'Clientes (Básico)',
+      description: 'Cadastro simples de clientes para vendas e histórico básico.'
     },
     {
       icon: Smartphone,
-      title: 'Acesso Mobile',
-      description: 'Interface responsiva que funciona perfeitamente em qualquer dispositivo.'
+      title: 'Interface Responsiva',
+      description: 'Funciona bem em diferentes tamanhos de tela.'
+    },
+    {
+      icon: Shield,
+      title: 'Instalação Local e Offline',
+      description: 'Dados no seu computador e funcionamento sem internet após instalação.'
     }
   ]
 
@@ -64,22 +63,20 @@ const HomePage = () => {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
-              Sistema Completo para
-              <span className="text-primary-600"> Pet Shops</span>
+              Sistema de Gestão para
+              <span className="text-primary-600"> Comércios</span>
             </h1>
             <p className="mt-6 text-lg leading-8 text-gray-600 max-w-3xl mx-auto">
-              Gerencie agendamentos, vendas, estoque e clientes em uma única plataforma. 
-              Solução completa e offline para o seu negócio crescer.
+              Gerencie vendas, estoque e clientes em uma única plataforma. 
+              Solução local e offline, simples e direta para o seu negócio.
             </p>
             <div className="mt-10 flex items-center justify-center gap-x-6">
-              <a
-                href={`${import.meta.env.VITE_SITE_URL}/planos`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                to="/precos"
                 className="btn-primary px-8 py-3 text-lg"
               >
                 Começar Agora
-              </a>
+              </Link>
               <Link
                 to="/recursos"
                 className="btn-outline px-8 py-3 text-lg"
@@ -146,17 +143,15 @@ const HomePage = () => {
               </h3>
               <p className="text-gray-600 mb-6">
                 Experimente gratuitamente por 30 dias e veja como o F-Flow Suite 
-                pode transformar a gestão do seu pet shop.
+                pode transformar a gestão do seu comércio.
               </p>
               <div className="space-y-4">
-                <a
-                  href={`${import.meta.env.VITE_SITE_URL}/planos`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  to="/precos"
                   className="btn-primary w-full text-center py-3"
                 >
                   Começar Teste Gratuito
-                </a>
+                </Link>
                 <Link
                   to="/docs/instalacao"
                   className="btn-outline w-full text-center py-3"

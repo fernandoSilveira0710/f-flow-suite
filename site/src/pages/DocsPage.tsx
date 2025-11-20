@@ -40,13 +40,13 @@ const DocsPage = () => {
     {
       icon: Book,
       title: 'Manual do Usuário',
-      description: 'Aprenda a usar todas as funcionalidades do sistema',
+      description: 'Aprenda a usar as funcionalidades disponíveis no sistema',
       link: '#manual',
       items: [
-        'Cadastro de clientes',
-        'Agendamentos',
-        'Ponto de venda',
-        'Relatórios'
+        'Cadastro de produtos e categorias',
+        'Ponto de venda (básico)',
+        'Gestão de estoque',
+        'Clientes (básico)'
       ]
     },
     {
@@ -238,7 +238,7 @@ const DocsPage = () => {
                   Comece a Usar
                 </h3>
                 <p className="text-gray-600">
-                  Cadastre seus primeiros clientes e comece a agendar atendimentos.
+                  Cadastre seus primeiros clientes e comece a registrar vendas.
                 </p>
               </div>
             </div>

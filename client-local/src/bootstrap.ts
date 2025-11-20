@@ -54,9 +54,20 @@ function setupDatabase(dataDir: string): string {
   
   // Copy seed database if running as binary and database doesn't exist
   if ((process as any).pkg && !existsSync(dbPath)) {
-    const seedDbPath = join(dirname(process.execPath), 'seed.db');
-    if (existsSync(seedDbPath)) {
-      copyFileSync(seedDbPath, dbPath);
+    // Try multiple candidate locations depending on how Electron packaged resources
+    const candidates = [
+      // Adjacent to exe
+      join(dirname(process.execPath), 'seed.db'),
+      // Inside resources root
+      join(dirname(process.execPath), 'resources', 'seed.db'),
+      // Inside resources/prisma
+      join(dirname(process.execPath), 'resources', 'prisma', 'seed.db'),
+    ];
+    for (const p of candidates) {
+      if (existsSync(p)) {
+        copyFileSync(p, dbPath);
+        break;
+      }
     }
   }
   
@@ -73,6 +84,8 @@ async function runMigrations(): Promise<void> {
     join(clientRoot, '..', 'prisma', 'migrations'),
     // Repositório: client-local\prisma\migrations
     join(clientRoot, 'prisma', 'migrations'),
+    // Electron resources: {ExeDir}\resources\prisma\migrations
+    join(dirname(process.execPath), 'resources', 'prisma', 'migrations'),
   ];
 
   for (const root of candidateRoots) {

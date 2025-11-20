@@ -32,7 +32,9 @@
     "extraResources": [
       { "from": "../client-local/dist", "to": "client-local/dist" },
       { "from": "../dist", "to": "erp-dist" },
-      { "from": "../client-local/node_modules", "to": "client-local/node_modules" }
+      { "from": "../client-local/node_modules", "to": "client-local/node_modules" },
+      { "from": "../client-local/prisma/migrations", "to": "prisma/migrations" },
+      { "from": "../client-local/prisma/prisma/seed.db", "to": "seed.db" }
     ],
     "win": {
       "target": [

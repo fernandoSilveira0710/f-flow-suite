@@ -44,14 +44,12 @@ const Header = () => {
                 {item.name}
               </Link>
             ))}
-            <a
-              href={`${import.meta.env.VITE_SITE_URL}/planos`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to="/precos"
               className="btn-primary px-4 py-2"
             >
               Começar Agora
-            </a>
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -85,14 +83,13 @@ const Header = () => {
                 </Link>
               ))}
               <div className="px-3 py-2">
-                <a
-                  href={`${import.meta.env.VITE_SITE_URL}/planos`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  to="/precos"
                   className="btn-primary px-4 py-2 w-full text-center"
+                  onClick={() => setIsMenuOpen(false)}
                 >
                   Começar Agora
-                </a>
+                </Link>
               </div>
             </div>
           </div>
