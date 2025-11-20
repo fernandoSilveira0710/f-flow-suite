@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
@@ -7,7 +7,7 @@ import { Check, Package2, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 const SignupPage = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const selectedPlan = searchParams.get('plan') || 'basico'
+  const selectedPlanParam = (searchParams.get('plan') || '').toLowerCase()
   
   const [formData, setFormData] = useState({
     name: '',
@@ -15,63 +15,86 @@ const SignupPage = () => {
     company: '',
     phone: '',
     password: '',
-    plan: selectedPlan
+    // armazenar o planId vindo do HUB
+    plan: ''
   })
 
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const plans = {
-    basico: {
-      name: 'Básico',
-      price: 'R$ 19,99',
-      period: '/mês',
-      planKey: 'starter',
-      features: [
-        'Até 2 usuários',
-        'Agendamento básico',
-        'PDV simples',
-        'Controle de estoque',
-        'Relatórios básicos',
-        'Suporte por email'
-      ]
-    },
-    profissional: {
-      name: 'Profissional',
-      price: 'R$ 59,99',
-      period: '/mês',
-      planKey: 'pro',
-      features: [
-        'Até 5 usuários',
-        'Agendamento avançado',
-        'PDV completo',
-        'Gestão de estoque avançada',
-        'CRM completo',
-        'Relatórios avançados',
-        'Notificações automáticas',
-        'Suporte prioritário'
-      ]
-    },
-    enterprise: {
-      name: 'Enterprise',
-      price: 'R$ 99,99',
-      period: '/mês',
-      planKey: 'max',
-      features: [
-        'Usuários ilimitados',
-        'Todos os recursos',
-        'Multi-loja',
-        'API personalizada',
-        'Relatórios personalizados',
-        'Treinamento incluído',
-        'Suporte 24/7',
-        'Gerente de conta dedicado'
-      ]
+  type HubPlan = {
+    id: string
+    name: string
+    description?: string | null
+    price: number
+    currency: string
+    maxSeats: number
+    maxDevices: number
+    featuresEnabled: Record<string, any> | string
+    active: boolean
+    createdAt: string
+    updatedAt: string
+  }
+
+  const [hubPlans, setHubPlans] = useState<HubPlan[]>([])
+  const [loadingPlans, setLoadingPlans] = useState<boolean>(false)
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      setLoadingPlans(true)
+      try {
+        const res = await fetch(`${import.meta.env.VITE_HUB_API_URL}/public/plans?active=true`)
+        if (!res.ok) throw new Error('Falha ao carregar planos do HUB')
+        const data: HubPlan[] = await res.json()
+        setHubPlans(data)
+        // Seleção inicial: usar query param (basico/profissional/enterprise) se bater com nome, senão primeiro plano
+        const byParam = data.find(p => p.name.toLowerCase().includes(selectedPlanParam))
+        const defaultPlanId = (byParam || data[0])?.id || ''
+        setFormData(prev => ({ ...prev, plan: defaultPlanId }))
+      } catch (err) {
+        console.error('Erro ao buscar planos do HUB:', err)
+      } finally {
+        setLoadingPlans(false)
+      }
+    }
+    fetchPlans()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const currentPlan: HubPlan | undefined = useMemo(() => {
+    return hubPlans.find(p => p.id === formData.plan)
+  }, [hubPlans, formData.plan])
+
+  const formatPrice = (price: number, currency: string) => {
+    try {
+      const formatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: currency || 'BRL' })
+      return formatter.format(price)
+    } catch {
+      return `R$ ${price.toFixed(2)}`
     }
   }
 
-  const currentPlan = plans[formData.plan as keyof typeof plans]
+  const planFeatures = useMemo(() => {
+    if (!currentPlan) return [] as string[]
+    const fe = currentPlan.featuresEnabled
+    try {
+      const parsed = typeof fe === 'string' ? JSON.parse(fe) : fe
+      if (Array.isArray(parsed)) {
+        return parsed as string[]
+      }
+      if (parsed && typeof parsed === 'object') {
+        // mostrar chaves com valor truthy como lista de recursos
+        return Object.keys(parsed).filter(k => Boolean((parsed as any)[k])).map(k => k.replace(/_/g, ' '))
+      }
+    } catch {
+      // fallback: usar description quebrada por linhas
+    }
+    if (currentPlan.description) {
+      return currentPlan.description.split(/\r?\n/).filter(Boolean)
+    }
+    return []
+  }, [currentPlan])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,7 +112,8 @@ const SignupPage = () => {
           name: formData.name,
           email: formData.email,
           password: formData.password,
-          planId: currentPlan.planKey
+          // enviar o planId do HUB
+          planId: formData.plan
         }),
       })
 
@@ -111,7 +135,14 @@ const SignupPage = () => {
           name: formData.name,
           email: formData.email,
           cpf: '000.000.000-00', // CPF fictício para teste gratuito
-          planKey: currentPlan.planKey,
+          // tentativa de mapear planKey a partir do nome, fallback starter
+          planKey: (() => {
+            const n = (currentPlan?.name || '').toLowerCase()
+            if (n.includes('básico') || n.includes('starter')) return 'starter'
+            if (n.includes('profissional') || n.includes('pro')) return 'pro'
+            if (n.includes('enterprise') || n.includes('max')) return 'max'
+            return 'starter'
+          })(),
           paymentId: 'FREE_TRIAL_' + Date.now() // ID fictício para teste gratuito
         }),
       })
@@ -128,7 +159,7 @@ const SignupPage = () => {
 
 📧 Email: ${formData.email}
 🏢 Empresa: ${formData.company}
-📦 Plano: ${currentPlan.name}
+📦 Plano: ${currentPlan?.name || 'N/D'}
 
 ✅ Teste gratuito de 30 dias ativado
 📥 Em breve você receberá um email com as instruções para download
@@ -314,9 +345,12 @@ Você será redirecionado para a página de instalação.`)
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       disabled={isLoading}
                     >
-                      <option value="basico">Básico - R$ 19,99/mês</option>
-                      <option value="profissional">Profissional - R$ 59,99/mês</option>
-                      <option value="enterprise">Enterprise - R$ 99,99/mês</option>
+                      {loadingPlans && <option>Carregando planos...</option>}
+                      {!loadingPlans && hubPlans.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} - {formatPrice(p.price, p.currency)}/mês
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -345,16 +379,19 @@ Você será redirecionado para a página de instalação.`)
                 
                 <div className="bg-white rounded-lg p-6 border border-gray-200 mb-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-gray-900">{currentPlan.name}</h4>
+                    <h4 className="text-lg font-semibold text-gray-900">{currentPlan?.name || 'Selecione um plano'}</h4>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-primary-600">{currentPlan.price}</div>
-                      <div className="text-sm text-gray-600">{currentPlan.period}</div>
+                      <div className="text-2xl font-bold text-primary-600">{currentPlan ? formatPrice(currentPlan.price, currentPlan.currency) : '-'}</div>
+                      <div className="text-sm text-gray-600">/mês</div>
                     </div>
                   </div>
                   
                   <div className="space-y-3">
                     <h5 className="font-medium text-gray-900">Recursos inclusos:</h5>
-                    {currentPlan.features.map((feature, index) => (
+                    {(!currentPlan || planFeatures.length === 0) && (
+                      <div className="text-gray-600 text-sm">Selecione um plano para ver os recursos.</div>
+                    )}
+                    {currentPlan && planFeatures.map((feature, index) => (
                       <div key={index} className="flex items-start">
                         <Check className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
                         <span className="text-gray-700">{feature}</span>
