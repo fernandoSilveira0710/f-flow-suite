@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
+import { Link } from 'react-router-dom'
 import { Check, Star } from 'lucide-react'
 
 interface HubPlan {
@@ -236,8 +237,8 @@ const PricingPage = () => {
                 </ul>
 
                 <div className="text-center">
-                  <a
-                    href={plan.cta === 'Começar Teste' ? '/cadastro' : '/contato'}
+                  <Link
+                    to={plan.cta === 'Começar Teste' ? '/cadastro' : '/contato'}
                     className={`w-full py-3 px-6 rounded-lg font-semibold transition-colors inline-block ${
                       plan.popular
                         ? 'bg-primary-600 text-white hover:bg-primary-700'
@@ -245,7 +246,7 @@ const PricingPage = () => {
                     }`}
                   >
                     {plan.cta}
-                  </a>
+                  </Link>
                 </div>
               </div>
             ))}
@@ -327,12 +328,12 @@ const PricingPage = () => {
               Experimente gratuitamente por 30 dias. Sem compromisso, sem cartão de crédito.
             </p>
             <div className="mt-8">
-              <a
-                href="/cadastro"
+              <Link
+                to="/cadastro"
                 className="bg-white text-primary-600 hover:bg-gray-50 px-8 py-3 rounded-md font-semibold text-lg transition-colors"
               >
                 Começar Teste Gratuito
-              </a>
+              </Link>
             </div>
           </div>
         </div>

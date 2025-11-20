@@ -6,7 +6,7 @@ import Footer from '../components/Footer'
 const NotFoundPage = () => {
   const popularPages = [
     { name: 'Página Inicial', path: '/' },
-    { name: 'Funcionalidades', path: '/funcionalidades' },
+    { name: 'Recursos', path: '/recursos' },
     { name: 'Preços', path: '/precos' },
     { name: 'Documentação', path: '/docs' },
     { name: 'Instalação', path: '/docs/instalacao' },
