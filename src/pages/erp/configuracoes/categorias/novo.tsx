@@ -8,21 +8,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Form, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { mockAPI, UnitOfMeasure } from '@/lib/mock-data';
+import { Category, fetchCategory, createCategory, updateCategory } from '@/lib/categories-api';
+import { toast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Nome deve conter ao menos 2 caracteres'),
-  abbreviation: z.string().min(1, 'Informe a abreviação').max(6, 'Máximo 6 caracteres'),
-  type: z.enum(['weight', 'volume', 'unit', 'length']),
+  description: z.string().optional(),
   active: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function NovaUnidade() {
+export default function NovaCategoria() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [loadingItem, setLoadingItem] = useState<boolean>(false);
@@ -32,8 +31,7 @@ export default function NovaUnidade() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
-      abbreviation: '',
-      type: 'unit',
+      description: '',
       active: true,
     },
   });
@@ -43,16 +41,18 @@ export default function NovaUnidade() {
       if (!id) return;
       setLoadingItem(true);
       try {
-        const unit = mockAPI.getUnitOfMeasure(id);
-        if (unit) {
+        const category = await fetchCategory(id);
+        if (category) {
           form.reset({
-            name: unit.name,
-            abbreviation: unit.abbreviation,
-            type: unit.type,
-            active: unit.active,
+            name: category.name,
+            description: category.description || '',
+            active: category.active,
           });
-          setLoadedName(unit.name);
+          setLoadedName(category.name);
         }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        toast({ title: 'Erro ao carregar categoria', description: message, variant: 'destructive' });
       } finally {
         setLoadingItem(false);
       }
@@ -62,12 +62,19 @@ export default function NovaUnidade() {
   }, [id]);
 
   const onSubmit = async (values: FormValues) => {
-    if (id) {
-      mockAPI.updateUnitOfMeasure(id, values as Partial<UnitOfMeasure>);
-    } else {
-      mockAPI.createUnitOfMeasure(values as Omit<UnitOfMeasure, 'id'>);
+    try {
+      if (id) {
+        await updateCategory(id, values as Partial<Category>);
+        toast({ title: 'Categoria atualizada', description: `"${values.name}" foi atualizada.` });
+      } else {
+        await createCategory(values);
+        toast({ title: 'Categoria criada', description: `"${values.name}" foi criada.` });
+      }
+      navigate('/erp/settings/categories');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast({ title: id ? 'Erro ao atualizar' : 'Erro ao criar', description: message, variant: 'destructive' });
     }
-    navigate('/erp/settings/units');
   };
 
   const isEditing = Boolean(id);
@@ -75,14 +82,14 @@ export default function NovaUnidade() {
   return (
     <div>
       <PageHeader
-        title={isEditing ? 'Editar Unidade de Medida' : 'Nova Unidade de Medida'}
-        description={isEditing ? `Atualize os dados de "${loadedName ?? ''}"` : 'Cadastre uma nova unidade de medida'}
+        title={isEditing ? 'Editar Categoria' : 'Nova Categoria'}
+        description={isEditing ? `Atualize os dados de "${loadedName ?? ''}"` : 'Cadastre uma nova categoria'}
       />
 
       <Card>
         <CardContent className="p-6">
           {loadingItem ? (
-            <div className="text-sm text-muted-foreground">Carregando unidade...</div>
+            <div className="text-sm text-muted-foreground">Carregando categoria...</div>
           ) : (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -93,7 +100,7 @@ export default function NovaUnidade() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Nome</FormLabel>
-                        <Input placeholder="Ex.: Quilograma" {...field} />
+                        <Input placeholder="Ex.: Higiene" {...field} />
                         <FormMessage />
                       </FormItem>
                     )}
@@ -101,33 +108,11 @@ export default function NovaUnidade() {
 
                   <FormField
                     control={form.control}
-                    name="abbreviation"
+                    name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Abreviação</FormLabel>
-                        <Input placeholder="Ex.: kg" {...field} />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Tipo</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione o tipo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="weight">Peso</SelectItem>
-                            <SelectItem value="volume">Volume</SelectItem>
-                            <SelectItem value="unit">Unidade</SelectItem>
-                            <SelectItem value="length">Comprimento</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>Descrição</FormLabel>
+                        <Input placeholder="Opcional" {...field} />
                         <FormMessage />
                       </FormItem>
                     )}
@@ -150,8 +135,8 @@ export default function NovaUnidade() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <Button type="submit">{isEditing ? 'Salvar Alterações' : 'Criar Unidade'}</Button>
-                  <Button type="button" variant="outline" onClick={() => navigate('/erp/settings/units')}>Cancelar</Button>
+                  <Button type="submit">{isEditing ? 'Salvar Alterações' : 'Criar Categoria'}</Button>
+                  <Button type="button" variant="outline" onClick={() => navigate('/erp/settings/categories')}>Cancelar</Button>
                 </div>
               </form>
             </Form>

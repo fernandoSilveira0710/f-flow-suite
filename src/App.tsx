@@ -81,6 +81,8 @@ import NovoPagamento from "./pages/erp/configuracoes/pagamentos/novo";
 import PaymentsIndex from "./pages/erp/configuracoes/pagamentos/index";
 import NovaUnidade from "./pages/erp/configuracoes/unidades/novo";
 import UnitsIndex from "./pages/erp/configuracoes/unidades/index";
+import NovaCategoria from "./pages/erp/configuracoes/categorias/novo";
+import CategoriesIndex from "./pages/erp/configuracoes/categorias/index";
 import ConfiguracoesRedirect from "./pages/erp/configuracoes/index";
 import ConfiguracoesAlias from "./pages/erp/configuracoes/[...alias]";
 
@@ -250,6 +252,11 @@ function App() {
                   <Route path="units" element={<UnitsIndex />} />
                   <Route path="units/new" element={<NovaUnidade />} />
                   <Route path="units/:id/edit" element={<NovaUnidade />} />
+
+                  {/* Categories */}
+                  <Route path="categories" element={<CategoriesIndex />} />
+                  <Route path="categories/new" element={<NovaCategoria />} />
+                  <Route path="categories/:id/edit" element={<NovaCategoria />} />
             {/* Products (Settings) - removido */}
                   <Route path="notifications" element={<Navigate to="/erp/settings/organization" replace />} />
                 </Route>

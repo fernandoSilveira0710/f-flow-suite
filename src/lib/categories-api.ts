@@ -35,6 +35,12 @@ export async function fetchCategories(params?: { active?: 'all' | 'true' | 'fals
   return res.json();
 }
 
+export async function fetchCategory(id: string): Promise<Category> {
+  const res = await fetch(`${API_BASE_URL}/categories/${id}`);
+  if (!res.ok) throw new Error(`Erro ao obter categoria: ${res.status}`);
+  return res.json();
+}
+
 export async function createCategory(payload: CreateCategoryPayload): Promise<Category> {
   const res = await fetch(`${API_BASE_URL}/categories`, {
     method: 'POST',

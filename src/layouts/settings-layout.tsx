@@ -12,6 +12,7 @@ import {
   Calendar,
   Scissors,
   Package,
+  Tags,
   
   Upload,
   Wallet,
@@ -79,6 +80,12 @@ export default function SettingsLayout() {
       label: 'Unidades de Medida',
       icon: Package,
       path: '/erp/settings/units',
+      requiresPlan: null,
+    },
+    {
+      label: 'Categorias',
+      icon: Tags,
+      path: '/erp/settings/categories',
       requiresPlan: null,
     },
     {
