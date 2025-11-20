@@ -177,6 +177,49 @@ LICENSE_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-
 ```
 (O conteúdo da chave privada deve ser colado em uma única linha com `\n`.)
 
+### Deploy no Render com Neon (PostgreSQL)
+
+Este passo a passo prepara apenas o Hub para rodar no Render usando um banco Neon Postgres.
+
+1) Criar o banco no Neon
+- Acesse `https://neon.tech` e crie um projeto novo (Postgres 17, região próxima).
+- Copie a `Connection string` no formato: `postgresql://<user>:<password>@<host>:5432/<database>`.
+
+2) Ajustes no código do Hub
+- O arquivo `hub/prisma/schema.prisma` foi atualizado para `provider = "postgresql"`.
+- As migrações existentes são específicas de SQLite. Para a primeira implantação, use `db push` no Render para criar o schema diretamente no Postgres (sem rodar migrações antigas).
+
+3) Criar o serviço Web no Render
+- Tipo: `Web Service`.
+- Root directory: `hub`.
+- Build command:
+  - `npm ci && npm run build && npx prisma generate && npx prisma db push`
+- Start command:
+  - `node dist/main.js`
+- Health check path:
+  - `/health`
+
+4) Variáveis de ambiente no Render
+- `DATABASE_URL`: URL copiada do Neon.
+- `NODE_ENV`: `production`.
+- `PORT`: `3001` (o Hub escuta essa porta por padrão).
+- `LICENSING_ENFORCED`: `false` (opcional para facilitar a primeira subida; defina `true` quando tiver as chaves).
+- `LICENSE_PUBLIC_KEY_PEM`: chave pública em PEM (uma única linha com `\n`).
+- `OIDC_REQUIRED`: `false` (ligue apenas se já tiver OIDC configurado).
+
+5) Primeira implantação
+- Clique em Deploy; o step de build executa `prisma db push` e cria as tabelas no Neon.
+- Após subir, acesse a URL do serviço e valide `GET /health`.
+
+6) Migrações (opcional para o futuro)
+- Se quiser voltar a usar migrações com Postgres: apague as migrações antigas de SQLite e gere uma migração inicial nova com Postgres.
+- Localmente: `cd hub && npx prisma migrate dev --name init_postgres`.
+- No Render, troque o build step para `npx prisma migrate deploy` quando o diretório `hub/prisma/migrations` estiver com migrações de Postgres válidas.
+
+7) Observações
+- A aplicação já está pronta para Postgres; garanta que `DATABASE_URL` aponte para o Neon.
+- Se usar Docker no Render, adapte o `docker-entrypoint.sh` para `prisma db push` na primeira implantação, ou mantenha `migrate deploy` após regenerar migrações para Postgres.
+
 #### Coleção Postman
 Arquivos em `postman/`:
 - `F-Flow-Hub.postman_collection.json`
