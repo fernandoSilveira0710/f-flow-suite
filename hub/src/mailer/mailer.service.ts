@@ -232,12 +232,20 @@ export class MailerService {
         port,
         secure,
         auth: { user, pass },
+        // Evita ficar travado indefinidamente em conexões problemáticas
+        connectionTimeout: 10_000,
+        socketTimeout: 10_000,
       });
 
-      this.logger.log(`[Mailer] SMTP: tentando envio. host=${host} port=${port} secure=${secure} from=${this.fromEmail} to=${payload.to}`);
+      const fromAddress = this.fromEmail && this.fromEmail.includes('@') ? this.fromEmail : user || this.fromEmail;
+      if (!this.fromEmail.includes('@')) {
+        this.logger.warn(`[Mailer] MAIL_FROM parece inválido ('${this.fromEmail}'). Usando fallback do usuário SMTP: '${fromAddress}'.`);
+      }
+
+      this.logger.log(`[Mailer] SMTP: tentando envio. host=${host} port=${port} secure=${secure} from=${fromAddress} to=${payload.to}`);
 
       const info = await transporter.sendMail({
-        from: this.fromEmail,
+        from: fromAddress,
         to: payload.to,
         subject: payload.subject,
         html: payload.html,

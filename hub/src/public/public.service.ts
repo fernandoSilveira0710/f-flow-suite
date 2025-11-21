@@ -188,13 +188,17 @@ export class PublicService {
     const fromName = [firstName, lastName].filter(Boolean).join(' ').trim() || undefined;
 
     this.logger.log(`[PublicService] Recebida mensagem de contato de ${email}${fromName ? ` (${fromName})` : ''}.`);
-    await this.mailer.sendContactEmail({
-      fromName,
-      fromEmail: email,
-      phone,
-      subject,
-      message,
-    });
+    // Dispara envio de contato em background para não bloquear a resposta HTTP
+    this.mailer
+      .sendContactEmail({
+        fromName,
+        fromEmail: email,
+        phone,
+        subject,
+        message,
+      })
+      .then(() => this.logger.log(`[PublicService] Email de contato disparado para ${email}.`))
+      .catch((err) => this.logger.error('[PublicService] Falha ao disparar email de contato', err as any));
 
     return { status: 'ok' };
   }
