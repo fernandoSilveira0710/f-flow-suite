@@ -18,6 +18,9 @@ dist-ssr
 .env.development.local
 .env.test.local
 .env.production.local
+# Ignore all env files across subprojects (keep examples)
+**/.env*
+!**/.env.example
 
 # Editor directories and files
 .vscode/*
@@ -30,6 +33,16 @@ dist-ssr
 *.sln
 *.sw?
 hub/.env
+hub/.env*
+site/.env*
+client-local/.env*
+desktop/**/.env*
+postman/*.postman_environment.json
+
+# Sensitive keys
+hub/license_private.pem
+**/*private*.pem
+
  
 # Build outputs and installer artifacts (do not commit)
 client-local/build/
