@@ -4,7 +4,7 @@
   "version": "1.0.30",
   "type": "module",
   "engines": {
-    "node": ">=18.18.0 <19.0.0"
+    "node": ">=20 <21"
   },
   "scripts": {
     "dev": "vite",
@@ -24,7 +24,8 @@
     "check:all": "npm run check:hub && npm run check:client && npm run check:web",
     "check:hub": "cd hub && npm run lint && npm run typecheck",
     "check:client": "cd client-local && npm run lint && npm run typecheck",
-    "check:web": "npm run lint && npx tsc --noEmit"
+    "check:web": "npm run lint && npx tsc --noEmit",
+    "build:render": "cd hub && npm ci --include=dev && npm run build && npm run prisma:generate"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
