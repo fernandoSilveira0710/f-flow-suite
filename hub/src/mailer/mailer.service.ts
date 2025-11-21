@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import nodemailer from 'nodemailer';
 
 interface SendEmailPayload {
   to: string;
@@ -22,20 +23,36 @@ interface WelcomeEmailData {
 export class MailerService {
   private readonly logger = new Logger(MailerService.name);
   private readonly enabled: boolean;
-  private readonly provider: 'resend' | 'none';
+  private readonly provider: 'resend' | 'smtp' | 'none';
   private readonly fromEmail: string;
   private readonly resendApiKey?: string;
   private readonly contactEmail: string;
   private readonly defaultDownloadUrl?: string;
 
+  // SMTP config
+  private readonly smtpHost?: string;
+  private readonly smtpPort?: number;
+  private readonly smtpSecure?: boolean;
+  private readonly smtpUser?: string;
+  private readonly smtpPass?: string;
+
   constructor(private readonly config: ConfigService) {
     this.enabled = this.config.get<boolean>('MAIL_ENABLE') ?? false;
     const provider = (this.config.get<string>('MAIL_PROVIDER') || 'none').toLowerCase();
-    this.provider = provider === 'resend' ? 'resend' : 'none';
+    this.provider = provider === 'resend' ? 'resend' : provider === 'smtp' ? 'smtp' : 'none';
     this.fromEmail = this.config.get<string>('MAIL_FROM') || 'no-reply@fflow.local';
     this.resendApiKey = this.config.get<string>('RESEND_API_KEY');
     this.contactEmail = this.config.get<string>('CONTACT_EMAIL') || 'contato@2fsolution.online';
     this.defaultDownloadUrl = this.config.get<string>('DOWNLOAD_URL');
+
+    // Load SMTP configuration
+    this.smtpHost = this.config.get<string>('SMTP_HOST');
+    this.smtpPort = this.config.get<number>('SMTP_PORT');
+    // Accept boolean (true/false) or string ('true'/'false')
+    const secureVal = this.config.get<string>('SMTP_SECURE');
+    this.smtpSecure = typeof secureVal === 'string' ? secureVal.toLowerCase() === 'true' : (this.config.get<boolean>('SMTP_SECURE') ?? undefined);
+    this.smtpUser = this.config.get<string>('SMTP_USER');
+    this.smtpPass = this.config.get<string>('SMTP_PASS');
   }
 
   async sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
@@ -126,6 +143,11 @@ export class MailerService {
       return;
     }
 
+    if (this.provider === 'smtp') {
+      await this.sendViaSMTP(payload);
+      return;
+    }
+
     this.logger.warn('[Mailer] Nenhum provider configurado (MAIL_PROVIDER=none). Email não foi enviado.');
   }
 
@@ -189,6 +211,42 @@ export class MailerService {
       }
     } catch (err) {
       this.logger.error('[Mailer] Erro ao enviar via Resend', err as any);
+    }
+  }
+
+  private async sendViaSMTP(payload: SendEmailPayload): Promise<void> {
+    const host = this.smtpHost;
+    const port = this.smtpPort;
+    const secure = this.smtpSecure;
+    const user = this.smtpUser;
+    const pass = this.smtpPass;
+
+    if (!host || !port || secure === undefined || !user || !pass) {
+      this.logger.warn('[Mailer] SMTP não configurado corretamente. Verifique SMTP_HOST/PORT/SECURE/USER/PASS.');
+      return;
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: { user, pass },
+      });
+
+      this.logger.log(`[Mailer] SMTP: tentando envio. host=${host} port=${port} secure=${secure} from=${this.fromEmail} to=${payload.to}`);
+
+      const info = await transporter.sendMail({
+        from: this.fromEmail,
+        to: payload.to,
+        subject: payload.subject,
+        html: payload.html,
+      });
+
+      const msgId = (info as any)?.messageId;
+      this.logger.log(`[Mailer] Email enviado via SMTP com sucesso${msgId ? ` (messageId=${msgId})` : ''}. to=${payload.to}`);
+    } catch (err) {
+      this.logger.error('[Mailer] Falha ao enviar via SMTP', err as any);
     }
   }
 }
