@@ -1,4 +1,4 @@
-﻿import { config as loadDotenv } from 'dotenv';
+import { config as loadDotenv } from 'dotenv';
 import { Logger } from '@nestjs/common';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,7 +21,7 @@ export function loadEnvConfig(): void {
     if (!existsSync(path)) {
       continue;
     }
-    loadDotenv({ path });
+    loadDotenv({ path, override: true });
     logger.log(`Environment variables loaded from ${path}`);
     envLoaded = true;
     return;

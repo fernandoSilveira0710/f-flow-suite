@@ -7,6 +7,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
 
   async onModuleInit() {
     try {
+      const url = process.env.DATABASE_URL ?? '';
+      const prefix = url.includes('://') ? url.split('://')[0] + '://' : '(unset)';
+      this.logger.log(`DATABASE_URL prefix: ${prefix}`);
       await this.$connect();
       this.logger.log('Prisma connected');
     } catch (err) {
