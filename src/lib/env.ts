@@ -4,9 +4,32 @@
  */
 
 // URLs das APIs
+// Permite override em runtime quando servido pelo ERP estático
+// O desktop injeta window.__FFLOW_CONFIG__.CLIENT_LOCAL com a porta dinâmica
+function runtimeClientLocal(): string | undefined {
+  try {
+    const w: any = typeof window !== 'undefined' ? window : undefined;
+    const v = w?.__FFLOW_CONFIG__?.CLIENT_LOCAL;
+    return typeof v === 'string' && v ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Permite override da URL do Hub em runtime quando servido pelo ERP estático
+function runtimeHub(): string | undefined {
+  try {
+    const w: any = typeof window !== 'undefined' ? window : undefined;
+    const v = w?.__FFLOW_CONFIG__?.HUB;
+    return typeof v === 'string' && v ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const API_URLS = {
-  HUB: import.meta.env.VITE_HUB_API_URL || 'http://localhost:3001',
-  CLIENT_LOCAL: import.meta.env.VITE_CLIENT_LOCAL_API_URL || 'http://localhost:8081',
+  HUB: runtimeHub() || (import.meta.env.VITE_HUB_API_URL || 'https://f-flow-suite.onrender.com'),
+  CLIENT_LOCAL: runtimeClientLocal() || (import.meta.env.VITE_CLIENT_LOCAL_API_URL || 'http://localhost:8081'),
   SITE: import.meta.env.VITE_SITE_URL || 'http://localhost:5173',
   FRONTEND: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:8080',
 } as const;

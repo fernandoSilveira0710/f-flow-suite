@@ -161,7 +161,7 @@ export class AuthService {
         if (daysSinceLastCheck > OFFLINE_MAX_DAYS) {
           return {
             success: false,
-            message: `Acesso offline bloqueado: mais de ${OFFLINE_MAX_DAYS} dias sem contato com o Hub. Faça login online para revalidar.`,
+            message: `Login offline bloqueado: passaram-se mais de ${OFFLINE_MAX_DAYS} dias sem conexão com o Hub. Conecte-se à internet e faça login online para revalidar sua licença. Se o Hub estiver indisponível, tente novamente em alguns minutos e verifique o horário do sistema.`,
           };
       }
       }

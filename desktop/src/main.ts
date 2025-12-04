@@ -11,10 +11,11 @@ let erpProc: ReturnType<typeof spawn> | null = null
 let writeLog: (msg: string) => void = (msg) => { try { console.log(msg) } catch {} }
 let logFilePath: string | null = null
 
-// Porta preferida da API local:
-// - Dev: 8081
-// - Pacote (Electron isPackaged): 18081 (alinha com VITE_CLIENT_LOCAL_API_URL em produção)
-const PREFERRED_API_PORT = app.isPackaged ? 18081 : 8081
+// Porta preferida da API local: usar sempre faixa alta pouco comum
+// Mantemos 18081 como padrão em qualquer modo, com descoberta dinâmica se ocupado
+const PREFERRED_API_PORT = 18081
+// Porta preferida do ERP estático: usar sempre faixa alta pouco comum
+const PREFERRED_ERP_PORT = 18080
 
 // Resolve a versão do aplicativo para propagar ao client-local
 function resolveAppVersion(): string {
@@ -73,6 +74,8 @@ function startApi() {
     PORT: String(PREFERRED_API_PORT), 
     CLIENT_HTTP_PORT: String(PREFERRED_API_PORT), 
     SKIP_MIGRATIONS: 'false',
+    HUB_API_URL: process.env.HUB_API_URL || 'https://f-flow-suite.onrender.com',
+    OFFLINE_MAX_DAYS: process.env.OFFLINE_MAX_DAYS || '30',
     APP_VERSION: APP_VERSION_VALUE,
     VITE_APP_VERSION: APP_VERSION_VALUE
   }
@@ -93,7 +96,11 @@ function startErpServer() {
     'C:\\Program Files\\nodejs\\node.exe'
   ]
   let nodePath = nodePathCandidates.find(p => fs.existsSync(p)) || process.execPath
-  const env = { ...process.env }
+  const env = {
+    ...process.env,
+    CLIENT_HTTP_PORT: process.env.CLIENT_HTTP_PORT || String(PREFERRED_API_PORT),
+    HUB_API_URL: process.env.HUB_API_URL || 'https://f-flow-suite.onrender.com'
+  }
   erpProc = spawn(nodePath, [script, '--erp-service', '--root', erpRoot, '--port', '8080'], {
     env,
     cwd: path.dirname(script),
@@ -156,6 +163,20 @@ async function findFreePort(preferred: number, candidates: number[], exclude: nu
   })
 }
 
+/**
+ * Descobre um par de portas livres (API, ERP).
+ * Preferências: 18081/18080 em pacote; 8081/8080 em dev; com fallback.
+ */
+async function findFreePortPair(): Promise<{ api: number; erp: number }> {
+  // Candidatos para API e ERP
+  const apiCandidates = [18081, 18082, 18181, 28181, 38181]
+  const erpCandidates = [18080, 18084, 18180, 28180, 38180]
+
+  const api = await findFreePort(PREFERRED_API_PORT, apiCandidates)
+  const erp = await findFreePort(PREFERRED_ERP_PORT, erpCandidates, [api])
+  return { api, erp }
+}
+
 async function createWindow() {
   mainWindow = new BrowserWindow({ width: 1200, height: 800 })
   // Tela de carregamento enquanto serviços sobem
@@ -184,6 +205,8 @@ function startApiDynamic(port: number) {
     PORT: String(port), 
     CLIENT_HTTP_PORT: String(port), 
     SKIP_MIGRATIONS: 'false',
+    HUB_API_URL: process.env.HUB_API_URL || 'https://f-flow-suite.onrender.com',
+    OFFLINE_MAX_DAYS: process.env.OFFLINE_MAX_DAYS || '30',
     APP_VERSION: APP_VERSION_VALUE,
     VITE_APP_VERSION: APP_VERSION_VALUE
   }
@@ -209,7 +232,10 @@ function startErpServerDynamic(port: number) {
     'C:\\Program Files (x86)\\nodejs\\node.exe'
   ]
   let nodePath = nodePathCandidates.find(p => fs.existsSync(p)) || process.execPath
-  const env = { ...process.env }
+  const env = {
+    ...process.env,
+    HUB_API_URL: process.env.HUB_API_URL || 'https://f-flow-suite.onrender.com'
+  }
   writeLog(`startErpServerDynamic: node=${nodePath} script=${script} root=${erpRoot} port=${port}`)
   erpProc = spawn(nodePath, [script, '--erp-service', '--root', erpRoot, '--port', String(port)], {
     env,
@@ -225,15 +251,19 @@ function startErpServerDynamic(port: number) {
 
 async function createWindowDynamic() {
   mainWindow = new BrowserWindow({ width: 1200, height: 800 })
-  mainWindow.loadURL('data:text/html;charset=utf-8,<style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style><div><h2>Iniciando...</h2><p>Aguardando serviços locais...</p></div>')
+  mainWindow.loadURL('data:text/html;charset=utf-8,<style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style><div><h2>Iniciando...</h2><p>Detectando portas livres e iniciando serviços...</p></div>')
 
-  const API_PORT = 18081
-  const ERP_PORT = 18080
-  writeLog(`createWindowDynamic: usando portas fixas API=${API_PORT} ERP=${ERP_PORT}`)
+  // Detecta par de portas livres
+  const { api: API_PORT, erp: ERP_PORT } = await findFreePortPair()
+  writeLog(`createWindowDynamic: portas escolhidas API=${API_PORT} ERP=${ERP_PORT}`)
 
+  // Inicia serviços com as portas escolhidas
   startApiDynamic(API_PORT)
+  // Propaga CLIENT_HTTP_PORT também ao ERP para injeção de config
+  try { process.env.CLIENT_HTTP_PORT = String(API_PORT) } catch {}
   startErpServerDynamic(ERP_PORT)
 
+  // Aguarda disponibilidade
   const apiReady = await waitForHttpOk(`http://127.0.0.1:${API_PORT}/health`, 30000, 800)
   const erpReady = await waitForHttpOk(`http://127.0.0.1:${ERP_PORT}/erp`, 30000, 800)
   writeLog(`ready-check: api=${apiReady} erp=${erpReady}`)
