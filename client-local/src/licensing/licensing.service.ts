@@ -113,7 +113,7 @@ export class LicensingService implements OnModuleInit {
         message: 'License activated successfully',
         tenantId,
         deviceId,
-        planKey: decodedToken.plan,
+        planKey: this.normalizePlanKey(decodedToken.plan),
         expiresAt: new Date(decodedToken.exp * 1000).toISOString()
       };
     } catch (error: any) {
@@ -170,13 +170,14 @@ export class LicensingService implements OnModuleInit {
         // Validate the token
         const decodedToken = await this.validateAndDecodeToken(token);
         const now = Math.floor(Date.now() / 1000);
+        const normalizedPlan = this.normalizePlanKey(decodedToken.plan);
         
         // Check if token is still valid
         if (now <= decodedToken.exp) {
           return {
             isInstalled: true,
             hasLicense: true,
-            planKey: decodedToken.plan,
+            planKey: normalizedPlan,
             expiresAt: new Date(decodedToken.exp * 1000).toISOString()
           };
         }
@@ -188,7 +189,7 @@ export class LicensingService implements OnModuleInit {
           return {
             isInstalled: true,
             hasLicense: true,
-            planKey: decodedToken.plan,
+            planKey: normalizedPlan,
             expiresAt: new Date(decodedToken.exp * 1000).toISOString()
           };
         }
@@ -246,6 +247,39 @@ export class LicensingService implements OnModuleInit {
         hasLicense: false
       };
     }
+  }
+
+  /**
+   * Normaliza o nome/chave do plano vindo do Hub/token para
+   * uma das chaves canônicas: 'starter' | 'pro' | 'max'.
+   */
+  private normalizePlanKey(raw?: string): 'starter' | 'pro' | 'max' {
+    const val = (raw || '').toLowerCase();
+    if (!val) return 'starter';
+
+    // Starter mappings
+    if ([
+      'starter', 'basic', 'básico', 'basico', 'free'
+    ].includes(val)) {
+      return 'starter';
+    }
+
+    // Pro mappings
+    if ([
+      'pro', 'professional', 'profissional'
+    ].includes(val)) {
+      return 'pro';
+    }
+
+    // Max / Enterprise mappings
+    if ([
+      'max', 'enterprise', 'premium', 'development'
+    ].includes(val)) {
+      return 'max';
+    }
+
+    // Fallback
+    return 'starter';
   }
 
   /**

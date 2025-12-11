@@ -123,6 +123,7 @@ function mapToHubPayload(data: Partial<PaymentMethod>): any {
 export const getPaymentMethods = async (): Promise<PaymentMethod[]> => {
   const tenantId = getTenantId();
   try {
+    console.debug('[Payments] GET list for tenant', tenantId, 'endpoint', endpointBase(tenantId));
     const list = await apiClientLocal<any[]>(`${endpointBase(tenantId)}`, { method: 'GET' });
     return (list || []).map(mapFromHub).sort((a, b) => a.ordem - b.ordem);
   } catch (error) {
@@ -139,7 +140,7 @@ export const getPaymentMethod = async (id: string): Promise<PaymentMethod | null
 };
 
 export const getUsablePaymentMethods = async (
-  userRole: string = 'Admin',
+  userRole: string = 'vendedor',
   caixaAberto: boolean = true
 ): Promise<PaymentMethod[]> => {
   const tenantId = getTenantId();
@@ -157,7 +158,10 @@ export const getUsablePaymentMethods = async (
     .filter((m) => m.visibilidade?.mostrarNoPDV !== false)
     .filter((m) => {
       const roles = m.visibilidade?.visivelSomenteParaRoles || [];
-      return !roles || roles.length === 0 || roles.includes(userRole);
+      if (!roles || roles.length === 0) return true;
+      const rolesLower = roles.map((r) => (r || '').toLowerCase());
+      const userRoleLower = (userRole || '').toLowerCase();
+      return rolesLower.includes(userRoleLower);
     })
     .filter((m) => {
       if (m.restricoes?.somenteSeCaixaAberto) return caixaAberto;

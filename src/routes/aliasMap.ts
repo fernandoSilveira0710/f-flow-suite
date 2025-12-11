@@ -3,8 +3,8 @@
  * Usado para redirecionar rotas antigas/PT para as rotas EN oficiais
  */
 export const SETTINGS_ALIASES: Record<string, string> = {
-  '/erp/configuracoes': '/erp/settings/organization',
-  '/erp/configurações': '/erp/settings/organization',
+  '/erp/configuracoes': '/erp/settings',
+  '/erp/configurações': '/erp/settings',
   '/erp/configuracoes/organizacao': '/erp/settings/organization',
   '/erp/configuracoes/usuarios': '/erp/settings/users',
   '/erp/configuracoes/papeis': '/erp/settings/roles',

@@ -72,6 +72,7 @@ import StockLabels from "./pages/erp/estoque/etiquetas";
 
 // Settings Layout & Pages
 import SettingsLayout from "./layouts/settings-layout";
+import SettingsIndexRedirect from "./pages/erp/settings/index-redirect";
 import OrganizacaoPage from "./pages/erp/configuracoes/organizacao";
 import UsuariosPage from "./pages/erp/configuracoes/usuarios";
 import PapeisPage from "./pages/erp/configuracoes/papeis";
@@ -242,7 +243,7 @@ function App() {
           
               {/* Settings Routes (EN - canonical) */}
                 <Route path="settings" element={<SettingsLayout />}>
-                  <Route index element={<Navigate to="/erp/settings/organization" replace />} />
+                  <Route index element={<SettingsIndexRedirect />} />
                   <Route path="organization" element={<RequirePermission permission="settings:organization"><OrganizacaoPage /></RequirePermission>} />
                   <Route path="users" element={<RequirePermission permission="settings:users"><UsuariosPage /></RequirePermission>} />
                   <Route path="roles" element={<RequirePermission permission="settings:roles"><PapeisPage /></RequirePermission>} />

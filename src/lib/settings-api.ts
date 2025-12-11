@@ -44,6 +44,8 @@ export interface User {
   email: string;
   roleId: string;
   ativo: boolean;
+  // PIN opcional para login rápido (4 dígitos)
+  pin?: string;
 }
 
 export interface Role {
@@ -218,31 +220,29 @@ const DEFAULT_ROLES: Role[] = [
     id: 'admin',
     nome: 'Admin',
     permissions: [
+      // Produtos (CRUD)
       'products:read', 'products:write', 'products:delete',
-      'pos:read', 'pos:checkout', 'pos:refund', 'pos:open', 'pos:close',
+      // PDV (realizar venda, abrir caixa, fechar caixa, estornar)
+      'pos:read', 'pos:checkout', 'pos:open', 'pos:close', 'pos:refund',
+      // Vendas (visualizar e estornar)
       'sales:read', 'sales:refund',
-      'stock:read', 'stock:entry', 'stock:exit', 'stock:adjust', 'stock:purchase_order',
-      'agenda:read', 'agenda:write', 'agenda:cancel',
-      'pet:read', 'pet:write', 'pet:workorder',
-      'reports:read', 'reports:export',
-      'settings:read', 'settings:write', 'settings:danger',
+      // Estoque (entrada, saída, ajuste)
+      'stock:read', 'stock:entry', 'stock:exit', 'stock:adjust',
+      // Relatórios (em desenvolvimento)
+      'reports:read',
+      // Configurações (submenus)
       'settings:organization', 'settings:users', 'settings:roles', 'settings:billing', 'settings:licenses', 'settings:units', 'settings:categories', 'settings:payments', 'settings:import-export',
     ],
   },
   {
     id: 'vendedor',
     nome: 'Vendedor',
-    permissions: ['products:read', 'pos:read', 'pos:checkout', 'sales:read', 'stock:read'],
+    permissions: ['products:read', 'pos:read', 'pos:checkout', 'sales:read'],
   },
   {
     id: 'estoquista',
     nome: 'Estoquista',
-    permissions: ['products:read', 'stock:read', 'stock:entry', 'stock:exit', 'stock:adjust', 'stock:purchase_order'],
-  },
-  {
-    id: 'groomer',
-    nome: 'Groomer',
-    permissions: ['pet:read', 'pet:write', 'pet:workorder', 'agenda:read', 'agenda:write'],
+    permissions: ['products:read', 'stock:read', 'stock:entry', 'stock:exit', 'stock:adjust'],
   },
 ];
 
@@ -268,32 +268,32 @@ const DEFAULT_SEATS: Seat[] = [
 ];
 
 export const ALL_PERMISSIONS = [
+  // Produtos (CRUD)
   { id: 'products:read', nome: 'Ver Produtos', grupo: 'Produtos' },
   { id: 'products:write', nome: 'Editar Produtos', grupo: 'Produtos' },
   { id: 'products:delete', nome: 'Excluir Produtos', grupo: 'Produtos' },
+
+  // PDV
   { id: 'pos:read', nome: 'Ver PDV', grupo: 'PDV' },
-  { id: 'pos:checkout', nome: 'Realizar Vendas', grupo: 'PDV' },
-  { id: 'pos:refund', nome: 'Realizar Devoluções', grupo: 'PDV' },
+  { id: 'pos:checkout', nome: 'Realizar Venda', grupo: 'PDV' },
   { id: 'pos:open', nome: 'Abrir Caixa', grupo: 'PDV' },
   { id: 'pos:close', nome: 'Fechar Caixa', grupo: 'PDV' },
-  { id: 'sales:read', nome: 'Ver Vendas', grupo: 'Vendas' },
+  { id: 'pos:refund', nome: 'Estornar (PDV)', grupo: 'PDV' },
+
+  // Vendas
+  { id: 'sales:read', nome: 'Visualizar Vendas', grupo: 'Vendas' },
   { id: 'sales:refund', nome: 'Estornar Vendas', grupo: 'Vendas' },
+
+  // Estoque
   { id: 'stock:read', nome: 'Ver Estoque', grupo: 'Estoque' },
-  { id: 'stock:entry', nome: 'Entrada de Estoque', grupo: 'Estoque' },
-  { id: 'stock:exit', nome: 'Saída de Estoque', grupo: 'Estoque' },
-  { id: 'stock:adjust', nome: 'Ajustar Estoque', grupo: 'Estoque' },
-  { id: 'stock:purchase_order', nome: 'Criar Pedidos de Compra', grupo: 'Estoque' },
-  { id: 'agenda:read', nome: 'Ver Agenda', grupo: 'Agenda' },
-  { id: 'agenda:write', nome: 'Editar Agenda', grupo: 'Agenda' },
-  { id: 'agenda:cancel', nome: 'Cancelar Agendamentos', grupo: 'Agenda' },
-  { id: 'pet:read', nome: 'Ver Banho & Tosa', grupo: 'Banho & Tosa' },
-  { id: 'pet:write', nome: 'Editar Banho & Tosa', grupo: 'Banho & Tosa' },
-  { id: 'pet:workorder', nome: 'Gerenciar OS Pet', grupo: 'Banho & Tosa' },
-  { id: 'reports:read', nome: 'Ver Relatórios', grupo: 'Relatórios' },
-  { id: 'reports:export', nome: 'Exportar Relatórios', grupo: 'Relatórios' },
-  { id: 'settings:read', nome: 'Ver Configurações', grupo: 'Configurações' },
-  { id: 'settings:write', nome: 'Editar Configurações', grupo: 'Configurações' },
-  { id: 'settings:danger', nome: 'Ações Perigosas', grupo: 'Configurações' },
+  { id: 'stock:entry', nome: 'Entrada', grupo: 'Estoque' },
+  { id: 'stock:exit', nome: 'Saída', grupo: 'Estoque' },
+  { id: 'stock:adjust', nome: 'Ajuste', grupo: 'Estoque' },
+
+  // Relatórios (em desenvolvimento)
+  { id: 'reports:read', nome: 'Relatórios', grupo: 'Relatórios' },
+
+  // Configurações
   { id: 'settings:organization', nome: 'Organização', grupo: 'Configurações' },
   { id: 'settings:users', nome: 'Usuários', grupo: 'Configurações' },
   { id: 'settings:roles', nome: 'Papéis & Permissões', grupo: 'Configurações' },
@@ -336,76 +336,113 @@ export const updateBranding = async (data: Branding): Promise<Branding> => {
 // Users - Using only localStorage (prepared for future backend integration)
 export const getUsers = async (): Promise<User[]> => {
   await delay(300);
-  // Ler usuários do storage
-  let users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
-
-  // Garantir que o usuário logado esteja presente como Admin para permitir acesso às configurações
   try {
-    const authRaw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
-    if (authRaw) {
-      const auth = JSON.parse(authRaw || '{}');
-      const email: string | undefined = auth?.email;
-      const displayName: string | undefined = auth?.displayName;
-      if (email && !users.some(u => u.email === email)) {
-        const seeded: User = {
-          id: `auth-${Date.now()}`,
-          nome: displayName || email,
-          email,
-          roleId: 'admin',
-          ativo: true,
-        };
-        users = [...users, seeded];
-        setInStorage(STORAGE_KEYS.users, users);
-      }
-    }
-  } catch {
-    // Em caso de erro, mantém lista atual
+    const res = await fetch(ENDPOINTS.CLIENT_USERS_LIST, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) throw new Error(`Falha ao buscar usuários: ${res.status}`);
+    const data = await res.json();
+    const users: User[] = (Array.isArray(data) ? data : []).map((u: any) => ({
+      id: u.id,
+      nome: u.displayName || u.nome || u.email,
+      email: u.email,
+      roleId: u.role || 'user',
+      ativo: u.active !== false,
+      pin: u.pin,
+    }));
+    setInStorage(STORAGE_KEYS.users, users);
+    return users;
+  } catch (err) {
+    // Fallback para storage local
+    return getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
   }
-
-  return users;
 };
 
 export const createUser = async (user: Omit<User, 'id'>): Promise<User> => {
-  await delay(500);
-  const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
-  const newUser = { ...user, id: Date.now().toString() };
-  const updated = [...users, newUser];
-  setInStorage(STORAGE_KEYS.users, updated);
-  appendAuditEvent('user.created', { id: newUser.id, email: newUser.email });
+  await delay(300);
+  const tenantId = getTenantId();
+  const payload = {
+    displayName: user.nome,
+    email: user.email,
+    role: user.roleId,
+    active: user.ativo,
+    tenantId,
+    ...(user.pin ? { pin: user.pin } : {}),
+  };
+  const res = await fetch(ENDPOINTS.CLIENT_USERS_LIST, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Falha ao criar usuário: ${res.status}`);
+  const created = await res.json();
+  const newUser: User = {
+    id: created.id,
+    nome: created.displayName || user.nome,
+    email: created.email,
+    roleId: created.role || user.roleId,
+    ativo: created.active !== false,
+  };
+  // Atualizar cache local
+  const current = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
+  setInStorage(STORAGE_KEYS.users, [...current.filter(u => u.id !== newUser.id), newUser]);
+  appendAuditEvent('user.created.sqlite', { id: newUser.id, email: newUser.email });
   return newUser;
 };
 
 export const updateUser = async (id: string, data: Partial<User>): Promise<User> => {
-  await delay(500);
-  const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
-  const updated = users.map(u => u.id === id ? { ...u, ...data } : u);
-  setInStorage(STORAGE_KEYS.users, updated);
-  const updatedUser = updated.find(u => u.id === id);
-  if (!updatedUser) {
-    throw new Error('Usuário não encontrado');
-  }
-  appendAuditEvent('user.updated', { id, changes: data });
+  await delay(300);
+  const payload: any = {};
+  if (typeof data.nome !== 'undefined') payload.displayName = data.nome;
+  if (typeof data.email !== 'undefined') payload.email = data.email;
+  if (typeof data.roleId !== 'undefined') payload.role = data.roleId;
+  if (typeof data.ativo !== 'undefined') payload.active = data.ativo;
+  if (typeof (data as any).pin !== 'undefined') payload.pin = (data as any).pin;
+
+  const res = await fetch(ENDPOINTS.CLIENT_USERS_BY_ID(id), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Falha ao atualizar usuário: ${res.status}`);
+  const updated = await res.json();
+  const updatedUser: User = {
+    id: updated.id,
+    nome: updated.displayName || updated.email,
+    email: updated.email,
+    roleId: updated.role || 'user',
+    ativo: updated.active !== false,
+    pin: updated.pin,
+  };
+  const local = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
+  setInStorage(STORAGE_KEYS.users, local.map(u => u.id === id ? updatedUser : u));
+  appendAuditEvent('user.updated.sqlite', { id, changes: payload });
   return updatedUser;
 };
 
 export const deleteUser = async (id: string): Promise<void> => {
-  await delay(500);
-  const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
-  const updated = users.filter(u => u.id !== id);
-  setInStorage(STORAGE_KEYS.users, updated);
-  appendAuditEvent('user.deleted', { id });
+  await delay(300);
+  const res = await fetch(ENDPOINTS.CLIENT_USERS_BY_ID(id), {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(`Falha ao remover usuário: ${res.status}`);
+  const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS).filter(u => u.id !== id);
+  setInStorage(STORAGE_KEYS.users, users);
+  appendAuditEvent('user.deleted.sqlite', { id });
 };
 
 // Roles - Using only localStorage (prepared for future backend integration)
 export const getRoles = async (): Promise<Role[]> => {
   await delay(200);
-  const tenantId = getTenantId();
   try {
-    const res = await apiClient<{ data: any[] }>(`/tenants/${tenantId}/roles`, {
+    const res = await fetch(ENDPOINTS.CLIENT_ROLES_LIST, {
       method: 'GET',
-      suppressErrorLog: true,
+      headers: { 'Content-Type': 'application/json' },
     });
-    const roles = (res?.data || []).map((r: any) => ({
+    if (!res.ok) throw new Error(`Falha ao buscar papéis: ${res.status}`);
+    const data = await res.json();
+    const parsed: Role[] = (Array.isArray(data) ? data : []).map((r: any) => ({
       id: r.id,
       nome: r.name || r.nome || 'Sem nome',
       permissions: (() => {
@@ -417,16 +454,23 @@ export const getRoles = async (): Promise<Role[]> => {
           return [] as string[];
         }
       })(),
-    })) as Role[];
-    return roles;
-  } catch (err) {
-    // Fallback para dados locais quando Hub estiver indisponível
-    // Respeitar completamente o storage atual (não reintroduzir DEFAULT_ROLES removidos)
-    const stored = getFromStorage<Role[] | null>(STORAGE_KEYS.roles, null);
-    if (stored && Array.isArray(stored)) {
-      return stored;
+    }));
+
+    // Se o backend retornar lista vazia, manter baseline local para evitar bloqueios
+    if (!parsed || parsed.length === 0) {
+      const stored = getFromStorage<Role[] | null>(STORAGE_KEYS.roles, null);
+      if (stored && Array.isArray(stored) && stored.length > 0) {
+        return stored;
+      }
+      setInStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
+      return DEFAULT_ROLES;
     }
-    // Primeira execução sem storage: inicializar com DEFAULT_ROLES
+
+    setInStorage(STORAGE_KEYS.roles, parsed);
+    return parsed;
+  } catch (err) {
+    const stored = getFromStorage<Role[] | null>(STORAGE_KEYS.roles, null);
+    if (stored && Array.isArray(stored) && stored.length > 0) return stored;
     setInStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
     return DEFAULT_ROLES;
   }
@@ -434,33 +478,117 @@ export const getRoles = async (): Promise<Role[]> => {
 
 export const createRole = async (role: Omit<Role, 'id'>): Promise<Role> => {
   await delay(200);
-  const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
-  const newRole: Role = { ...role, id: Date.now().toString() };
-  const updated = [...roles, newRole];
-  setInStorage(STORAGE_KEYS.roles, updated);
-  appendAuditEvent('role.created.offline', { id: newRole.id, nome: newRole.nome });
+  const payload = {
+    name: role.nome,
+    permissions: role.permissions,
+  };
+  const res = await fetch(ENDPOINTS.CLIENT_ROLES_CREATE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Falha ao criar papel: ${res.status}`);
+  const created = await res.json();
+  const newRole: Role = {
+    id: created.id,
+    nome: created.name || role.nome,
+    permissions: (() => {
+      try {
+        if (Array.isArray(created.permissions)) return created.permissions as string[];
+        if (typeof created.permissions === 'string') return JSON.parse(created.permissions || '[]');
+        return [] as string[];
+      } catch {
+        return role.permissions;
+      }
+    })(),
+  };
+  const current = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
+  setInStorage(STORAGE_KEYS.roles, [...current, newRole]);
+  appendAuditEvent('role.created.sqlite', { id: newRole.id, nome: newRole.nome });
   return newRole;
 };
 
 export const updateRole = async (id: string, data: Partial<Role>): Promise<Role> => {
   await delay(200);
-  const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
-  const updatedLocal = roles.map(r => r.id === id ? { ...r, ...data } : r);
-  setInStorage(STORAGE_KEYS.roles, updatedLocal);
-  const updatedRole = updatedLocal.find(r => r.id === id);
-  if (!updatedRole) {
-    throw new Error('Role não encontrada');
+  const payload: any = {
+    ...(typeof data.nome !== 'undefined' ? { name: data.nome } : {}),
+    ...(typeof data.permissions !== 'undefined' ? { permissions: data.permissions } : {}),
+    // description/active podem ser adicionados futuramente via UI
+  };
+  const res = await fetch(ENDPOINTS.CLIENT_ROLES_UPDATE(id), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  // Se o papel não existe no backend (ex.: baseline 'admin' local), criar em vez de falhar
+  if (res.status === 404) {
+    const createPayload = {
+      name: (data.nome || id),
+      permissions: data.permissions || [],
+    } as any;
+    const createRes = await fetch(ENDPOINTS.CLIENT_ROLES_CREATE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(createPayload),
+    });
+    if (!createRes.ok) throw new Error(`Falha ao criar papel: ${createRes.status}`);
+    const created = await createRes.json();
+    const createdRole: Role = {
+      id: created.id,
+      nome: created.name || (data.nome || id),
+      permissions: (() => {
+        try {
+          if (Array.isArray(created.permissions)) return created.permissions as string[];
+          if (typeof created.permissions === 'string') return JSON.parse(created.permissions || '[]');
+          return data.permissions || [];
+        } catch {
+          return data.permissions || [];
+        }
+      })(),
+    };
+    const local = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
+    // Substituir o papel anterior (ex.: 'admin') pelo recém-criado
+    setInStorage(STORAGE_KEYS.roles, local.map(r => r.id === id ? createdRole : r));
+    appendAuditEvent('role.created.sqlite', { id: createdRole.id, nome: createdRole.nome });
+    return createdRole;
   }
-  appendAuditEvent('role.updated.offline', { id, changes: data });
+  if (!res.ok) throw new Error(`Falha ao atualizar papel: ${res.status}`);
+  const updated = await res.json();
+  const updatedRole: Role = {
+    id: updated.id,
+    nome: updated.name || (data.nome || 'Sem nome'),
+    permissions: (() => {
+      try {
+        if (Array.isArray(updated.permissions)) return updated.permissions as string[];
+        if (typeof updated.permissions === 'string') return JSON.parse(updated.permissions || '[]');
+        return data.permissions || [];
+      } catch {
+        return data.permissions || [];
+      }
+    })(),
+  };
+  const local = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
+  setInStorage(STORAGE_KEYS.roles, local.map(r => r.id === id ? updatedRole : r));
+  appendAuditEvent('role.updated.sqlite', { id, changes: payload });
   return updatedRole;
 };
 
 export const deleteRole = async (id: string): Promise<void> => {
   await delay(200);
-  const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
-  const updated = roles.filter(r => r.id !== id);
-  setInStorage(STORAGE_KEYS.roles, updated);
-  appendAuditEvent('role.deleted.offline', { id });
+  const res = await fetch(ENDPOINTS.CLIENT_ROLES_DELETE(id), {
+    method: 'DELETE',
+  });
+  if (res.status === 404) {
+    // Papel não existe no backend (ex.: baseline local). Remover apenas do storage local.
+    const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES).filter(r => r.id !== id);
+    setInStorage(STORAGE_KEYS.roles, roles);
+    appendAuditEvent('role.deleted.sqlite', { id, note: 'local-only baseline removed' } as any);
+    return;
+  }
+  if (!res.ok) throw new Error(`Falha ao remover papel: ${res.status}`);
+  const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES).filter(r => r.id !== id);
+  setInStorage(STORAGE_KEYS.roles, roles);
+  appendAuditEvent('role.deleted.sqlite', { id });
 };
 
 // Seats - Using only localStorage (prepared for future backend integration)
@@ -556,9 +684,10 @@ export const getPlanInfo = async (): Promise<PlanInfo> => {
   const hubSubscription = await fetchTenantSubscription(tenantId);
   
   if (hubSubscription && hubSubscription.plan) {
-    // Mapear dados do Hub para o formato esperado
-    const planKey = hubSubscription.plan.name?.toLowerCase() || 'starter';
-    const mappedPlan = ['starter', 'pro', 'max'].includes(planKey) ? planKey : 'starter';
+    // Mapear dados do Hub para o formato esperado de forma resiliente
+    const { normalizePlanKey, extractPlanKeyFromSubscription } = await import('./plan-utils');
+    const extracted = extractPlanKeyFromSubscription(hubSubscription) || 'starter';
+    const mappedPlan = normalizePlanKey(extracted) || 'starter';
     
     // Calcular próxima cobrança baseada na assinatura
     const nextBilling = hubSubscription.expiresAt 
@@ -783,27 +912,42 @@ export const resetDemoData = async (): Promise<void> => {
 export const getCurrentPermissions = (): string[] => {
   try {
     const authRaw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
-    const email = authRaw ? (JSON.parse(authRaw || '{}')?.email as string | undefined) : undefined;
+    const authUser = authRaw ? (JSON.parse(authRaw || '{}') as Partial<User> & { roleId?: string; role?: string }) : undefined;
     const users = getFromStorage<User[]>(STORAGE_KEYS.users, DEFAULT_USERS);
-    // Mesclar papéis em memória com DEFAULT_ROLES para garantir novas permissões
-    const storedRoles = getFromStorage<Role[]>(STORAGE_KEYS.roles, DEFAULT_ROLES);
-    const defaultMap = new Map(DEFAULT_ROLES.map(r => [r.id, r]));
-    const rolesMap = new Map(storedRoles.map(r => [r.id, r]));
+    const roles = getFromStorage<Role[]>(STORAGE_KEYS.roles, DEFAULT_ROLES);
 
-    for (const [id, def] of defaultMap.entries()) {
-      const existing = rolesMap.get(id);
-      if (existing) {
-        const mergedPerms = Array.from(new Set([...(existing.permissions || []), ...(def.permissions || [])]));
-        rolesMap.set(id, { ...existing, permissions: mergedPerms, nome: existing.nome || def.nome });
-      } else {
-        rolesMap.set(id, def);
-      }
+    // Garantir baseline: se o papel 'admin' existir mas sem permissões, usar DEFAULT_ROLES
+    const defaultAdmin = DEFAULT_ROLES.find(r => r.id === 'admin');
+    const adminRole = roles.find(r => r.id === 'admin');
+    const safeAdminPerms = (adminRole && Array.isArray(adminRole.permissions) && adminRole.permissions.length > 0)
+      ? adminRole.permissions
+      : (defaultAdmin?.permissions || []);
+
+    // 1) Priorizar roleId vindo do auth_user (login) se existir
+    const roleFromAuth = (() => {
+      const id = authUser?.roleId || (authUser as any)?.role;
+      if (!id) return undefined;
+      return roles.find(r => r.id === id);
+    })();
+    if (roleFromAuth) {
+      const perms = roleFromAuth.permissions || [];
+      // Se for admin com lista vazia, aplicar baseline
+      if (roleFromAuth.id === 'admin' && perms.length === 0) return safeAdminPerms;
+      return perms;
     }
 
-    const roles = Array.from(rolesMap.values());
+    // 2) Caso contrário, buscar usuário por email no cache e usar seu roleId
+    const email = authUser?.email as string | undefined;
     const current = email ? users.find(u => u.email === email) : users[0];
     const role = roles.find(r => r.id === (current?.roleId || 'admin'));
-    return role?.permissions || [];
+    if (role) {
+      const perms = role.permissions || [];
+      if (role.id === 'admin' && perms.length === 0) return safeAdminPerms;
+      return perms;
+    }
+
+    // 3) Fallback seguro: usar ADMIN padrão (ambiente dev) para evitar bloqueios indevidos
+    return safeAdminPerms;
   } catch {
     return [];
   }

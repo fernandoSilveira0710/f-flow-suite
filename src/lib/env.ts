@@ -55,6 +55,13 @@ export const ENDPOINTS = {
   // Client-Local endpoints
   CLIENT_USERS_HAS_USERS: `${API_URLS.CLIENT_LOCAL}/users/has-users`,
   CLIENT_USERS_SYNC: `${API_URLS.CLIENT_LOCAL}/users/sync`,
+  CLIENT_USERS_LIST: `${API_URLS.CLIENT_LOCAL}/users`,
+  CLIENT_USERS_FIND_BY_EMAIL: (email: string) => `${API_URLS.CLIENT_LOCAL}/users/lookup/by-email?email=${encodeURIComponent(email)}`,
+  CLIENT_USERS_BY_ID: (id: string) => `${API_URLS.CLIENT_LOCAL}/users/${id}`,
+  CLIENT_ROLES_LIST: `${API_URLS.CLIENT_LOCAL}/users/roles/list`,
+  CLIENT_ROLES_CREATE: `${API_URLS.CLIENT_LOCAL}/users/roles`,
+  CLIENT_ROLES_UPDATE: (id: string) => `${API_URLS.CLIENT_LOCAL}/users/roles/${id}`,
+  CLIENT_ROLES_DELETE: (id: string) => `${API_URLS.CLIENT_LOCAL}/users/roles/${id}`,
   CLIENT_LICENSING_ACTIVATE: `${API_URLS.CLIENT_LOCAL}/licensing/activate`,
   CLIENT_LICENSING_PERSIST: `${API_URLS.CLIENT_LOCAL}/licensing/persist`,
   CLIENT_LICENSING_VALIDATE_OFFLINE: `${API_URLS.CLIENT_LOCAL}/licensing/validate-offline`,
@@ -62,6 +69,7 @@ export const ENDPOINTS = {
   CLIENT_LICENSING_SYNC_PLAN: `${API_URLS.CLIENT_LOCAL}/licensing/sync-plan`,
   CLIENT_AUTH_PERSIST: `${API_URLS.CLIENT_LOCAL}/auth/persist`,
   CLIENT_AUTH_OFFLINE_LOGIN: `${API_URLS.CLIENT_LOCAL}/auth/offline-login`,
+  CLIENT_AUTH_OFFLINE_PIN_LOGIN: `${API_URLS.CLIENT_LOCAL}/auth/offline-pin-login`,
   CLIENT_PLANS_SUBSCRIPTION: (tenantId: string) => `${API_URLS.CLIENT_LOCAL}/plans/tenants/${tenantId}/subscription`,
   CLIENT_PLANS_INVOICES: (tenantId: string) => `${API_URLS.CLIENT_LOCAL}/plans/tenants/${tenantId}/invoices`,
 

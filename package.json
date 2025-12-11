@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "dev:erp": "npm run dev",
-    "dev:client": "npm --prefix client-local run start:dev",
+    "dev:client": "set CLIENT_HTTP_PORT=8081&& set NODE_ENV=development&& npm --prefix client-local run start:dev",
     "dev:hub": "npm --prefix hub run start:dev",
     "dev:all": "concurrently -k -n ERP,CLIENT,HUB \"npm run dev\" \"npm run dev:client\" \"npm run dev:hub\"",
     "build": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json && vite build",

@@ -12,13 +12,18 @@ const LICENSE_TOKEN_TS_KEY = '2f.license.token.ts';
 const LICENSE_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
 export function getTenantId(): string {
+  // Preferir o tenantId definido durante o login (chave antiga 'tenant_id')
   if (typeof window === 'undefined') return 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
-  return localStorage.getItem(TENANT_KEY) || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
+  const legacy = localStorage.getItem('tenant_id');
+  const modern = localStorage.getItem(TENANT_KEY);
+  return legacy || modern || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
 }
 
 export function setTenantId(tenantId: string): void {
   if (typeof window === 'undefined') return;
+  // Sincronizar ambas as chaves para evitar inconsistências entre módulos antigos e novos
   localStorage.setItem(TENANT_KEY, tenantId);
+  localStorage.setItem('tenant_id', tenantId);
 }
 
 interface FetchOptions extends RequestInit {
@@ -74,17 +79,24 @@ export async function apiClientLocal<T = any>(
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     'X-Tenant-Id': tenantId,
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
     ...(options.headers || {}),
   };
 
   const config: RequestInit = {
     ...options,
     headers,
+    // Evitar uso de cache do navegador para endpoints dinâmicos
+    cache: 'no-store' as RequestCache,
     body: options.body ? JSON.stringify(options.body) : undefined,
   };
 
   try {
-    const response = await fetch(`${BASE_URL_LOCAL}${endpoint}`, config);
+    // Bust de cache para GETs (evita 304 Not Modified sem corpo)
+    const isGet = (options.method || 'GET').toUpperCase() === 'GET';
+    const cacheBust = isGet ? (endpoint.includes('?') ? '&' : '?') + `_${Date.now()}` : '';
+    const response = await fetch(`${BASE_URL_LOCAL}${endpoint}${cacheBust}`, config);
 
     if (!response.ok) {
       let errorMessage = `Erro HTTP ${response.status}`;
@@ -123,6 +135,8 @@ export async function apiClient<T = any>(
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     'X-Tenant-Id': tenantId,
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
     ...(options.headers || {}),
   };
 
@@ -139,12 +153,16 @@ export async function apiClient<T = any>(
   const config: RequestInit = {
     ...options,
     headers,
+    cache: 'no-store' as RequestCache,
     body: options.body ? JSON.stringify(options.body) : undefined,
   };
 
   // Fazer requisição real para o Hub
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, config);
+    // Bust de cache para GETs
+    const isGet = (options.method || 'GET').toUpperCase() === 'GET';
+    const cacheBust = isGet ? (endpoint.includes('?') ? '&' : '?') + `_${Date.now()}` : '';
+    const response = await fetch(`${BASE_URL}${endpoint}${cacheBust}`, config);
     
     if (!response.ok) {
       let errorMessage = `Erro HTTP ${response.status}`;

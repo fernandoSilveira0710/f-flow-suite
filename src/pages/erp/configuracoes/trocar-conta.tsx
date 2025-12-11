@@ -14,11 +14,11 @@ export default function TrocarContaPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<{ id: string; nome: string }[]>([]);
   const [search, setSearch] = useState('');
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
-  const { login, logout, user } = useAuth();
+  const { loginWithPin, logout, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -39,25 +39,25 @@ export default function TrocarContaPage() {
 
   const promptPassword = (email: string) => {
     setSelectedEmail(email);
-    setPassword('');
+    setPin('');
     setModalOpen(true);
   };
 
   const handleLoginConfirm = async () => {
     if (!selectedEmail) return;
-    if (!password) {
-      toast.error('Informe a senha para entrar');
+    if (!pin || pin.replace(/\D/g, '').length !== 4) {
+      toast.error('Informe o PIN de 4 dígitos');
       return;
     }
     setLoggingIn(true);
-    const ok = await login(selectedEmail, password);
+    const ok = await loginWithPin(selectedEmail, pin);
     setLoggingIn(false);
     if (ok) {
       toast.success('Login realizado com sucesso');
       setModalOpen(false);
       navigate('/erp/dashboard');
     } else {
-      toast.error('Falha no login. Verifique a senha.');
+      toast.error('Falha no login. Verifique o PIN.');
     }
   };
 
@@ -114,19 +114,22 @@ export default function TrocarContaPage() {
         </div>
       </div>
 
-      {/* Modal de senha */}
+      {/* Modal de PIN */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar login</DialogTitle>
+            <DialogTitle>Confirmar login por PIN</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Informe a senha para entrar como <strong>{selectedEmail}</strong>.</p>
+            <p className="text-sm text-muted-foreground">Informe o PIN de 4 dígitos para entrar como <strong>{selectedEmail}</strong>.</p>
             <Input
               type="password"
-              placeholder="Senha"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              inputMode="numeric"
+              pattern="\\d{4}"
+              maxLength={4}
+              placeholder="PIN (4 dígitos)"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
             />
           </div>
           <DialogFooter>

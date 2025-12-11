@@ -20,22 +20,27 @@ export function ProtectedRoute({
   const [checkingInstallation, setCheckingInstallation] = useState(false);
   const [syncingLicense, setSyncingLicense] = useState(false);
   const warnedInvalidLicenseRef = useRef(false);
+  const lastSyncAttemptRef = useRef<number>(0);
+  const DEBUG = Boolean(import.meta.env.VITE_DEBUG_PROTECTED_ROUTE === 'true');
+  const SYNC_COOLDOWN_MS = Math.max(30000, Number(import.meta.env.VITE_HUB_SYNC_COOLDOWN_MS ?? 120000));
 
-  console.log('🛡️ PROTECTED ROUTE - Estado atual:', {
-    pathname: location.pathname,
-    user: user ? 'PRESENTE' : 'AUSENTE',
-    licenseStatus: licenseStatus,
-    isLoading,
-    requireAuth,
-    requireLicense
-  });
+  if (DEBUG) {
+    console.log('🛡️ PROTECTED ROUTE - Estado atual:', {
+      pathname: location.pathname,
+      user: user ? 'PRESENTE' : 'AUSENTE',
+      licenseStatus: licenseStatus,
+      isLoading,
+      requireAuth,
+      requireLicense
+    });
+  }
 
   useEffect(() => {
-    console.log('🛡️ PROTECTED ROUTE useEffect - Verificando condições...');
+    if (DEBUG) console.log('🛡️ PROTECTED ROUTE useEffect - Verificando condições...');
     
     // Se não há usuário e é necessário autenticação
     if (!isLoading && requireAuth && !user) {
-      console.log('❌ PROTECTED ROUTE - Usuário não autenticado, mostrando toast');
+      if (DEBUG) console.log('❌ PROTECTED ROUTE - Usuário não autenticado, mostrando toast');
       toast({
         title: "Acesso negado",
         description: "Você precisa fazer login para acessar esta página.",
@@ -45,13 +50,13 @@ export function ProtectedRoute({
 
     // Licenciamento inválido: apenas efeitos (sem side-effects em render)
     if (!isLoading && requireLicense && licenseStatus && !licenseStatus.isValid) {
-      console.log('🎫 PROTECTED ROUTE - Licença inválida (effect):', licenseStatus);
+      if (DEBUG) console.log('🎫 PROTECTED ROUTE - Licença inválida (effect):', licenseStatus);
       if (!licenseStatus.isInstalled) {
         setCheckingInstallation(true);
         (async () => {
           try {
             const isFirst = await isFirstInstallation();
-            console.log('🔍 PROTECTED ROUTE - Resultado isFirstInstallation:', isFirst);
+            if (DEBUG) console.log('🔍 PROTECTED ROUTE - Resultado isFirstInstallation:', isFirst);
             if (isFirst) {
               toast({
                 title: 'Sistema não instalado',
@@ -66,7 +71,7 @@ export function ProtectedRoute({
               });
             }
           } catch (e) {
-            console.error('💥 PROTECTED ROUTE - Erro ao verificar instalação:', e);
+            if (DEBUG) console.error('💥 PROTECTED ROUTE - Erro ao verificar instalação:', e);
             toast({
               title: 'Erro de verificação',
               description: 'Erro ao verificar instalação. Redirecionamento bloqueado para debug.',
@@ -86,16 +91,24 @@ export function ProtectedRoute({
           });
         }
         if (!syncingLicense) {
+          // Evitar tentativas frequentes de sincronização: cooldown configurável
+          const now = Date.now();
+          if (lastSyncAttemptRef.current && (now - lastSyncAttemptRef.current) < SYNC_COOLDOWN_MS) {
+            if (DEBUG) console.log('⏱️ PROTECTED ROUTE - Ignorando sync, dentro do cooldown');
+            return;
+          }
+          lastSyncAttemptRef.current = now;
           setSyncingLicense(true);
           (async () => {
-            const online = isHubOnline || (await checkHubConnectivity());
+            // Não forçar checagem de conectividade aqui; confiar no polling do AuthContext
+            const online = isHubOnline;
             if (online) {
-              console.log('🔄 PROTECTED ROUTE - Hub online detectado, sincronizando licença...');
+              if (DEBUG) console.log('🔄 PROTECTED ROUTE - Hub online detectado, sincronizando licença...');
               try {
                 await syncLicenseWithHub();
                 await refreshLicenseStatus(true);
               } catch (e) {
-                console.warn('⚠️ PROTECTED ROUTE - Falha na sincronização automática da licença', e);
+                if (DEBUG) console.warn('⚠️ PROTECTED ROUTE - Falha na sincronização automática da licença', e);
               }
             }
             setSyncingLicense(false);
@@ -134,7 +147,7 @@ export function ProtectedRoute({
 
   // Mostrar loading enquanto verifica autenticação
   if (isLoading || checkingInstallation) {
-    console.log('⏳ PROTECTED ROUTE - Mostrando loading...');
+    if (DEBUG) console.log('⏳ PROTECTED ROUTE - Mostrando loading...');
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
@@ -144,13 +157,13 @@ export function ProtectedRoute({
 
   // Verificar autenticação
   if (requireAuth && !user) {
-    console.log('🔐 PROTECTED ROUTE - Redirecionando para login (sem usuário)');
+    if (DEBUG) console.log('🔐 PROTECTED ROUTE - Redirecionando para login (sem usuário)');
     return <Navigate to="/erp/login" state={{ from: location }} replace />;
   }
 
   // (Removido) Efeito separado de licenciamento para evitar mismatch de hooks em HMR
 
   // Se chegou até aqui, pode renderizar o conteúdo
-  console.log('✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo');
+  if (DEBUG) console.log('✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo');
   return <>{children}</>;
 }

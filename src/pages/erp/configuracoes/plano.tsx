@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,8 +6,10 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { getPlanInfo, updatePlan } from '@/lib/settings-api';
 import { getAllPlans } from '@/lib/entitlements';
+import { useEntitlements } from '@/hooks/use-entitlements';
 import { Check, Clock, X, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { ENDPOINTS, API_URLS } from '@/lib/env';
+import { extractPlanKeyFromSubscription, normalizePlanKey } from '@/lib/plan-utils';
 import {
   Table,
   TableBody,
@@ -58,13 +60,25 @@ export default function PlanoPage() {
   const [loading, setLoading] = useState(true);
   const [isHubOnline, setIsHubOnline] = useState(false);
   const [hubConnectivityChecked, setHubConnectivityChecked] = useState(false);
+  const { currentPlan } = useEntitlements();
 
+  // Delay inicial: aguarda 20s antes de chamar /health nesta página
+  const healthFirstTimeoutRef = useRef<number | null>(null);
+  const HUB_HEALTH_POLL_INTERVAL_MS = Math.max(5000, Number(import.meta.env.VITE_HUB_HEALTH_POLL_INTERVAL_MS ?? 20000));
   useEffect(() => {
-    checkHubConnectivity();
+    healthFirstTimeoutRef.current = window.setTimeout(() => {
+      checkHubConnectivity();
+    }, HUB_HEALTH_POLL_INTERVAL_MS);
+    return () => {
+      if (healthFirstTimeoutRef.current) {
+        window.clearTimeout(healthFirstTimeoutRef.current);
+        healthFirstTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   // Helper para requisições com timeout explícito
-  const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 15000) => {
+  const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 20000) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -85,7 +99,7 @@ export default function PlanoPage() {
       const timestamp = new Date().getTime();
       const url = `${ENDPOINTS.HUB_HEALTH}?_t=${timestamp}`;
 
-      const response = await fetchWithTimeout(url, { method: 'GET', headers: { 'Accept': 'application/json' } }, 15000);
+      const response = await fetchWithTimeout(url, { method: 'GET', headers: { 'Accept': 'application/json' } }, 20000);
       
       if (response.ok) {
         console.log('✅ Hub está online, carregando dados...');
@@ -259,14 +273,14 @@ export default function PlanoPage() {
         return;
       }
 
-      // Mapear dados da assinatura do Hub
-      const planKeyFromHub = (subscription?.plan?.name || 'starter').toLowerCase();
+      // Mapear dados da assinatura do Hub de forma resiliente
+      const planKeyFromHub = extractPlanKeyFromSubscription(subscription) || 'starter';
       const featuresEnabled = subscription?.plan?.featuresEnabled || {};
       const cycleRaw = (subscription?.billingCycle || 'MONTHLY').toString().toLowerCase();
       const mappedCycle: 'MENSAL' | 'ANUAL' = cycleRaw.includes('year') ? 'ANUAL' : 'MENSAL';
 
       let mappedPlanInfo: PlanInfo = {
-        plano: (['starter', 'pro', 'max'].includes(planKeyFromHub) ? planKeyFromHub : 'starter') as 'starter' | 'pro' | 'max',
+        plano: (normalizePlanKey(planKeyFromHub) || 'starter') as 'starter' | 'pro' | 'max',
         seatLimit: subscription?.plan?.maxSeats || 1,
         recursos: {
           products: { enabled: featuresEnabled.products !== false },
@@ -286,9 +300,9 @@ export default function PlanoPage() {
         const validateRes = await fetch(validateUrl, { method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } });
         if (validateRes.ok) {
           const data = await validateRes.json().catch(() => null);
-          const licensePlanKey = (data?.license?.planKey || data?.planKey || '').toLowerCase();
+          const licensePlanKey = normalizePlanKey((data?.license?.planKey || data?.planKey || '')); 
           const isValidLicense = data?.valid === true || data?.licensed === true;
-          if (isValidLicense && ['starter', 'pro', 'max'].includes(licensePlanKey) && licensePlanKey !== mappedPlanInfo.plano) {
+          if (isValidLicense && licensePlanKey && licensePlanKey !== mappedPlanInfo.plano) {
             mappedPlanInfo = {
               ...mappedPlanInfo,
               plano: licensePlanKey as 'starter' | 'pro' | 'max',
@@ -304,6 +318,39 @@ export default function PlanoPage() {
 
       console.log('🎯 Dados do plano carregados do Hub:', subscription);
       setPlanInfo(mappedPlanInfo);
+
+      // Após obter do Hub, sincronizar com client-local e atualizar localStorage
+      try {
+        // Atualizar cache local para uso offline
+        const nowIso = new Date().toISOString();
+        await fetch(`${API_URLS.CLIENT_LOCAL}/licensing/update-cache`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantId,
+            planKey: mappedPlanInfo.plano,
+            lastChecked: nowIso,
+            updatedAt: nowIso,
+            expiresAt: subscription?.expiresAt,
+          })
+        });
+
+        // Sincronizar plano com client-local
+        await fetch(ENDPOINTS.CLIENT_LICENSING_SYNC_PLAN, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenantId, planKey: mappedPlanInfo.plano })
+        });
+
+        // Atualizar cache do navegador e notificar listeners locais
+        localStorage.setItem('selectedPlan', mappedPlanInfo.plano);
+        try {
+          window.dispatchEvent(new CustomEvent('planChanged', { detail: { planKey: mappedPlanInfo.plano } }));
+        } catch {}
+        console.log('✅ Plano sincronizado com client-local e localStorage');
+      } catch (e) {
+        console.warn('⚠️ Falha ao sincronizar plano com client-local/localStorage', e);
+      }
     } catch (error) {
       console.error('Erro ao carregar plano do Hub:', error);
       // Não lançar erro para não marcar Hub como offline
@@ -587,13 +634,13 @@ export default function PlanoPage() {
   }
 
   const allPlans = getAllPlans();
-  const currentPlanData = allPlans.find(p => p.id === planInfo.plano);
+  const currentPlanData = allPlans.find(p => p.id === currentPlan);
   // Tentar pegar o nome do plano diretamente do Hub se disponível
   const currentHubPlan = hubPlans.find(p => 
-    p.id === planInfo.plano || 
-    p.name.toLowerCase() === planInfo.plano.toLowerCase()
+    p.id === currentPlan || 
+    p.name.toLowerCase() === String(currentPlan).toLowerCase()
   );
-  const displayPlanName = currentHubPlan?.name || currentPlanData?.name || planInfo.plano;
+  const displayPlanName = currentHubPlan?.name || currentPlanData?.name || String(currentPlan);
 
   return (
     <div className="space-y-6">
@@ -674,8 +721,8 @@ export default function PlanoPage() {
         <div className="grid gap-4 md:grid-cols-3">
           {hubPlans.map((plan) => {
             const isCurrentPlan = planInfo && (
-              plan.id === planInfo.plano || 
-              plan.name.toLowerCase() === planInfo.plano.toLowerCase()
+              plan.id === currentPlan || 
+              plan.name.toLowerCase() === String(currentPlan).toLowerCase()
             );
             
             console.log(`🔍 Checking plan ${plan.id} (${plan.name}):`, {

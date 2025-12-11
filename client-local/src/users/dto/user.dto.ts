@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsBoolean, IsOptional, MinLength } from 'class-validator';
+import { IsEmail, IsString, IsBoolean, IsOptional, MinLength, Matches } from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
@@ -23,6 +23,11 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   hubUserId?: string;
+
+  @IsString()
+  @Matches(/^\d{4}$/)
+  @IsOptional()
+  pin?: string;
 }
 
 export class UpdateUserDto {
@@ -50,4 +55,9 @@ export class UpdateUserDto {
   @IsString()
   @IsOptional()
   hubUserId?: string;
+
+  @IsString()
+  @Matches(/^\d{4}$/)
+  @IsOptional()
+  pin?: string;
 }

@@ -7,11 +7,17 @@ import { API_URLS, ENDPOINTS } from '../lib/env';
 const OFFLINE_MAX_DAYS = Math.max(0, Number(import.meta.env.VITE_OFFLINE_MAX_DAYS ?? 5));
 // Timeout do login no Hub (Render pode ter cold-start). Padrão 45s.
 const HUB_LOGIN_TIMEOUT_MS = Math.max(10000, Number(import.meta.env.VITE_HUB_LOGIN_TIMEOUT_MS ?? 45000));
+// Timeout das checagens de saúde do Hub. Recomendado 15–20s; padrão 20s.
+const HUB_HEALTH_TIMEOUT_MS = Math.max(10000, Number(import.meta.env.VITE_HUB_HEALTH_TIMEOUT_MS ?? 20000));
+// Intervalo de polling do health. Padrão: 20s. Primeiro check acontece somente após este delay.
+const HUB_HEALTH_POLL_INTERVAL_MS = Math.max(5000, Number(import.meta.env.VITE_HUB_HEALTH_POLL_INTERVAL_MS ?? 20000));
 
 interface User {
   id: string;
   email: string;
   name: string;
+  // Opcional: papel do usuário (para controle de permissões no frontend)
+  roleId?: string;
 }
 
 interface LicenseStatus {
@@ -26,6 +32,7 @@ interface AuthContextType {
   licenseStatus: LicenseStatus | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  loginWithPin: (email: string, pin: string) => Promise<boolean>;
   logout: () => void;
   switchAccountByEmail: (email: string) => Promise<boolean>;
   checkLicenseStatus: () => Promise<void>;
@@ -191,12 +198,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         return map[s] || (['starter','pro','max'].includes(s) ? (s as 'starter'|'pro'|'max') : undefined);
       };
-      const order = { starter: 0, pro: 1, max: 2 } as const;
+      // Sempre priorizar o plano do Hub como fonte da verdade.
       const hubPlan = normalizePlan(statusData.planKey);
       const localPlan = normalizePlan(installData.planKey);
-      const chosenPlan = (hubPlan && localPlan)
-        ? (order[localPlan] >= order[hubPlan] ? localPlan : hubPlan)
-        : (hubPlan || localPlan);
+      const chosenPlan = hubPlan || localPlan;
 
       const newLicenseStatus = {
         isValid: Boolean(statusData.valid),
@@ -238,8 +243,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ETAPA 1: Tentar autenticação no Hub (verificar cadastro + licenças)
       console.log('📡 ETAPA 1: Tentando autenticação no Hub...');
       let hubResponse;
-      // Considerar Hub disponível sempre que houver configuração explícita
-      const hubConfigured = Boolean(import.meta.env.VITE_HUB_API_URL);
+      // Considerar Hub disponível quando houver URL resolvida (env ou runtime default)
+      const hubConfigured = Boolean(API_URLS.HUB);
       let hubAvailable = hubConfigured;
       
       if (hubAvailable) {
@@ -330,6 +335,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setUser(userData);
                 localStorage.setItem('auth_user', JSON.stringify(userData));
                 localStorage.setItem('tenant_id', result.user.tenant.id);
+                localStorage.setItem('2f.tenantId', result.user.tenant.id);
 
                 // Persistir credenciais para uso offline
                 try {
@@ -442,6 +448,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setUser(userData);
               localStorage.setItem('auth_user', JSON.stringify(userData));
               localStorage.setItem('tenant_id', result.user.tenant.id);
+              localStorage.setItem('2f.tenantId', result.user.tenant.id);
               localStorage.setItem('show_plans_modal', 'true');
               
               toast({
@@ -565,6 +572,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               localStorage.setItem('auth_user', JSON.stringify(userData));
               if (offlineResult.user?.tenantId) {
                 localStorage.setItem('tenant_id', String(offlineResult.user.tenantId));
+                localStorage.setItem('2f.tenantId', String(offlineResult.user.tenantId));
               }
               
               // Definir status de licença offline
@@ -670,6 +678,108 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Login rápido por PIN (via client-local, centralizando regras de licença/bloqueios)
+  const loginWithPin = async (email: string, pin: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const cleanPin = String(pin).replace(/\D/g, '');
+      if (cleanPin.length !== 4) {
+        toast({ title: 'PIN inválido', description: 'Informe 4 dígitos.', variant: 'destructive' });
+        return false;
+      }
+      // Não enviar tenantId para evitar mismatch; backend usa tenantId do usuário local
+      const payload: any = { email, pin: cleanPin };
+
+      const res = await fetchWithTimeout(ENDPOINTS.CLIENT_AUTH_OFFLINE_PIN_LOGIN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }, 8000);
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          const data = await parseJsonSafe(res, '/auth/offline-pin-login');
+          // Fallback: se for mismatch de tenant, tentar sem tenantId (já estamos sem, mas mantém robustez)
+          if (String(data?.message || '').toLowerCase().includes('tenantid informado não corresponde')) {
+            const retry = await fetchWithTimeout(ENDPOINTS.CLIENT_AUTH_OFFLINE_PIN_LOGIN, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, pin: cleanPin })
+            }, 8000);
+            if (!retry.ok) {
+              const retryData = await parseJsonSafe(retry, '/auth/offline-pin-login');
+              toast({ title: 'Login por PIN falhou', description: retryData?.message || 'PIN inválido ou restrições offline.', variant: 'destructive' });
+              return false;
+            }
+            const retryResult = await parseJsonSafe(retry, '/auth/offline-pin-login');
+            if (!retryResult?.success || !retryResult?.user) {
+              toast({ title: 'Login por PIN falhou', description: retryResult?.message || 'Não foi possível autenticar.', variant: 'destructive' });
+              return false;
+            }
+            const nextUserRetry: User = {
+              id: String(retryResult.user.id),
+              email: String(retryResult.user.email),
+              name: String(retryResult.user.displayName || String(retryResult.user.email).split('@')[0]),
+              roleId: typeof retryResult.user.role === 'string' ? String(retryResult.user.role) : undefined,
+            };
+            localStorage.setItem('auth_user', JSON.stringify(nextUserRetry));
+            if (retryResult.user?.tenantId) {
+              localStorage.setItem('tenant_id', String(retryResult.user.tenantId));
+              localStorage.setItem('2f.tenantId', String(retryResult.user.tenantId));
+            }
+            setUser(nextUserRetry);
+            setLicenseStatus({ isValid: true, isInstalled: true, plan: retryResult.license?.planKey || 'starter', expiresAt: retryResult.license?.expiresAt });
+            toast({ title: 'Login por PIN', description: `Conectado como ${nextUserRetry.name || nextUserRetry.email}` });
+            await checkLicenseStatus();
+            return true;
+          }
+          toast({ title: 'Login por PIN falhou', description: data?.message || 'PIN inválido ou restrições offline.', variant: 'destructive' });
+          return false;
+        }
+        toast({ title: 'Serviço offline indisponível', description: `Falha ao comunicar com client-local (${res.status}).`, variant: 'destructive' });
+        return false;
+      }
+
+      const result = await parseJsonSafe(res, '/auth/offline-pin-login');
+      if (!result?.success || !result?.user) {
+        toast({ title: 'Login por PIN falhou', description: result?.message || 'Não foi possível autenticar.', variant: 'destructive' });
+        return false;
+      }
+
+      const nextUser: User = {
+        id: String(result.user.id),
+        email: String(result.user.email),
+        name: String(result.user.displayName || String(result.user.email).split('@')[0]),
+        roleId: typeof result.user.role === 'string' ? String(result.user.role) : undefined,
+      };
+      // Persistir no localStorage incluindo roleId para cálculo de permissões
+      localStorage.setItem('auth_user', JSON.stringify(nextUser));
+      if (result.user?.tenantId) {
+        localStorage.setItem('tenant_id', String(result.user.tenantId));
+        localStorage.setItem('2f.tenantId', String(result.user.tenantId));
+      }
+      setUser(nextUser);
+
+      // Atualizar status de licença com base no retorno e sincronizar cache
+      setLicenseStatus({
+        isValid: true,
+        isInstalled: true,
+        plan: result.license?.planKey || 'starter',
+        expiresAt: result.license?.expiresAt
+      });
+
+      toast({ title: 'Login por PIN', description: `Conectado como ${nextUser.name || nextUser.email}` });
+
+      // Forçar atualização de status de licença (menus/permissões atualizados)
+      await checkLicenseStatus();
+      return true;
+    } catch (err) {
+      console.error('loginWithPin error', err);
+      toast({ title: 'Erro no login por PIN', description: 'Tente novamente mais tarde.', variant: 'destructive' });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Trocar conta rapidamente usando usuários locais (sem revalidação de licença)
   const switchAccountByEmail = useCallback(async (email: string) => {
     try {
@@ -697,11 +807,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setLicenseStatus(null);
     
-    // Limpar localStorage completamente
-    localStorage.clear();
+    // Limpar apenas chaves de autenticação e estado transitório
+    try {
+      localStorage.removeItem('auth_user');
+      localStorage.removeItem('tenant_id');
+      localStorage.removeItem('2f.tenantId');
+      localStorage.removeItem('show_plans_modal');
+      localStorage.removeItem('license_expired_offline');
+      localStorage.removeItem('user_not_found');
+      // Importante: NÃO limpar dados de configurações (ex: 2f.settings.users, roles, etc.)
+    } catch (e) {
+      console.warn('Erro ao limpar chaves de autenticação do localStorage', e);
+    }
     
     // Limpar sessionStorage
-    sessionStorage.clear();
+    try {
+      sessionStorage.clear();
+    } catch (e) {
+      console.warn('Erro ao limpar sessionStorage', e);
+    }
     
     console.log('🧹 Cache limpo - redirecionando para login...');
     
@@ -767,23 +891,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Hub connectivity + license sync
   const [isHubOnline, setIsHubOnline] = useState<boolean>(false);
   const [hubLastCheck, setHubLastCheck] = useState<string | null>(null);
+  // Evitar chamadas concorrentes e múltiplos intervals em Strict Mode
+  const healthCheckInFlightRef = useRef(false);
+  const healthPollStartedRef = useRef(false);
 
   const checkHubConnectivity = useCallback(async (): Promise<boolean> => {
-    // Evitar requisição ao Hub se não houver configuração explícita
-    const hubConfigured = Boolean(import.meta.env.VITE_HUB_API_URL);
+    // Evitar requisição ao Hub se não houver URL resolvida (env ou default runtime)
+    const hubConfigured = Boolean(API_URLS.HUB);
     if (!hubConfigured) {
       setIsHubOnline(false);
       return false;
     }
 
     try {
-      const res = await fetchWithTimeout(`${ENDPOINTS.HUB_HEALTH}?t=${Date.now()}`, { method: 'GET' }, 3000);
+      if (healthCheckInFlightRef.current) {
+        // Já existe uma checagem em andamento; evita overlapping
+        return isHubOnline;
+      }
+      healthCheckInFlightRef.current = true;
+      // Timeout maior (20s por padrão) para validar o health com folga
+      const res = await fetchWithTimeout(`${ENDPOINTS.HUB_HEALTH}?t=${Date.now()}`, { method: 'GET' }, HUB_HEALTH_TIMEOUT_MS);
       const ok = res.ok;
       setIsHubOnline(ok);
       if (ok) setHubLastCheck(new Date().toISOString());
+      healthCheckInFlightRef.current = false;
       return ok;
     } catch (e) {
       setIsHubOnline(false);
+      healthCheckInFlightRef.current = false;
       return false;
     }
   }, [fetchWithTimeout]);
@@ -836,6 +971,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [fetchWithTimeout]);
 
+  // Polling: aguarda 20s e então verifica; repete a cada 20s. Evita duplicidade em Strict Mode.
+  useEffect(() => {
+    if (healthPollStartedRef.current) return; // Evita iniciar múltiplas vezes
+    healthPollStartedRef.current = true;
+
+    let intervalId: number | undefined;
+    let firstTimeoutId: number | undefined;
+
+    firstTimeoutId = window.setTimeout(() => {
+      checkHubConnectivity();
+      intervalId = window.setInterval(() => {
+        checkHubConnectivity();
+      }, HUB_HEALTH_POLL_INTERVAL_MS);
+    }, HUB_HEALTH_POLL_INTERVAL_MS);
+
+    return () => {
+      if (firstTimeoutId) window.clearTimeout(firstTimeoutId);
+      if (intervalId) window.clearInterval(intervalId);
+      healthPollStartedRef.current = false;
+    };
+  }, [checkHubConnectivity]);
+
   // Removido objeto 'value' não utilizado para evitar erro de tipagem.
 
   return (
@@ -845,6 +1002,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         licenseStatus,
         isLoading,
         login,
+        loginWithPin,
         logout,
         switchAccountByEmail,
         checkLicenseStatus,

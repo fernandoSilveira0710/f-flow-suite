@@ -13,7 +13,7 @@ export class HealthController {
   check() {
     const envVersion = this.configService.get<string>('APP_VERSION')
       ?? this.configService.get<string>('VITE_APP_VERSION')
-      ?? '1.0.0';
+      ?? '1.3.0';
     const version = envVersion?.startsWith('V ')
       ? envVersion
       : `V ${envVersion}`;

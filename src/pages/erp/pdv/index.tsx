@@ -58,6 +58,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/contexts/auth-context';
 import {
   getCurrentSession,
   createSession,
@@ -144,6 +145,7 @@ export default function PdvPage() {
   // Split payments
   const [splitMode, setSplitMode] = useState(false);
   const [splitPayments, setSplitPayments] = useState<{ method?: string; amount: string; installments?: number }[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     loadSession();
@@ -156,13 +158,14 @@ export default function PdvPage() {
     (async () => {
       try {
         const caixaAberto = session?.status === 'Aberto';
-        const list = await getUsablePaymentMethods('Admin', !!caixaAberto);
+        const role = user?.roleId || 'vendedor';
+        const list = await getUsablePaymentMethods(role, !!caixaAberto);
         setPaymentMethods(list);
       } catch (err) {
         // silencioso no PDV; falhas serão tratadas quando abrir o checkout
       }
     })();
-  }, [session?.status]);
+  }, [session?.status, user?.roleId]);
 
   useEffect(() => {
     // Check scanner focus periodically
@@ -321,11 +324,24 @@ export default function PdvPage() {
     }, disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'F10', handler: () => {
       if (cart.length > 0 && session?.status === 'Aberto') {
-        if (paymentMethods.length === 0) {
-          toast.error('Nenhum método de pagamento configurado no PDV');
-          return;
-        }
-        setShowCheckout(true);
+        (async () => {
+          try {
+            let methods = paymentMethods;
+            if (methods.length === 0) {
+              const role = user?.roleId || 'vendedor';
+              const caixaAberto = session?.status === 'Aberto';
+              methods = await getUsablePaymentMethods(role, !!caixaAberto);
+              setPaymentMethods(methods);
+            }
+            if (methods.length === 0) {
+              toast.error('Nenhum método de pagamento configurado no PDV');
+              return;
+            }
+            setShowCheckout(true);
+          } catch {
+            toast.error('Falha ao carregar métodos de pagamento');
+          }
+        })();
       } else if (cart.length === 0) {
         toast.error('Carrinho vazio');
       } else {

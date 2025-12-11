@@ -243,7 +243,7 @@ export default function ErpLayout() {
               })()}
               {/* Versão do cliente local / ERP */}
               <p className="text-xs text-sidebar-accent-foreground/70 mt-1">
-                Versão: {import.meta.env.VITE_APP_VERSION || 'dev'}
+                Versão: {import.meta.env.VITE_APP_VERSION || '1.3.0'}
               </p>
               <Button variant="link" size="sm" className="p-0 h-auto mt-1" asChild>
                 <a href={ENDPOINTS.SITE_RENOVACAO} target="_blank" rel="noopener noreferrer">Fazer Upgrade</a>
@@ -270,6 +270,11 @@ export default function ErpLayout() {
                 <span className="text-xs text-muted-foreground">Atualizado: {formatDate(hubLastCheck || undefined)}</span>
               ) : (
                 <>
+                  {hubLastCheck && (
+                    <span className="text-xs text-muted-foreground">
+                      Último online: {formatDate(hubLastCheck)}
+                    </span>
+                  )}
                   {typeof offlineDaysLeft === 'number' && (
                     <span className="text-xs text-muted-foreground">
                       Restam {offlineDaysLeft} dias offline
@@ -284,9 +289,7 @@ export default function ErpLayout() {
                 </span>
               )}
 
-              <Button variant="ghost" size="icon" onClick={handleRefreshHub} title="Atualizar">
-                <RefreshCw className="h-5 w-5" />
-              </Button>
+              {/* Removido botão de atualizar: status agora é verificado automaticamente a cada 10s */}
 
               <TooltipProvider>
                 <Tooltip>

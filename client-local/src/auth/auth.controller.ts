@@ -23,6 +23,12 @@ export interface OfflineLoginResponse {
   };
 }
 
+export interface OfflinePinLoginRequest {
+  email: string;
+  pin: string;
+  tenantId?: string;
+}
+
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
@@ -76,6 +82,30 @@ export class AuthController {
       this.logger.error(`💥 Erro no login offline para ${body.email}:`, error);
       throw new HttpException(
         `Falha na autenticação offline: ${error.message}`,
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+  }
+
+  @Post('offline-pin-login')
+  @HttpCode(HttpStatus.OK)
+  async offlinePinLogin(@Body() body: OfflinePinLoginRequest): Promise<OfflineLoginResponse> {
+    try {
+      this.logger.log(`🔐 Tentativa de login offline por PIN para: ${body.email}`);
+
+      const result = await this.authService.authenticateOfflineByPin(body.email, body.pin, body.tenantId);
+
+      if (result.success) {
+        this.logger.log(`✅ Login offline por PIN bem-sucedido para: ${body.email}`);
+        return result;
+      }
+
+      this.logger.warn(`❌ Login offline por PIN falhou para: ${body.email} - ${result.message}`);
+      throw new HttpException(result.message || 'Falha na autenticação offline por PIN', HttpStatus.UNAUTHORIZED);
+    } catch (error: any) {
+      this.logger.error(`💥 Erro no login offline por PIN para ${body.email}:`, error);
+      throw new HttpException(
+        `Falha na autenticação offline por PIN: ${error.message}`,
         HttpStatus.UNAUTHORIZED
       );
     }

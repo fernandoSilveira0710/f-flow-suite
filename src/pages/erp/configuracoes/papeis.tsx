@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth-context';
-import { getUsers, getRoles, updateRole, deleteRole, createRole, ALL_PERMISSIONS, Role } from '@/lib/settings-api';
+import { getUsers, getRoles, updateRole, deleteRole, createRole, ALL_PERMISSIONS, Role, getCurrentPermissions } from '@/lib/settings-api';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,11 +42,9 @@ export default function PapeisPage() {
   useEffect(() => {
     const checkAdmin = async () => {
       try {
-        const [users, roles] = await Promise.all([getUsers(), getRoles()]);
-        const current = users.find(u => u.email === user?.email);
-        const role = roles.find(r => r.id === current?.roleId);
-        const hasDanger = !!role?.permissions?.includes('settings:danger');
-        if (!hasDanger) {
+        const perms = await getCurrentPermissions();
+        const canManageRoles = perms.includes('settings:roles');
+        if (!canManageRoles) {
           toast.error('Acesso restrito: apenas admin pode gerenciar papéis.');
           navigate('/erp/settings/organization');
         }

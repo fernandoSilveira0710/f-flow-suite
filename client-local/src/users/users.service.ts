@@ -78,11 +78,19 @@ export class UsersService {
 
   async remove(id: string) {
     try {
-      const user = await this.prisma.user.delete({
+      // Verificar existência primeiro
+      const existing = await this.prisma.user.findUnique({ where: { id } });
+      if (!existing) {
+        throw new NotFoundException(`User with ID ${id} not found`);
+      }
+
+      // Soft delete: marcar como inativo ao invés de remover definitivamente
+      const user = await this.prisma.user.update({
         where: { id },
+        data: { active: false },
       });
 
-      // Generate outbox event for synchronization
+      // Gerar evento de sincronização
       await this.generateUserEvent(user, 'user.deleted.v1');
 
       return user;
@@ -115,6 +123,65 @@ export class UsersService {
       }
       throw error;
     }
+  }
+
+  async updateRole(id: string, roleData: { name?: string; description?: string; permissions?: string; active?: boolean }) {
+    try {
+      const role = await this.prisma.role.update({
+        where: { id },
+        data: {
+          ...(typeof roleData.name !== 'undefined' ? { name: roleData.name } : {}),
+          ...(typeof roleData.description !== 'undefined' ? { description: roleData.description } : {}),
+          ...(typeof roleData.permissions !== 'undefined' ? { permissions: roleData.permissions || '[]' } : {}),
+          ...(typeof roleData.active !== 'undefined' ? { active: roleData.active } : {}),
+        },
+      });
+      return role;
+    } catch (error: any) {
+      if (error?.code === 'P2025') {
+        throw new NotFoundException(`Role with ID ${id} not found`);
+      }
+      if (error?.code === 'P2002') {
+        throw new ConflictException('Role name already exists');
+      }
+      throw error;
+    }
+  }
+
+  async removeRole(idOrName: string) {
+    try {
+      // Tentar localizar por ID. Se não existir, tentar por nome.
+      const byId = await this.prisma.role.findUnique({ where: { id: idOrName } });
+      const target = byId ?? (await this.prisma.role.findUnique({ where: { name: idOrName } }));
+
+      if (!target) {
+        throw new NotFoundException(`Role with ID or name '${idOrName}' not found`);
+      }
+
+      // Soft delete: marcar como inativo para não quebrar relacionamentos
+      const role = await this.prisma.role.update({
+        where: { id: target.id },
+        data: { active: false },
+      });
+      return role;
+    } catch (error: any) {
+      if (error?.code === 'P2025') {
+        throw new NotFoundException(`Role with ID or name '${idOrName}' not found`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Atualiza o PIN de todos os usuários (opcionalmente apenas ativos).
+   */
+  async setAllPins(pin: string, onlyActive: boolean = true): Promise<{ updatedCount: number }> {
+    const where = onlyActive ? { active: true } : {};
+    const result = await this.prisma.user.updateMany({
+      where,
+      data: { pin },
+    });
+    return { updatedCount: result.count };
   }
 
   private async generateUserEvent(user: any, eventType: string): Promise<void> {

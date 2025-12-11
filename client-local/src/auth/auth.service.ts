@@ -97,6 +97,9 @@ export class AuthService {
 
   async authenticateOffline(email: string, password: string): Promise<OfflineLoginResponse> {
     try {
+      // Permitir bypass de licença em modo desenvolvimento quando LICENSING_ENFORCED !== 'true'
+      const licensingEnforced = String(process.env.LICENSING_ENFORCED || 'false') === 'true';
+
       // 1. Buscar usuário no banco local
       this.logger.log(`👤 Buscando usuário: ${email}`);
       const user = await this.prisma.user.findUnique({
@@ -117,7 +120,7 @@ export class AuthService {
         };
       }
 
-      // 2. Carregar cache de licença do tenant do usuário
+      // 2. Carregar cache de licença do tenant do usuário (a menos que licença não esteja sendo aplicada)
       this.logger.log('🔍 Verificando cache de licença do tenant...');
       let licenseCache: any = null;
       if (user.tenantId) {
@@ -125,8 +128,10 @@ export class AuthService {
           where: { tenantId: user.tenantId }
         });
       }
-
-      if (!licenseCache) {
+      if (!licensingEnforced && !licenseCache) {
+        // Em modo desenvolvimento, permitir login offline mesmo sem cache de licença
+        this.logger.warn('LICENSING_ENFORCED=false: permitindo login offline sem licença em cache (development mode).');
+      } else if (!licenseCache) {
         return {
           success: false,
           message: 'Nenhuma licença em cache encontrada para o tenant do usuário. É necessário fazer login online primeiro.'
@@ -135,9 +140,9 @@ export class AuthService {
 
       // 3. Verificar expiração com período de graça para uso offline
       const now = new Date();
-      const expiresAt = licenseCache.expiresAt ?? null;
-      const graceDays = (licenseCache as any).graceDays ?? 7;
-      let licenseStatus: 'cached' | 'offline_grace' = 'cached';
+      const expiresAt = licenseCache?.expiresAt ?? null;
+      const graceDays = (licenseCache as any)?.graceDays ?? 7;
+      let licenseStatus: 'cached' | 'offline_grace' | 'development' = licensingEnforced ? 'cached' : 'development';
       if (expiresAt && now > expiresAt) {
         const gracePeriodEnd = new Date(expiresAt.getTime() + graceDays * 24 * 60 * 60 * 1000);
         if (now <= gracePeriodEnd) {
@@ -153,9 +158,9 @@ export class AuthService {
       }
 
       // 4. Bloqueio após X dias sem comunicação com o Hub (configurável via env OFFLINE_MAX_DAYS, padrão 5)
-      const lastChecked: Date | null = licenseCache.lastChecked ?? null;
+      const lastChecked: Date | null = licenseCache?.lastChecked ?? null;
       const OFFLINE_MAX_DAYS = Math.max(0, Number(process.env.OFFLINE_MAX_DAYS ?? 5));
-      if (lastChecked) {
+      if (licensingEnforced && lastChecked) {
         const msSinceLastCheck = now.getTime() - new Date(lastChecked).getTime();
         const daysSinceLastCheck = Math.floor(msSinceLastCheck / (24 * 60 * 60 * 1000));
         if (daysSinceLastCheck > OFFLINE_MAX_DAYS) {
@@ -196,8 +201,8 @@ export class AuthService {
           role: user.role
         },
         license: {
-          planKey: licenseCache.planKey || 'unknown',
-          expiresAt: licenseCache.expiresAt?.toISOString() || '',
+          planKey: (licenseCache?.planKey || 'starter'),
+          expiresAt: licenseCache?.expiresAt?.toISOString() || '',
           status: licenseStatus
         }
       };
@@ -207,6 +212,144 @@ export class AuthService {
       return {
         success: false,
         message: `Erro interno na autenticação offline: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
+      };
+    }
+  }
+
+  async authenticateOfflineByPin(email: string, pin: string, tenantId?: string): Promise<OfflineLoginResponse> {
+    try {
+      // Permitir bypass de licença em modo desenvolvimento quando LICENSING_ENFORCED !== 'true'
+      const licensingEnforced = String(process.env.LICENSING_ENFORCED || 'false') === 'true';
+
+      // 1. Buscar usuário no banco local
+      this.logger.log(`🔢 Autenticação offline por PIN para: ${email}`);
+      const user = await this.prisma.user.findUnique({
+        where: { email }
+      });
+
+      if (!user) {
+        return {
+          success: false,
+          message: 'Usuário não encontrado no cache local. É necessário fazer login online primeiro.'
+        };
+      }
+
+      if (!user.active) {
+        return {
+          success: false,
+          message: 'Usuário inativo.'
+        };
+      }
+
+      // 2. Validar tenantId se fornecido
+      let effectiveTenantId = tenantId ?? user.tenantId ?? undefined;
+      if (tenantId && user.tenantId && user.tenantId !== tenantId) {
+        if (!licensingEnforced) {
+          // Em desenvolvimento, ignorar mismatch e usar o tenantId do usuário local
+          this.logger.warn('LICENSING_ENFORCED=false: ignorando mismatch de tenantId, usando tenantId do usuário.');
+          effectiveTenantId = user.tenantId ?? undefined;
+        } else {
+          return {
+            success: false,
+            message: 'TenantId informado não corresponde ao usuário.'
+          };
+        }
+      }
+
+      // 3. Validar PIN
+      const cleanPin = String(pin).replace(/\D/g, '');
+      if (cleanPin.length !== 4) {
+        return {
+          success: false,
+          message: 'PIN inválido. Informe 4 dígitos.'
+        };
+      }
+      if (!user.pin) {
+        return {
+          success: false,
+          message: 'PIN não configurado para este usuário.'
+        };
+      }
+      if (user.pin !== cleanPin) {
+        return {
+          success: false,
+          message: 'PIN incorreto.'
+        };
+      }
+
+      // 4. Carregar cache de licença do tenant
+      this.logger.log('🔍 Verificando cache de licença do tenant para PIN...');
+      let licenseCache: any = null;
+      if (effectiveTenantId) {
+        licenseCache = await this.prisma.licenseCache.findUnique({
+          where: { tenantId: effectiveTenantId }
+        });
+      }
+      if (!licensingEnforced && !licenseCache) {
+        // Em modo desenvolvimento, permitir login offline por PIN mesmo sem cache de licença
+        this.logger.warn('LICENSING_ENFORCED=false: permitindo login por PIN sem licença em cache (development mode).');
+      } else if (!licenseCache) {
+        return {
+          success: false,
+          message: 'Nenhuma licença em cache encontrada para o tenant do usuário. É necessário fazer login online primeiro.'
+        };
+      }
+
+      // 5. Verificar expiração com período de graça
+      const now = new Date();
+      const expiresAt = licenseCache?.expiresAt ?? null;
+      const graceDays = (licenseCache as any)?.graceDays ?? 7;
+      let licenseStatus: 'cached' | 'offline_grace' | 'development' = licensingEnforced ? 'cached' : 'development';
+      if (expiresAt && now > expiresAt) {
+        const gracePeriodEnd = new Date(expiresAt.getTime() + graceDays * 24 * 60 * 60 * 1000);
+        if (now <= gracePeriodEnd) {
+          licenseStatus = 'offline_grace';
+          this.logger.warn(`⚠️ Licença expirada, mas dentro do período de graça de ${graceDays} dias.`);
+        } else {
+          return {
+            success: false,
+            message: 'Licença em cache expirada e fora do período de graça. É necessário renovar a licença online.'
+          };
+        }
+      }
+
+      // 6. Bloqueio após X dias sem comunicação com o Hub
+      const lastChecked: Date | null = licenseCache?.lastChecked ?? null;
+      const OFFLINE_MAX_DAYS = Math.max(0, Number(process.env.OFFLINE_MAX_DAYS ?? 5));
+      if (licensingEnforced && lastChecked) {
+        const msSinceLastCheck = now.getTime() - new Date(lastChecked).getTime();
+        const daysSinceLastCheck = Math.floor(msSinceLastCheck / (24 * 60 * 60 * 1000));
+        if (daysSinceLastCheck > OFFLINE_MAX_DAYS) {
+          return {
+            success: false,
+            message: `Login offline bloqueado: passaram-se mais de ${OFFLINE_MAX_DAYS} dias sem conexão com o Hub. Conecte-se à internet e faça login online para revalidar sua licença.`,
+          };
+        }
+      }
+
+      this.logger.log('✅ Autenticação offline por PIN bem-sucedida');
+
+      return {
+        success: true,
+        message: 'Login offline por PIN realizado com sucesso',
+        user: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          tenantId: user.tenantId || '',
+          role: user.role
+        },
+        license: {
+          planKey: (licenseCache?.planKey || 'starter'),
+          expiresAt: licenseCache?.expiresAt?.toISOString() || '',
+          status: licenseStatus
+        }
+      };
+    } catch (error) {
+      this.logger.error('💥 Erro na autenticação offline por PIN:', error);
+      return {
+        success: false,
+        message: `Erro interno na autenticação offline por PIN: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
       };
     }
   }

@@ -111,15 +111,16 @@ export class LicensingController {
         };
       }
 
-      // Mapear o plano 'enterprise' (desenvolvimento) para 'max'
-      let planKey = license.plan;
-      if (planKey === 'enterprise') {
+      // Normalizar nomes vindos do Hub para chaves canônicas
+      const raw = (license.plan || '').toLowerCase();
+      let planKey: 'starter' | 'pro' | 'max';
+      if (['starter', 'basic', 'básico', 'basico', 'free'].includes(raw)) {
+        planKey = 'starter';
+      } else if (['pro', 'professional', 'profissional'].includes(raw)) {
+        planKey = 'pro';
+      } else if (['max', 'enterprise', 'premium', 'development'].includes(raw)) {
         planKey = 'max';
-      }
-
-      // Garantir que o planKey seja válido
-      const validPlans = ['starter', 'pro', 'max'];
-      if (!validPlans.includes(planKey)) {
+      } else {
         planKey = 'starter';
       }
 

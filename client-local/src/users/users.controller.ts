@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, BadRequestException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 
@@ -57,5 +57,33 @@ export class UsersController {
       permissions: roleData.permissions ? JSON.stringify(roleData.permissions) : undefined,
     };
     return this.usersService.createRole(processedRoleData);
+  }
+
+  @Put('roles/:id')
+  async updateRole(
+    @Param('id') id: string,
+    @Body() roleData: { name?: string; description?: string; permissions?: string[]; active?: boolean }
+  ) {
+    const processedRoleData = {
+      ...roleData,
+      permissions: roleData.permissions ? JSON.stringify(roleData.permissions) : undefined,
+    } as any;
+    return this.usersService.updateRole(id, processedRoleData);
+  }
+
+  @Delete('roles/:id')
+  async removeRole(@Param('id') id: string) {
+    return this.usersService.removeRole(id);
+  }
+
+  @Post('pins/bulk')
+  async bulkSetPins(@Body() body: { pin: string; onlyActive?: boolean }) {
+    const cleanPin = String(body.pin ?? '').replace(/\D/g, '');
+    if (!cleanPin || cleanPin.length !== 4) {
+      throw new BadRequestException('PIN inválido: informe exatamente 4 dígitos.');
+    }
+    const onlyActive = typeof body.onlyActive === 'boolean' ? body.onlyActive : true;
+    const result = await this.usersService.setAllPins(cleanPin, onlyActive);
+    return { success: true, updated: result.updatedCount, pin: cleanPin, onlyActive };
   }
 }

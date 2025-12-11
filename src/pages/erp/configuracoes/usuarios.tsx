@@ -60,7 +60,7 @@ export default function UsuariosPage() {
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState({ nome: '', email: '', roleId: '', ativo: true });
+  const [formData, setFormData] = useState({ nome: '', email: '', roleId: '', ativo: true, pin: '' });
   const { entitlements } = useEntitlements();
 
   useEffect(() => {
@@ -91,13 +91,13 @@ export default function UsuariosPage() {
       return;
     }
     setEditingUser(null);
-    setFormData({ nome: '', email: '', roleId: roles[0]?.id || '', ativo: true });
+    setFormData({ nome: '', email: '', roleId: roles[0]?.id || '', ativo: true, pin: '' });
     setShowDialog(true);
   };
 
   const handleEdit = (user: User) => {
     setEditingUser(user);
-    setFormData({ nome: user.nome, email: user.email, roleId: user.roleId, ativo: user.ativo });
+    setFormData({ nome: user.nome, email: user.email, roleId: user.roleId, ativo: user.ativo, pin: user.pin || '' });
     setShowDialog(true);
   };
 
@@ -239,6 +239,21 @@ export default function UsuariosPage() {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pin">PIN (4 dígitos)</Label>
+              <Input
+                id="pin"
+                type="password"
+                inputMode="numeric"
+                pattern="\\d{4}"
+                maxLength={4}
+                value={formData.pin}
+                onChange={(e) => {
+                  const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setFormData({ ...formData, pin: onlyDigits });
+                }}
               />
             </div>
             <div className="space-y-2">
