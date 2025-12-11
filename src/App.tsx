@@ -79,6 +79,7 @@ import PapeisPage from "./pages/erp/configuracoes/papeis";
 import PlanoPage from "./pages/erp/configuracoes/plano";
 import LicencasPage from "./pages/erp/configuracoes/licencas";
 import RelatoriosAuditoriaPage from "./pages/erp/relatorios/auditoria";
+import RelatoriosHomePage from "./pages/erp/relatorios";
 import TrocarContaPage from "./pages/erp/configuracoes/trocar-conta";
 // Settings pages inexistentes removidos do build
 import NovoPagamento from "./pages/erp/configuracoes/pagamentos/novo";
@@ -235,7 +236,7 @@ function App() {
           <Route path="grooming/*" element={<Navigate to="/erp/dashboard" replace />} />
           
           {/* Relatórios */}
-          <Route path="relatorios" element={<RequirePermission permission="reports:read"><StubPage title="Relatórios" description="Relatórios e Análises" /></RequirePermission>} />
+          <Route path="relatorios" element={<RequirePermission permission="reports:read"><RelatoriosHomePage /></RequirePermission>} />
           <Route path="relatorios/auditoria" element={<RequirePermission permission="reports:read"><RelatoriosAuditoriaPage /></RequirePermission>} />
 
           {/* Fallback interno do ERP */}

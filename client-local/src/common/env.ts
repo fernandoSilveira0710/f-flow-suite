@@ -23,8 +23,9 @@ export function loadEnvConfig(): void {
     // 1) Try current working directory
     const cwdPath = join(process.cwd(), candidate);
     if (existsSync(cwdPath)) {
-      // Do not override existing environment variables injected by Electron
-      loadDotenv({ path: cwdPath, override: false });
+      // In desenvolvimento, permita que .env sobrescreva variáveis de ambiente
+      // Em produção/serviço, mantenha o comportamento original (não sobrescrever)
+      loadDotenv({ path: cwdPath, override: process.env.NODE_ENV === 'development' });
       logger.log(`Loaded environment variables from ${candidate} (cwd)`);
       envLoaded = true;
       return;
@@ -33,8 +34,8 @@ export function loadEnvConfig(): void {
     // 2) Try next to compiled dist (service mode safety)
     const distSiblingPath = join(__dirname, '..', candidate);
     if (existsSync(distSiblingPath)) {
-      // Do not override existing environment variables injected by Electron
-      loadDotenv({ path: distSiblingPath, override: false });
+      // Em desenvolvimento, sobrescreva; em produção/serviço, não sobrescreva
+      loadDotenv({ path: distSiblingPath, override: process.env.NODE_ENV === 'development' });
       logger.log(`Loaded environment variables from ${candidate} (dist sibling)`);
       envLoaded = true;
       return;

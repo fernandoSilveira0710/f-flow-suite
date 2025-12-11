@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 
-export default function RelatoriosAuditoriaPage() {
+type Props = { showHeader?: boolean };
+
+export default function RelatoriosAuditoriaPage({ showHeader = true }: Props) {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [query, setQuery] = useState('');
 
@@ -29,10 +31,12 @@ export default function RelatoriosAuditoriaPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Relatórios</h1>
-        <p className="text-muted-foreground mt-1">Auditoria de operações</p>
-      </div>
+      {showHeader && (
+        <div>
+          <h1 className="text-3xl font-bold">Relatórios</h1>
+          <p className="text-muted-foreground mt-1">Auditoria de operações</p>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
