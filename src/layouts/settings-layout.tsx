@@ -33,6 +33,7 @@ type MenuItem = {
 export default function SettingsLayout() {
   const location = useLocation();
   const { currentPlan, entitlements } = useEntitlements();
+  const hideSidebar = location.pathname.startsWith('/erp/settings/switch-account');
 
   const menuItems: MenuItem[] = [
     {
@@ -46,7 +47,7 @@ export default function SettingsLayout() {
       requiresPlan: null,
     },
     {
-      label: 'Usuários & Assentos',
+      label: 'Usuários',
       icon: Users,
       path: '/erp/settings/users',
       requiresPlan: null,
@@ -120,8 +121,10 @@ export default function SettingsLayout() {
   };
 
   return (
-    <div className="flex gap-6">
+    <div className={cn('flex gap-6', hideSidebar && 'gap-0 justify-center')}
+    >
       {/* Sidebar */}
+      {!hideSidebar && (
       <aside className="w-64 flex-shrink-0">
         <div className="sticky top-6">
           <nav className="space-y-1">
@@ -167,10 +170,19 @@ export default function SettingsLayout() {
 
         </div>
       </aside>
+      )}
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0">
-        <Outlet />
+      <main className={cn('flex-1 min-w-0', hideSidebar && 'max-w-4xl w-full mx-auto')}> 
+        {hideSidebar ? (
+          <div className="min-h-[70vh] flex items-center justify-center">
+            <div className="w-full">
+              <Outlet />
+            </div>
+          </div>
+        ) : (
+          <Outlet />
+        )}
       </main>
     </div>
   );

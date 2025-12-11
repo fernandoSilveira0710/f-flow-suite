@@ -25,7 +25,7 @@ export const SETTINGS_ALIASES: Record<string, string> = {
  */
 export const SETTINGS_LABELS: Record<string, string> = {
   organization: 'Organização',
-  users: 'Usuários & Assentos',
+  users: 'Usuários',
   roles: 'Papéis & Permissões',
   billing: 'Plano & Faturamento',
   licenses: 'Licenças & Ativação',

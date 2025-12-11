@@ -4,6 +4,7 @@
  */
 
 import { API_URLS } from './env';
+import { getCurrentPermissions } from './settings-api';
 
 // Types and Interfaces
 export interface Product {
@@ -330,6 +331,10 @@ export const createSale = async (
   payments?: { method: string; amount: number; installments?: number }[]
 ): Promise<Sale> => {
   try {
+    const perms = getCurrentPermissions();
+    if (!perms.includes('pos:checkout')) {
+      throw new Error('Permissão negada: Realizar Vendas (pos:checkout)');
+    }
     // Helper: aplica desconto global proporcionalmente
     const applyGlobalDiscount = (items: CartItem[], discountValue = 0) => {
       const subtotal = items.reduce((sum, it) => sum + it.subtotal, 0);
@@ -485,6 +490,10 @@ export const getCurrentSession = (): Session | null => {
 
 export const createSession = async (operador: { id: string; nome: string }, saldoInicial: number): Promise<Session> => {
   await delay(300);
+  const perms = getCurrentPermissions();
+  if (!perms.includes('pos:open')) {
+    throw new Error('Permissão negada: Abrir Caixa (pos:open)');
+  }
   
   const session: Session = {
     id: Date.now().toString(),
@@ -502,6 +511,10 @@ export const createSession = async (operador: { id: string; nome: string }, sald
 
 export const closeSession = async (resumoFechamento: Session['resumoFechamento']): Promise<Session> => {
   await delay(300);
+  const perms = getCurrentPermissions();
+  if (!perms.includes('pos:close')) {
+    throw new Error('Permissão negada: Fechar Caixa (pos:close)');
+  }
   
   const session = getCurrentSession();
   if (!session) {
@@ -581,6 +594,10 @@ export const applyItemDiscount = (item: CartItem, discountPercent: number): Cart
 
 // Refund function
 export const refundSale = async (saleId: string): Promise<void> => {
+  const perms = getCurrentPermissions();
+  if (!perms.includes('pos:refund') && !perms.includes('sales:refund')) {
+    throw new Error('Permissão negada: Estornar Venda');
+  }
   // Calls the local client API to process the refund and revert inventory
   await apiCall<any>(`/sales/${saleId}/refund`, {
     method: 'POST',

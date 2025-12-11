@@ -14,9 +14,19 @@ export function useEntitlements() {
       setCurrentPlan(getCurrentPlan());
     };
 
+    // Evento nativo (dispara apenas entre abas)
     window.addEventListener('storage', handleStorageChange);
+
+    // Evento customizado (dispara na mesma aba quando updatePlan() é chamado)
+    const handlePlanChanged = () => {
+      setEntitlements(getEntitlements());
+      setCurrentPlan(getCurrentPlan());
+    };
+    window.addEventListener('planChanged', handlePlanChanged as EventListener);
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('planChanged', handlePlanChanged as EventListener);
     };
   }, []);
 
@@ -28,7 +38,7 @@ export function useEntitlements() {
       const map: Record<string, PlanType> = {
         starter: 'starter', basico: 'starter', básico: 'starter', basic: 'starter',
         pro: 'pro', profissional: 'pro',
-        max: 'max', enterprise: 'max'
+        max: 'max', enterprise: 'max', development: 'max'
       };
       const normalized = map[raw] || (['starter','pro','max'].includes(raw) ? raw as PlanType : 'starter');
       if (currentPlan !== normalized) {

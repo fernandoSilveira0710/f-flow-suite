@@ -5,6 +5,7 @@
 
 import { getCurrentPlan, setPlan as setEntitlementsPlan, getEntitlements } from './entitlements';
 import { ENDPOINTS } from './env';
+import { apiClient, getTenantId } from './api-client';
 
 // Types
 export interface Organization {
@@ -135,6 +136,7 @@ const STORAGE_KEYS = {
   petPrefs: '2f.settings.petPrefs',
   stockPrefs: '2f.settings.stockPrefs',
   planCycle: '2f.settings.planCycle',
+  auditEvents: '2f.audit.events',
 };
 
 // Helpers
@@ -149,6 +151,33 @@ const getFromStorage = <T>(key: string, defaultValue: T): T => {
 const setInStorage = <T>(key: string, value: T): void => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(key, JSON.stringify(value));
+};
+
+// Audit helpers
+const getCurrentUserEmail = (): string => {
+  try {
+    const authRaw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
+    if (authRaw) {
+      const auth = JSON.parse(authRaw || '{}');
+      return auth?.email || 'unknown';
+    }
+  } catch {}
+  return 'unknown';
+};
+
+const appendAuditEvent = (tipo: string, payload: unknown): void => {
+  if (typeof window === 'undefined') return;
+  const events = getFromStorage<AuditEvent[]>(STORAGE_KEYS.auditEvents, []);
+  const evt: AuditEvent = {
+    id: Date.now().toString(),
+    data: new Date().toISOString(),
+    tipo,
+    usuario: getCurrentUserEmail(),
+    payload: (() => {
+      try { return JSON.stringify(payload); } catch { return String(payload); }
+    })(),
+  };
+  setInStorage(STORAGE_KEYS.auditEvents, [evt, ...events].slice(0, 1000));
 };
 
 // Default data
@@ -190,23 +219,25 @@ const DEFAULT_ROLES: Role[] = [
     nome: 'Admin',
     permissions: [
       'products:read', 'products:write', 'products:delete',
-      'pos:read', 'pos:checkout', 'pos:refund',
-      'stock:read', 'stock:adjust', 'stock:purchase_order',
+      'pos:read', 'pos:checkout', 'pos:refund', 'pos:open', 'pos:close',
+      'sales:read', 'sales:refund',
+      'stock:read', 'stock:entry', 'stock:exit', 'stock:adjust', 'stock:purchase_order',
       'agenda:read', 'agenda:write', 'agenda:cancel',
       'pet:read', 'pet:write', 'pet:workorder',
       'reports:read', 'reports:export',
       'settings:read', 'settings:write', 'settings:danger',
+      'settings:organization', 'settings:users', 'settings:roles', 'settings:billing', 'settings:licenses', 'settings:units', 'settings:categories', 'settings:payments', 'settings:import-export',
     ],
   },
   {
     id: 'vendedor',
     nome: 'Vendedor',
-    permissions: ['products:read', 'pos:read', 'pos:checkout', 'stock:read'],
+    permissions: ['products:read', 'pos:read', 'pos:checkout', 'sales:read', 'stock:read'],
   },
   {
     id: 'estoquista',
     nome: 'Estoquista',
-    permissions: ['products:read', 'stock:read', 'stock:adjust', 'stock:purchase_order'],
+    permissions: ['products:read', 'stock:read', 'stock:entry', 'stock:exit', 'stock:adjust', 'stock:purchase_order'],
   },
   {
     id: 'groomer',
@@ -243,7 +274,13 @@ export const ALL_PERMISSIONS = [
   { id: 'pos:read', nome: 'Ver PDV', grupo: 'PDV' },
   { id: 'pos:checkout', nome: 'Realizar Vendas', grupo: 'PDV' },
   { id: 'pos:refund', nome: 'Realizar Devoluções', grupo: 'PDV' },
+  { id: 'pos:open', nome: 'Abrir Caixa', grupo: 'PDV' },
+  { id: 'pos:close', nome: 'Fechar Caixa', grupo: 'PDV' },
+  { id: 'sales:read', nome: 'Ver Vendas', grupo: 'Vendas' },
+  { id: 'sales:refund', nome: 'Estornar Vendas', grupo: 'Vendas' },
   { id: 'stock:read', nome: 'Ver Estoque', grupo: 'Estoque' },
+  { id: 'stock:entry', nome: 'Entrada de Estoque', grupo: 'Estoque' },
+  { id: 'stock:exit', nome: 'Saída de Estoque', grupo: 'Estoque' },
   { id: 'stock:adjust', nome: 'Ajustar Estoque', grupo: 'Estoque' },
   { id: 'stock:purchase_order', nome: 'Criar Pedidos de Compra', grupo: 'Estoque' },
   { id: 'agenda:read', nome: 'Ver Agenda', grupo: 'Agenda' },
@@ -257,6 +294,15 @@ export const ALL_PERMISSIONS = [
   { id: 'settings:read', nome: 'Ver Configurações', grupo: 'Configurações' },
   { id: 'settings:write', nome: 'Editar Configurações', grupo: 'Configurações' },
   { id: 'settings:danger', nome: 'Ações Perigosas', grupo: 'Configurações' },
+  { id: 'settings:organization', nome: 'Organização', grupo: 'Configurações' },
+  { id: 'settings:users', nome: 'Usuários', grupo: 'Configurações' },
+  { id: 'settings:roles', nome: 'Papéis & Permissões', grupo: 'Configurações' },
+  { id: 'settings:billing', nome: 'Plano & Faturamento', grupo: 'Configurações' },
+  { id: 'settings:licenses', nome: 'Licenças & Ativação', grupo: 'Configurações' },
+  { id: 'settings:units', nome: 'Unidades de Medida', grupo: 'Configurações' },
+  { id: 'settings:categories', nome: 'Categorias', grupo: 'Configurações' },
+  { id: 'settings:payments', nome: 'Métodos de Pagamento', grupo: 'Configurações' },
+  { id: 'settings:import-export', nome: 'Importar/Exportar', grupo: 'Configurações' },
 ];
 
 // API Functions
@@ -270,6 +316,7 @@ export const getOrganization = async (): Promise<Organization> => {
 export const updateOrganization = async (data: Organization): Promise<Organization> => {
   await delay(500);
   setInStorage(STORAGE_KEYS.organization, data);
+  appendAuditEvent('organization.updated', { tenantId: data.tenantId, changes: data });
   return data;
 };
 
@@ -282,13 +329,40 @@ export const getBranding = async (): Promise<Branding> => {
 export const updateBranding = async (data: Branding): Promise<Branding> => {
   await delay(500);
   setInStorage(STORAGE_KEYS.branding, data);
+  appendAuditEvent('branding.updated', data);
   return data;
 };
 
 // Users - Using only localStorage (prepared for future backend integration)
 export const getUsers = async (): Promise<User[]> => {
   await delay(300);
-  return getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
+  // Ler usuários do storage
+  let users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
+
+  // Garantir que o usuário logado esteja presente como Admin para permitir acesso às configurações
+  try {
+    const authRaw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
+    if (authRaw) {
+      const auth = JSON.parse(authRaw || '{}');
+      const email: string | undefined = auth?.email;
+      const displayName: string | undefined = auth?.displayName;
+      if (email && !users.some(u => u.email === email)) {
+        const seeded: User = {
+          id: `auth-${Date.now()}`,
+          nome: displayName || email,
+          email,
+          roleId: 'admin',
+          ativo: true,
+        };
+        users = [...users, seeded];
+        setInStorage(STORAGE_KEYS.users, users);
+      }
+    }
+  } catch {
+    // Em caso de erro, mantém lista atual
+  }
+
+  return users;
 };
 
 export const createUser = async (user: Omit<User, 'id'>): Promise<User> => {
@@ -297,6 +371,7 @@ export const createUser = async (user: Omit<User, 'id'>): Promise<User> => {
   const newUser = { ...user, id: Date.now().toString() };
   const updated = [...users, newUser];
   setInStorage(STORAGE_KEYS.users, updated);
+  appendAuditEvent('user.created', { id: newUser.id, email: newUser.email });
   return newUser;
 };
 
@@ -309,6 +384,7 @@ export const updateUser = async (id: string, data: Partial<User>): Promise<User>
   if (!updatedUser) {
     throw new Error('Usuário não encontrado');
   }
+  appendAuditEvent('user.updated', { id, changes: data });
   return updatedUser;
 };
 
@@ -317,40 +393,74 @@ export const deleteUser = async (id: string): Promise<void> => {
   const users = getFromStorage(STORAGE_KEYS.users, DEFAULT_USERS);
   const updated = users.filter(u => u.id !== id);
   setInStorage(STORAGE_KEYS.users, updated);
+  appendAuditEvent('user.deleted', { id });
 };
 
 // Roles - Using only localStorage (prepared for future backend integration)
 export const getRoles = async (): Promise<Role[]> => {
-  await delay(300);
-  return getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
+  await delay(200);
+  const tenantId = getTenantId();
+  try {
+    const res = await apiClient<{ data: any[] }>(`/tenants/${tenantId}/roles`, {
+      method: 'GET',
+      suppressErrorLog: true,
+    });
+    const roles = (res?.data || []).map((r: any) => ({
+      id: r.id,
+      nome: r.name || r.nome || 'Sem nome',
+      permissions: (() => {
+        try {
+          if (Array.isArray(r.permissions)) return r.permissions as string[];
+          if (typeof r.permissions === 'string') return JSON.parse(r.permissions || '[]');
+          return [] as string[];
+        } catch {
+          return [] as string[];
+        }
+      })(),
+    })) as Role[];
+    return roles;
+  } catch (err) {
+    // Fallback para dados locais quando Hub estiver indisponível
+    // Respeitar completamente o storage atual (não reintroduzir DEFAULT_ROLES removidos)
+    const stored = getFromStorage<Role[] | null>(STORAGE_KEYS.roles, null);
+    if (stored && Array.isArray(stored)) {
+      return stored;
+    }
+    // Primeira execução sem storage: inicializar com DEFAULT_ROLES
+    setInStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
+    return DEFAULT_ROLES;
+  }
 };
 
 export const createRole = async (role: Omit<Role, 'id'>): Promise<Role> => {
-  await delay(500);
+  await delay(200);
   const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
-  const newRole = { ...role, id: Date.now().toString() };
+  const newRole: Role = { ...role, id: Date.now().toString() };
   const updated = [...roles, newRole];
   setInStorage(STORAGE_KEYS.roles, updated);
+  appendAuditEvent('role.created.offline', { id: newRole.id, nome: newRole.nome });
   return newRole;
 };
 
 export const updateRole = async (id: string, data: Partial<Role>): Promise<Role> => {
-  await delay(500);
+  await delay(200);
   const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
-  const updated = roles.map(r => r.id === id ? { ...r, ...data } : r);
-  setInStorage(STORAGE_KEYS.roles, updated);
-  const updatedRole = updated.find(r => r.id === id);
+  const updatedLocal = roles.map(r => r.id === id ? { ...r, ...data } : r);
+  setInStorage(STORAGE_KEYS.roles, updatedLocal);
+  const updatedRole = updatedLocal.find(r => r.id === id);
   if (!updatedRole) {
     throw new Error('Role não encontrada');
   }
+  appendAuditEvent('role.updated.offline', { id, changes: data });
   return updatedRole;
 };
 
 export const deleteRole = async (id: string): Promise<void> => {
-  await delay(500);
+  await delay(200);
   const roles = getFromStorage(STORAGE_KEYS.roles, DEFAULT_ROLES);
   const updated = roles.filter(r => r.id !== id);
   setInStorage(STORAGE_KEYS.roles, updated);
+  appendAuditEvent('role.deleted.offline', { id });
 };
 
 // Seats - Using only localStorage (prepared for future backend integration)
@@ -371,6 +481,7 @@ export const createSeat = async (seat: Omit<Seat, 'id' | 'criadoEm' | 'tipo' | '
   };
   const updated = [...seats, newSeat];
   setInStorage(STORAGE_KEYS.seats, updated);
+  appendAuditEvent('seat.created', { id: newSeat.id, nome: newSeat.nome });
   return newSeat;
 };
 
@@ -383,6 +494,7 @@ export const updateSeat = async (id: string, data: Partial<Seat>): Promise<Seat>
   if (!updatedSeat) {
     throw new Error('Assento não encontrado');
   }
+  appendAuditEvent('seat.updated', { id, changes: data });
   return updatedSeat;
 };
 
@@ -391,6 +503,7 @@ export const deleteSeat = async (id: string): Promise<void> => {
   const seats = getFromStorage(STORAGE_KEYS.seats, DEFAULT_SEATS);
   const updated = seats.filter(s => s.id !== id);
   setInStorage(STORAGE_KEYS.seats, updated);
+  appendAuditEvent('seat.deleted', { id });
 };
 
 export const getSeatById = async (id: string): Promise<Seat | null> => {
@@ -599,6 +712,7 @@ export const getPosPrefs = async (): Promise<PosPrefs> => {
 export const updatePosPrefs = async (data: PosPrefs): Promise<PosPrefs> => {
   await delay(500);
   setInStorage(STORAGE_KEYS.posPrefs, data);
+  appendAuditEvent('posPrefs.updated', data);
   return data;
 };
 
@@ -610,6 +724,7 @@ export const getAgendaPrefs = async (): Promise<AgendaPrefs> => {
 export const updateAgendaPrefs = async (data: AgendaPrefs): Promise<AgendaPrefs> => {
   await delay(500);
   setInStorage(STORAGE_KEYS.agendaPrefs, data);
+  appendAuditEvent('agendaPrefs.updated', data);
   return data;
 };
 
@@ -621,6 +736,7 @@ export const getPetPrefs = async (): Promise<PetPrefs> => {
 export const updatePetPrefs = async (data: PetPrefs): Promise<PetPrefs> => {
   await delay(500);
   setInStorage(STORAGE_KEYS.petPrefs, data);
+  appendAuditEvent('petPrefs.updated', data);
   return data;
 };
 
@@ -632,19 +748,15 @@ export const getStockPrefs = async (): Promise<StockPrefs> => {
 export const updateStockPrefs = async (data: StockPrefs): Promise<StockPrefs> => {
   await delay(500);
   setInStorage(STORAGE_KEYS.stockPrefs, data);
+  appendAuditEvent('stockPrefs.updated', data);
   return data;
 };
 
 // Audit
 export const getAuditEvents = async (): Promise<AuditEvent[]> => {
   await delay(300);
-  return [
-    { id: '1', data: new Date().toISOString(), tipo: 'user.created', usuario: 'admin@demo.com', payload: '{"nome":"João Silva"}' },
-    { id: '2', data: new Date(Date.now() - 86400000).toISOString(), tipo: 'product.updated', usuario: 'admin@demo.com', payload: '{"id":"123","nome":"Produto X"}' },
-    { id: '3', data: new Date(Date.now() - 172800000).toISOString(), tipo: 'plan.changed', usuario: 'admin@demo.com', payload: '{"from":"starter","to":"pro"}' },
-    { id: '4', data: new Date(Date.now() - 259200000).toISOString(), tipo: 'settings.updated', usuario: 'admin@demo.com', payload: '{"section":"organization"}' },
-    { id: '5', data: new Date(Date.now() - 345600000).toISOString(), tipo: 'user.deleted', usuario: 'admin@demo.com', payload: '{"id":"999"}' },
-  ];
+  const events = getFromStorage<AuditEvent[]>(STORAGE_KEYS.auditEvents, []);
+  return events.sort((a, b) => (a.data < b.data ? 1 : -1));
 };
 
 // Import/Export (mock)
@@ -666,4 +778,33 @@ export const importData = async (file: File): Promise<{ success: number; errors:
 export const resetDemoData = async (): Promise<void> => {
   await delay(1000);
   // Mock: não faz nada de verdade
+};
+// Current user permissions helper
+export const getCurrentPermissions = (): string[] => {
+  try {
+    const authRaw = typeof window !== 'undefined' ? localStorage.getItem('auth_user') : null;
+    const email = authRaw ? (JSON.parse(authRaw || '{}')?.email as string | undefined) : undefined;
+    const users = getFromStorage<User[]>(STORAGE_KEYS.users, DEFAULT_USERS);
+    // Mesclar papéis em memória com DEFAULT_ROLES para garantir novas permissões
+    const storedRoles = getFromStorage<Role[]>(STORAGE_KEYS.roles, DEFAULT_ROLES);
+    const defaultMap = new Map(DEFAULT_ROLES.map(r => [r.id, r]));
+    const rolesMap = new Map(storedRoles.map(r => [r.id, r]));
+
+    for (const [id, def] of defaultMap.entries()) {
+      const existing = rolesMap.get(id);
+      if (existing) {
+        const mergedPerms = Array.from(new Set([...(existing.permissions || []), ...(def.permissions || [])]));
+        rolesMap.set(id, { ...existing, permissions: mergedPerms, nome: existing.nome || def.nome });
+      } else {
+        rolesMap.set(id, def);
+      }
+    }
+
+    const roles = Array.from(rolesMap.values());
+    const current = email ? users.find(u => u.email === email) : users[0];
+    const role = roles.find(r => r.id === (current?.roleId || 'admin'));
+    return role?.permissions || [];
+  } catch {
+    return [];
+  }
 };

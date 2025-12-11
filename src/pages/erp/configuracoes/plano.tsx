@@ -63,26 +63,29 @@ export default function PlanoPage() {
     checkHubConnectivity();
   }, []);
 
+  // Helper para requisições com timeout explícito
+  const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 15000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      return response;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
   const checkHubConnectivity = async () => {
     console.log('🔍 Verificando conectividade com o Hub...');
     setLoading(true);
     setHubConnectivityChecked(false);
     
     try {
-      // Testar conectividade com o Hub usando um endpoint simples
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos timeout
-      
-      // Usar timestamp para evitar cache sem headers CORS problemáticos
+      // Testar conectividade com o Hub usando /health com timeout maior
       const timestamp = new Date().getTime();
-      const url = `${ENDPOINTS.HUB_PLANS}?_t=${timestamp}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
+      const url = `${ENDPOINTS.HUB_HEALTH}?_t=${timestamp}`;
+
+      const response = await fetchWithTimeout(url, { method: 'GET', headers: { 'Accept': 'application/json' } }, 15000);
       
       if (response.ok) {
         console.log('✅ Hub está online, carregando dados...');
@@ -153,7 +156,8 @@ export default function PlanoPage() {
       const tenantId = localStorage.getItem('2f.tenantId') || 'cf0fee8c-5cb6-493b-8f02-d4fc045b114b';
       const timestamp = new Date().getTime();
       // Usar a rota correta de assinatura por tenant
-      const url = `${ENDPOINTS.HUB_TENANTS_SUBSCRIPTION(tenantId)}?_t=${timestamp}`;
+      // Usar Client-Local como proxy para evitar CORS e depender do token local
+      const url = `${ENDPOINTS.CLIENT_PLANS_SUBSCRIPTION(tenantId)}?_t=${timestamp}`;
 
       const doFallbackFromValidate = async (): Promise<boolean> => {
         try {
@@ -229,9 +233,6 @@ export default function PlanoPage() {
         headers: {
           'Accept': 'application/json',
           'x-tenant-id': tenantId,
-          // Enviar cabeçalhos de licença de forma compatível com o LicenseGuard do Hub
-          'X-License-Token': licenseToken,
-          'Authorization': `Bearer ${licenseToken}`,
         },
       });
 
@@ -325,11 +326,32 @@ export default function PlanoPage() {
         setHubPlans(plans);
         console.log('✅ Planos carregados do Hub:', plans.length);
       } else {
-        throw new Error(`Erro ao buscar planos: ${response.status}`);
+        console.warn(`⚠️ Erro ao buscar planos do Hub (HTTP ${response.status}). Usando fallback local.`);
+        const allPlans = getAllPlans();
+        setHubPlans(allPlans.map(p => ({
+          id: p.id,
+          name: p.name,
+          price: 0,
+          currency: 'BRL',
+          billingCycle: 'MONTHLY',
+          maxSeats: p.seatLimit,
+          maxDevices: p.deviceLimit ?? 1,
+          featuresEnabled: p.entitlements
+        })) as any);
       }
     } catch (error) {
-      console.error('❌ Erro ao buscar planos do Hub:', error);
-      throw error;
+      console.warn('⚠️ Erro ao buscar planos do Hub, aplicando fallback local:', error);
+      const allPlans = getAllPlans();
+      setHubPlans(allPlans.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: 0,
+        currency: 'BRL',
+        billingCycle: 'MONTHLY',
+        maxSeats: p.seatLimit,
+        maxDevices: p.deviceLimit ?? 1,
+        featuresEnabled: p.entitlements
+      })) as any);
     }
   };
 

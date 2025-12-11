@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import RequirePermission from "@/components/auth/require-permission";
 
 // Site pages desabilitados no build dev para evitar erros
 
@@ -76,6 +77,8 @@ import UsuariosPage from "./pages/erp/configuracoes/usuarios";
 import PapeisPage from "./pages/erp/configuracoes/papeis";
 import PlanoPage from "./pages/erp/configuracoes/plano";
 import LicencasPage from "./pages/erp/configuracoes/licencas";
+import RelatoriosAuditoriaPage from "./pages/erp/relatorios/auditoria";
+import TrocarContaPage from "./pages/erp/configuracoes/trocar-conta";
 // Settings pages inexistentes removidos do build
 import NovoPagamento from "./pages/erp/configuracoes/pagamentos/novo";
 import PaymentsIndex from "./pages/erp/configuracoes/pagamentos/index";
@@ -121,24 +124,24 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             
             {/* Produtos */}
-            <Route path="produtos" element={<ProdutosIndex />} />
-            <Route path="produtos/novo" element={<ProdutosNovo />} />
-            <Route path="produtos/:id" element={<ProdutoDetalhe />} />
-            <Route path="produtos/:id/editar" element={<ProdutoEditar />} />
+            <Route path="produtos" element={<RequirePermission permission="products:read"><ProdutosIndex /></RequirePermission>} />
+            <Route path="produtos/novo" element={<RequirePermission permission="products:write"><ProdutosNovo /></RequirePermission>} />
+            <Route path="produtos/:id" element={<RequirePermission permission="products:read"><ProdutoDetalhe /></RequirePermission>} />
+            <Route path="produtos/:id/editar" element={<RequirePermission permission="products:write"><ProdutoEditar /></RequirePermission>} />
 
           {/* PDV Routes */}
-          <Route path="pdv" element={<PdvIndex />} />
-          <Route path="pdv/session" element={<PdvSession />} />
-          <Route path="pdv/checkout" element={<PdvCheckout />} />
-          <Route path="pdv/history" element={<PdvHistory />} />
+          <Route path="pdv" element={<RequirePermission permission="pos:read"><PdvIndex /></RequirePermission>} />
+          <Route path="pdv/session" element={<RequirePermission permission="pos:read"><PdvSession /></RequirePermission>} />
+          <Route path="pdv/checkout" element={<RequirePermission permission="pos:checkout"><PdvCheckout /></RequirePermission>} />
+          <Route path="pdv/history" element={<RequirePermission permission="pos:read"><PdvHistory /></RequirePermission>} />
           
           {/* Vendas */}
-          <Route path="vendas" element={<VendasIndex />} />
+          <Route path="vendas" element={<RequirePermission permission="sales:read"><VendasIndex /></RequirePermission>} />
           
           {/* Stock Routes */}
-          <Route path="estoque" element={<StockPosition />} />
-          <Route path="estoque/movimentacoes" element={<StockMovements />} />
-          <Route path="estoque/fornecedores" element={<StockSuppliers />} />
+          <Route path="estoque" element={<RequirePermission permission="stock:read"><StockPosition /></RequirePermission>} />
+          <Route path="estoque/movimentacoes" element={<RequirePermission permission="stock:read"><StockMovements /></RequirePermission>} />
+          <Route path="estoque/fornecedores" element={<RequirePermission permission="stock:read"><StockSuppliers /></RequirePermission>} />
           <Route path="estoque/pedidos-compra" element={<StubPage title="Pedidos de Compra" description="Gestão de pedidos" />} />
           <Route path="estoque/pedidos-compra/novo" element={<StubPage title="Novo Pedido" description="Criar pedido de compra" />} />
           <Route path="estoque/pedidos-compra/:id" element={<StubPage title="Detalhe do Pedido" description="Visualizar pedido" />} />
@@ -230,8 +233,9 @@ function App() {
           <Route path="banho-tosa" element={<Navigate to="/erp/dashboard" replace />} />
           <Route path="grooming/*" element={<Navigate to="/erp/dashboard" replace />} />
           
-          {/* Relatórios - manter */}
-          <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
+          {/* Relatórios */}
+          <Route path="relatorios" element={<RequirePermission permission="reports:read"><StubPage title="Relatórios" description="Relatórios e Análises" /></RequirePermission>} />
+          <Route path="relatorios/auditoria" element={<RequirePermission permission="reports:read"><RelatoriosAuditoriaPage /></RequirePermission>} />
 
           {/* Fallback interno do ERP */}
           <Route path="*" element={<SimpleNotFound />} />
@@ -239,24 +243,25 @@ function App() {
               {/* Settings Routes (EN - canonical) */}
                 <Route path="settings" element={<SettingsLayout />}>
                   <Route index element={<Navigate to="/erp/settings/organization" replace />} />
-                  <Route path="organization" element={<OrganizacaoPage />} />
-                  <Route path="users" element={<UsuariosPage />} />
-                  <Route path="roles" element={<PapeisPage />} />
-                  <Route path="billing" element={<PlanoPage />} />
-                  <Route path="licenses" element={<LicencasPage />} />
+                  <Route path="organization" element={<RequirePermission permission="settings:organization"><OrganizacaoPage /></RequirePermission>} />
+                  <Route path="users" element={<RequirePermission permission="settings:users"><UsuariosPage /></RequirePermission>} />
+                  <Route path="roles" element={<RequirePermission permission="settings:roles"><PapeisPage /></RequirePermission>} />
+                  <Route path="switch-account" element={<TrocarContaPage />} />
+                  <Route path="billing" element={<RequirePermission permission="settings:billing"><PlanoPage /></RequirePermission>} />
+                  <Route path="licenses" element={<RequirePermission permission="settings:licenses"><LicencasPage /></RequirePermission>} />
                   {/* Payments index */}
-                  <Route path="payments" element={<PaymentsIndex />} />
-                  <Route path="payments/new" element={<NovoPagamento />} />
-                  <Route path="payments/:id/edit" element={<NovoPagamento />} />
+                  <Route path="payments" element={<RequirePermission permission="settings:payments"><PaymentsIndex /></RequirePermission>} />
+                  <Route path="payments/new" element={<RequirePermission permission="settings:payments"><NovoPagamento /></RequirePermission>} />
+                  <Route path="payments/:id/edit" element={<RequirePermission permission="settings:payments"><NovoPagamento /></RequirePermission>} />
                   {/* Units of Measure */}
-                  <Route path="units" element={<UnitsIndex />} />
-                  <Route path="units/new" element={<NovaUnidade />} />
-                  <Route path="units/:id/edit" element={<NovaUnidade />} />
+                  <Route path="units" element={<RequirePermission permission="settings:units"><UnitsIndex /></RequirePermission>} />
+                  <Route path="units/new" element={<RequirePermission permission="settings:units"><NovaUnidade /></RequirePermission>} />
+                  <Route path="units/:id/edit" element={<RequirePermission permission="settings:units"><NovaUnidade /></RequirePermission>} />
 
                   {/* Categories */}
-                  <Route path="categories" element={<CategoriesIndex />} />
-                  <Route path="categories/new" element={<NovaCategoria />} />
-                  <Route path="categories/:id/edit" element={<NovaCategoria />} />
+                  <Route path="categories" element={<RequirePermission permission="settings:categories"><CategoriesIndex /></RequirePermission>} />
+                  <Route path="categories/new" element={<RequirePermission permission="settings:categories"><NovaCategoria /></RequirePermission>} />
+                  <Route path="categories/:id/edit" element={<RequirePermission permission="settings:categories"><NovaCategoria /></RequirePermission>} />
             {/* Products (Settings) - removido */}
                   <Route path="notifications" element={<Navigate to="/erp/settings/organization" replace />} />
                 </Route>

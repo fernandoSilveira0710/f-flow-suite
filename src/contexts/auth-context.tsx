@@ -5,6 +5,8 @@ import { PlanSyncService } from '@/services/plan-sync.service';
 import { API_URLS, ENDPOINTS } from '../lib/env';
 // Limite de dias offline configurável via env; padrão 5
 const OFFLINE_MAX_DAYS = Math.max(0, Number(import.meta.env.VITE_OFFLINE_MAX_DAYS ?? 5));
+// Timeout do login no Hub (Render pode ter cold-start). Padrão 45s.
+const HUB_LOGIN_TIMEOUT_MS = Math.max(10000, Number(import.meta.env.VITE_HUB_LOGIN_TIMEOUT_MS ?? 45000));
 
 interface User {
   id: string;
@@ -25,6 +27,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  switchAccountByEmail: (email: string) => Promise<boolean>;
   checkLicenseStatus: () => Promise<void>;
   refreshLicenseStatus: (forceUpdate?: boolean) => Promise<void>;
   isFirstInstallation: () => Promise<boolean>;
@@ -177,12 +180,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const installData = await parseJsonSafe(installResponse, '/licensing/install-status');
       console.log('🔧 Install data from client-local:', installData);
       
+      // Normalizar planos e escolher o mais "alto" entre Hub e client-local
+      const normalizePlan = (raw?: string): 'starter' | 'pro' | 'max' | undefined => {
+        if (!raw) return undefined;
+        const s = String(raw).toLowerCase();
+        const map: Record<string, 'starter' | 'pro' | 'max'> = {
+          starter: 'starter', basico: 'starter', básico: 'starter', basic: 'starter',
+          pro: 'pro', profissional: 'pro',
+          max: 'max', enterprise: 'max', development: 'max'
+        };
+        return map[s] || (['starter','pro','max'].includes(s) ? (s as 'starter'|'pro'|'max') : undefined);
+      };
+      const order = { starter: 0, pro: 1, max: 2 } as const;
+      const hubPlan = normalizePlan(statusData.planKey);
+      const localPlan = normalizePlan(installData.planKey);
+      const chosenPlan = (hubPlan && localPlan)
+        ? (order[localPlan] >= order[hubPlan] ? localPlan : hubPlan)
+        : (hubPlan || localPlan);
+
       const newLicenseStatus = {
         isValid: Boolean(statusData.valid),
         // Considera instalado se qualquer fonte indicar instalação
         isInstalled: Boolean(installData.isInstalled) || Boolean(statusData.canStart),
-        // Prefira o planKey do status (após avaliação), com fallback para install-status
-        plan: statusData.planKey || installData.planKey,
+        // Escolhe o plano mais permissivo entre Hub e client-local para ambiente de desenvolvimento
+        plan: chosenPlan,
         expiresAt: installData.expiresAt || statusData.expiresAt
       } as LicenseStatus;
       
@@ -224,14 +245,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (hubAvailable) {
         try {
           console.log('🌐 Fazendo requisição para Hub:', ENDPOINTS.HUB_LOGIN);
-          hubResponse = await fetch(ENDPOINTS.HUB_LOGIN, {
+          // Aumenta timeout (configurável) para evitar abortos em cold-start do provider
+          hubResponse = await fetchWithTimeout(ENDPOINTS.HUB_LOGIN, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ email, password }),
-            signal: AbortSignal.timeout(5000) // Timeout de 5 segundos
-          });
+          }, HUB_LOGIN_TIMEOUT_MS);
           console.log('📡 Resposta do Hub - Status:', hubResponse.status, 'OK:', hubResponse.ok);
         } catch (hubError) {
           console.warn('❌ Hub não disponível:', hubError);
@@ -649,6 +670,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Trocar conta rapidamente usando usuários locais (sem revalidação de licença)
+  const switchAccountByEmail = useCallback(async (email: string) => {
+    try {
+      // Buscar usuários locais no settings-api para obter nome/id
+      const mod = await import('../lib/settings-api');
+      const users = await mod.getUsers();
+      const found = users.find(u => u.email === email);
+      if (!found) return false;
+      const nextUser: User = { id: found.id, email: found.email, name: found.nome };
+      localStorage.setItem('auth_user', JSON.stringify(nextUser));
+      setUser(nextUser);
+      toast({ title: 'Conta alternada', description: `Agora usando ${nextUser.name || nextUser.email}` });
+      return true;
+    } catch (err) {
+      console.error('switchAccountByEmail error', err);
+      toast({ title: 'Erro ao trocar conta', description: 'Tente novamente mais tarde', variant: 'destructive' });
+      return false;
+    }
+  }, []);
+
   const logout = () => {
     console.log('🚪 Iniciando logout - limpando cache...');
     
@@ -798,17 +839,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Removido objeto 'value' não utilizado para evitar erro de tipagem.
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      licenseStatus,
-      isLoading,
-      login,
-      logout,
-      checkLicenseStatus,
-      refreshLicenseStatus,
-      isFirstInstallation,
-      hasLocalUsers,
-      isHubOnline,
+    <AuthContext.Provider
+      value={{
+        user,
+        licenseStatus,
+        isLoading,
+        login,
+        logout,
+        switchAccountByEmail,
+        checkLicenseStatus,
+        refreshLicenseStatus,
+        isFirstInstallation,
+        hasLocalUsers,
+        isHubOnline,
       hubLastCheck,
       checkHubConnectivity,
       syncLicenseWithHub,

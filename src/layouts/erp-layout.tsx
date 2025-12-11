@@ -24,6 +24,7 @@ import {
   RefreshCw,
   HelpCircle,
   User as UserIcon,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,8 @@ export default function ErpLayout() {
   const [blockedFeature, setBlockedFeature] = useState('');
   const [requiredPlan, setRequiredPlan] = useState('');
   const location = useLocation();
+  // Ocultar chrome (sidebar e header) na tela de troca de conta
+  const hideChrome = location.pathname.startsWith('/erp/settings/switch-account');
   const { entitlements, currentPlan } = useEntitlements();
   const { logout, licenseStatus, isHubOnline, hubLastCheck, checkHubConnectivity, syncLicenseWithHub, refreshLicenseStatus, user, offlineDaysLeft, licenseCacheUpdatedAt } = useAuth();
   const queryClient = useQueryClient();
@@ -141,12 +144,13 @@ export default function ErpLayout() {
   return (
     <div className="flex min-h-screen w-full">
       {/* Sidebar */}
-      <aside
-        className={cn(
-          'flex flex-col border-r bg-sidebar transition-all duration-300',
-          collapsed ? 'w-16' : 'w-64'
-        )}
-      >
+      {!hideChrome && (
+        <aside
+          className={cn(
+            'flex flex-col border-r bg-sidebar transition-all duration-300',
+            collapsed ? 'w-16' : 'w-64'
+          )}
+        >
         {/* Logo */}
         <div className="flex h-16 items-center justify-between px-4 border-b">
           {!collapsed && (
@@ -247,12 +251,14 @@ export default function ErpLayout() {
             </div>
           </div>
         )}
-      </aside>
+        </aside>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="h-16 border-b bg-background flex items-center justify-end px-6">
+        {!hideChrome && (
+          <header className="h-16 border-b bg-background flex items-center justify-end px-6">
         <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 pr-2">
               <span className={`inline-flex items-center gap-2 rounded-md px-3 py-1 border ${isHubOnline ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
@@ -315,6 +321,11 @@ export default function ErpLayout() {
                 <span>Usuário: {user.name || user.email}</span>
               </div>
             )}
+            <Link to="/erp/settings/switch-account">
+              <Button variant="ghost" size="icon" title="Trocar conta">
+                <Users className="h-5 w-5" />
+              </Button>
+            </Link>
              <Button variant="ghost" size="icon" onClick={toggleTheme}>
                                {theme === 'light' ? (
                                  <Moon className="h-5 w-5" />
@@ -328,9 +339,10 @@ export default function ErpLayout() {
                              </Button>
                            </div>
                          </header>
+        )}
 
         {/* Page Content */}
-        <main className="flex-1 p-6 overflow-auto">
+        <main className={cn('flex-1 overflow-auto', hideChrome ? 'p-0' : 'p-6')}>
           <Outlet />
         </main>
       </div>
