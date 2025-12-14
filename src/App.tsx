@@ -90,6 +90,7 @@ import NovaCategoria from "./pages/erp/configuracoes/categorias/novo";
 import CategoriesIndex from "./pages/erp/configuracoes/categorias/index";
 import ConfiguracoesRedirect from "./pages/erp/configuracoes/index";
 import ConfiguracoesAlias from "./pages/erp/configuracoes/[...alias]";
+import ImportarExportarPage from "./pages/erp/configuracoes/importar-exportar";
 
 // Fallback simples inline para 404
 const SimpleNotFound = () => (
@@ -264,6 +265,8 @@ function App() {
                   <Route path="categories" element={<RequirePermission permission="settings:categories"><CategoriesIndex /></RequirePermission>} />
                   <Route path="categories/new" element={<RequirePermission permission="settings:categories"><NovaCategoria /></RequirePermission>} />
                   <Route path="categories/:id/edit" element={<RequirePermission permission="settings:categories"><NovaCategoria /></RequirePermission>} />
+                  {/* Import/Export */}
+                  <Route path="import-export" element={<RequirePermission permission="settings:import-export"><ImportarExportarPage /></RequirePermission>} />
             {/* Products (Settings) - removido */}
                   <Route path="notifications" element={<Navigate to="/erp/settings/organization" replace />} />
                 </Route>
