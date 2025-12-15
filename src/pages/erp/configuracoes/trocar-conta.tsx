@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, LogIn, LogOut } from 'lucide-react';
+import { Users, LogIn, LogOut, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { getUsers, getRoles, User } from '@/lib/settings-api';
-import { toast } from 'sonner';
+// Removido uso direto de 'sonner' para evitar toasts duplicados.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 
@@ -45,19 +45,15 @@ export default function TrocarContaPage() {
 
   const handleLoginConfirm = async () => {
     if (!selectedEmail) return;
-    if (!pin || pin.replace(/\D/g, '').length !== 4) {
-      toast.error('Informe o PIN de 4 dígitos');
-      return;
-    }
     setLoggingIn(true);
     const ok = await loginWithPin(selectedEmail, pin);
     setLoggingIn(false);
     if (ok) {
-      toast.success('Login realizado com sucesso');
       setModalOpen(false);
       navigate('/erp/dashboard');
     } else {
-      toast.error('Falha no login. Verifique o PIN.');
+      // Mensagens de erro e validações são tratadas no AuthContext (use-toast),
+      // evitando duplicidade de toasts aqui.
     }
   };
 
@@ -65,6 +61,9 @@ export default function TrocarContaPage() {
     <div className="min-h-screen w-full flex flex-col">
       <div className="flex items-center justify-between px-6 pt-10 pb-6">
         <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/erp/settings')} title="Voltar">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <Users className="h-6 w-6" />
           <h1 className="text-2xl font-bold">Trocar conta</h1>
         </div>

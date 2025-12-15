@@ -152,22 +152,19 @@ export default function ErpLayout() {
           )}
         >
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between px-4 border-b">
+        <div className="relative flex h-32 items-center justify-center px-4 border-b">
           {!collapsed && (
-            <Link to="/erp/dashboard" className="flex items-center gap-2 font-bold" onClick={() => {
+            <Link to="/erp/dashboard" className="flex items-center justify-center" onClick={() => {
               queryClient.refetchQueries({ queryKey: ['dashboard', 'summary'], type: 'active' });
             }}>
-              <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-                <Package2 className="h-5 w-5 text-sidebar-primary-foreground" />
-              </div>
-              <span>2F ERP</span>
+              <img src="/brand/2F-large.png" alt="2F" className="h-full w-auto" />
             </Link>
           )}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setCollapsed(!collapsed)}
-            className="ml-auto"
+            className="absolute right-4"
           >
             {collapsed ? (
               <ChevronRight className="h-4 w-4" />
