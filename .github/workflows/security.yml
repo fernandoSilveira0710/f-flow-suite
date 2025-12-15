@@ -1,13 +1,14 @@
 name: Security
 
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
   schedule:
     # Run security scan daily at 2 AM UTC
     - cron: '0 2 * * *'
+  workflow_dispatch:
 
 jobs:
   dependency-scan:

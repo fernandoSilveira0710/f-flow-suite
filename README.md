@@ -580,3 +580,18 @@ Ambos os módulos (Customers e Pets) suportam sincronização bidirecional:
 5. **Integração frontend**: substituir mocks do app React por chamadas autenticadas ao Hub quando endpoints estiverem estáveis.
 
 Para detalhes arquiteturais completos, consulte `apoio.txt`.
+
+## CI/CD e Workflows
+
+Para reduzir ruído e evitar execuções redundantes, os workflows do GitHub Actions foram simplificados:
+
+- CI: roda apenas em `pull_request` e `push` para `main` quando arquivos relevantes mudam (`hub/**`, `client-local/**`, `site/**`, `desktop/**`, `src/**`, `package.json` e locks). Possui `concurrency` para cancelar execuções duplicadas.
+- Release: é criada automaticamente ao mesclar um PR na `main` (`Release on merge to main`). Constrói ERP, client-local e o instalador Windows do desktop e publica uma Release com o artefato. Tags são derivadas da versão em `desktop/package.json`.
+- Legacy release workflows: `release.yml` e `release-build.yml` foram tornados somente `workflow_dispatch` (manual), deixando de disparar automaticamente em tags/releases para evitar duplicidade.
+- Deploy: deixou de disparar em `push`. Agora é manual (`workflow_dispatch`) com `inputs` para escolher `staging` ou `production`.
+- Segurança: varreduras executam diariamente via `schedule` e podem ser disparadas manualmente. Removidos gatilhos em `push`/`pull_request` para reduzir custo.
+- Changelog: atualizado em `release` publicada ou manualmente; não roda mais em cada `push` para `main`.
+- Auto-merge: escopo reduzido para eventos de PR (labeled, synchronize, reopened, ready_for_review) e submissão de review; continua exigindo label/critérios.
+- Labeler/Stale/Update Contributors: mantidos com seus gatilhos leves (PR/Issues e cron diário).
+
+Observação: para releases manuais, use `Actions > Build Windows Installer on Release > Run workflow`. Para releases automáticas, siga o fluxo via Pull Request para `main`.

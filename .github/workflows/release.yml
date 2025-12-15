@@ -1,9 +1,7 @@
-name: Release
+name: [DEPRECATED] Legacy Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 jobs:
   create-release:
