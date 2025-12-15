@@ -375,28 +375,30 @@ export default function PlanoPage() {
       } else {
         console.warn(`⚠️ Erro ao buscar planos do Hub (HTTP ${response.status}). Usando fallback local.`);
         const allPlans = getAllPlans();
+        // Fallback local: usar entitlements para os limites
         setHubPlans(allPlans.map(p => ({
           id: p.id,
           name: p.name,
           price: 0,
           currency: 'BRL',
           billingCycle: 'MONTHLY',
-          maxSeats: p.seatLimit,
-          maxDevices: p.deviceLimit ?? 1,
+          maxSeats: p.entitlements.seatLimit,
+          maxDevices: 1,
           featuresEnabled: p.entitlements
         })) as any);
       }
     } catch (error) {
       console.warn('⚠️ Erro ao buscar planos do Hub, aplicando fallback local:', error);
       const allPlans = getAllPlans();
+      // Fallback local: usar entitlements para os limites
       setHubPlans(allPlans.map(p => ({
         id: p.id,
         name: p.name,
         price: 0,
         currency: 'BRL',
         billingCycle: 'MONTHLY',
-        maxSeats: p.seatLimit,
-        maxDevices: p.deviceLimit ?? 1,
+        maxSeats: p.entitlements.seatLimit,
+        maxDevices: 1,
         featuresEnabled: p.entitlements
       })) as any);
     }

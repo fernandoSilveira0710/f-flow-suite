@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Form, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Category, fetchCategory, createCategory, updateCategory } from '@/lib/categories-api';
+import { fetchCategory, createCategory, updateCategory, type UpdateCategoryPayload, type CreateCategoryPayload } from '@/lib/categories-api';
 import { toast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
@@ -64,10 +64,15 @@ export default function NovaCategoria() {
   const onSubmit = async (values: FormValues) => {
     try {
       if (id) {
-        await updateCategory(id, values as Partial<Category>);
+        await updateCategory(id, values as UpdateCategoryPayload);
         toast({ title: 'Categoria atualizada', description: `"${values.name}" foi atualizada.` });
       } else {
-        await createCategory(values);
+        const payload: CreateCategoryPayload = {
+          name: values.name,
+          description: values.description || undefined,
+          active: values.active,
+        };
+        await createCategory(payload);
         toast({ title: 'Categoria criada', description: `"${values.name}" foi criada.` });
       }
       navigate('/erp/settings/categories');

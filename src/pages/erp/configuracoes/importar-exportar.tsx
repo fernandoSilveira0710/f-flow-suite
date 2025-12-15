@@ -291,7 +291,7 @@ export default function ImportarExportarPage() {
             ...prev,
             current: i + 1,
             success: prev.success + 1,
-            logs: [...prev.logs, { row: excelRowNumber, status: 'success' }].slice(-80),
+            logs: [...prev.logs, { row: excelRowNumber, status: 'success' as const }].slice(-80),
           };
           return next;
         });
@@ -303,7 +303,7 @@ export default function ImportarExportarPage() {
             ...prev,
             current: i + 1,
             errors: prev.errors + 1,
-            logs: [...prev.logs, { row: excelRowNumber, status: 'error', message: msg }].slice(-80),
+            logs: [...prev.logs, { row: excelRowNumber, status: 'error' as const, message: msg }].slice(-80),
           };
           return next;
         });

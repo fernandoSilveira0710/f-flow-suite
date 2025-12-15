@@ -1,6 +1,6 @@
 {
   "name": "fflow-desktop",
-  "version": "1.2.1",
+  "version": "1.6.3",
   "private": true,
   "main": "dist/main.js",
   "description": "F-Flow Suite Desktop (ERP + API em Electron)",
@@ -8,15 +8,16 @@
   "scripts": {
     "dev": "tsc -w & electron .",
     "build": "tsc",
-    "dist": "tsc && npm --prefix ../client-local prune --omit=dev && electron-builder"
+    "dist": "tsc && npm --prefix ../client-local prune --omit=dev && electron-builder",
+    "icon:gen": "node scripts/generate-icon.js"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
     "electron": "^32.2.0",
-    "typescript": "^5.6.3",
-    "electron-builder": "^24.6.4"
+    "electron-builder": "^24.6.4",
+    "png-to-ico": "^3.0.1",
+    "typescript": "^5.6.3"
   },
-  "dependencies": {},
   "build": {
     "appId": "com.2fsolutions.fflowsuite",
     "productName": "F-Flow Suite",
@@ -30,23 +31,46 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "../client-local/dist", "to": "client-local/dist" },
-      { "from": "../dist", "to": "erp-dist" },
-      { "from": "../client-local/node_modules", "to": "client-local/node_modules" },
-      { "from": "../client-local/prisma/migrations", "to": "prisma/migrations" },
-      { "from": "../client-local/prisma/prisma/seed.db", "to": "seed.db" }
+      {
+        "from": "../client-local/dist",
+        "to": "client-local/dist"
+      },
+      {
+        "from": "../dist",
+        "to": "erp-dist"
+      },
+      {
+        "from": "../client-local/node_modules",
+        "to": "client-local/node_modules"
+      },
+      {
+        "from": "../client-local/prisma/migrations",
+        "to": "prisma/migrations"
+      },
+      {
+        "from": "../client-local/prisma/prisma/seed.db",
+        "to": "seed.db"
+      }
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
-      "artifactName": "FFlowSuite_Setup_${version}.exe"
+      "artifactName": "FFlowSuite_Setup_${version}.exe",
+      "icon": "src/2F.ico"
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "src/2F.ico",
+      "installerHeaderIcon": "src/2F.ico"
     }
   }
 }

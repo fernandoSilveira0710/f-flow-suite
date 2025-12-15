@@ -94,6 +94,18 @@ const InstallationPage = () => {
                       Abrir página de download
                     </a>
                   </div>
+                  {/* Embed oficial do itch.io para facilitar o download imediato */}
+                  <div className="mt-6 flex justify-center">
+                    <iframe
+                      frameBorder="0"
+                      src="https://itch.io/embed/4054583"
+                      width="552"
+                      height="167"
+                      title="f-flow - download via itch.io"
+                    >
+                      <a href="https://2fsolutions.itch.io/f-flow">f-flow by 2fsolutions</a>
+                    </iframe>
+                  </div>
                   <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                     <div className="flex items-start">
                       <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />

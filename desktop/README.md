@@ -24,3 +24,9 @@ npm run dist
 ```
 
 O instalador inclui `dist/` (ERP) e `client-local/dist` automaticamente.
+
+## Portas e inicialização dinâmica
+- O desktop detecta um par de portas livres para a API e ERP.
+- Preferências: `18081` para API e `18080` para ERP; tenta alternativas e faz até 3 tentativas.
+- Se não houver `node.exe` instalado, o launcher usa o próprio executável do Electron com `ELECTRON_RUN_AS_NODE=1` para executar o `client-local/dist/main.js`.
+- Logs de inicialização ficam em `startup.log` no diretório `userData` do Electron.
