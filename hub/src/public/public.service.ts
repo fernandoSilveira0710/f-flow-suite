@@ -80,9 +80,13 @@ export class PublicService {
       try {
         const plan = await this.plansService.findPlanById(planId);
         planName = plan?.name;
-        planPrice = (plan as any)?.price;
-        planCurrency = (plan as any)?.currency || 'BRL';
-      } catch {}
+        planPrice = plan.price;
+        planCurrency = plan.currency || 'BRL';
+      } catch (err) {
+        const stack = err instanceof Error ? err.stack : undefined;
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`[PublicService] Não foi possível obter detalhes do plano: ${msg}`, stack);
+      }
     }
 
     // Fire-and-forget welcome email (non-blocking)
@@ -101,7 +105,9 @@ export class PublicService {
         this.logger.log(`[PublicService] Envio de boas-vindas disparado para ${email}.`);
       })
       .catch((err) => {
-        this.logger.error('[PublicService] Falha ao disparar email de boas-vindas', err as any);
+        const stack = err instanceof Error ? err.stack : undefined;
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`[PublicService] Falha ao disparar email de boas-vindas: ${msg}`, stack);
       });
 
     return {
@@ -198,7 +204,11 @@ export class PublicService {
         message,
       })
       .then(() => this.logger.log(`[PublicService] Email de contato disparado para ${email}.`))
-      .catch((err) => this.logger.error('[PublicService] Falha ao disparar email de contato', err as any));
+      .catch((err) => {
+        const stack = err instanceof Error ? err.stack : undefined;
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`[PublicService] Falha ao disparar email de contato: ${msg}`, stack);
+      });
 
     return { status: 'ok' };
   }

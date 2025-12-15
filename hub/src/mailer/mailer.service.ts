@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import nodemailer from 'nodemailer';
+import nodemailer, { type SentMessageInfo } from 'nodemailer';
 
 interface SendEmailPayload {
   to: string;
@@ -184,8 +184,10 @@ export class MailerService {
         let id: string | undefined;
         try {
           const json = await resPrimary.json();
-          id = json?.id;
-        } catch {}
+          id = (json as { id?: string })?.id;
+        } catch (e) {
+          this.logger.debug('[Mailer] Resend: corpo da resposta não é JSON válido para primary');
+        }
         this.logger.log(`[Mailer] Email enviado via Resend com sucesso${id ? ` (id=${id})` : ''}. to=${payload.to} from=${primaryFrom}`);
         return;
       }
@@ -201,8 +203,10 @@ export class MailerService {
           let fid: string | undefined;
           try {
             const json = await resFallback.json();
-            fid = json?.id;
-          } catch {}
+            fid = (json as { id?: string })?.id;
+          } catch (e) {
+            this.logger.debug('[Mailer] Resend: corpo da resposta não é JSON válido para fallback');
+          }
           this.logger.log(`[Mailer] Fallback bem-sucedido via Resend${fid ? ` (id=${fid})` : ''}. to=${payload.to} from=${fallbackFrom}`);
           return;
         }
@@ -210,7 +214,9 @@ export class MailerService {
         this.logger.error(`[Mailer] Fallback falhou via Resend: status=${resFallback.status} response=${fbText}`);
       }
     } catch (err) {
-      this.logger.error('[Mailer] Erro ao enviar via Resend', err as any);
+      const stack = err instanceof Error ? err.stack : undefined;
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[Mailer] Erro ao enviar via Resend: ${msg}`, stack);
     }
   }
 
@@ -244,19 +250,21 @@ export class MailerService {
 
       this.logger.log(`[Mailer] SMTP: tentando envio. host=${host} port=${port} secure=${secure} from=${fromAddress} to=${payload.to}`);
 
-      const info = await transporter.sendMail({
+      const info: SentMessageInfo = await transporter.sendMail({
         from: fromAddress,
         to: payload.to,
         subject: payload.subject,
         html: payload.html,
       });
 
-      const msgId = (info as any)?.messageId;
+      const msgId = info.messageId;
       this.logger.log(`[Mailer] Email enviado via SMTP com sucesso${msgId ? ` (messageId=${msgId})` : ''}. to=${payload.to}`);
     } catch (err) {
-      this.logger.error('[Mailer] Falha ao enviar via SMTP', err as any);
+      const stack = err instanceof Error ? err.stack : undefined;
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[Mailer] Falha ao enviar via SMTP: ${msg}`, stack);
     }
-  }
+}
 }
 
 function escapeHtml(input: string): string {
