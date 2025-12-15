@@ -28,7 +28,7 @@ export class PrismaTenantMiddleware implements NestMiddleware {
 
     // Extrair de path quando padrão for /tenants/:tenantId/...
     if (!tenantId) {
-      const pathMatch = req.path.match(/^\/tenants\/([^\/]+)/);
+      const pathMatch = req.path.match(/^\/tenants\/([^/]+)/);
       if (pathMatch && pathMatch[1]) {
         tenantId = pathMatch[1];
       }
