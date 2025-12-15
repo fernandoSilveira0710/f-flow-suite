@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useState } from 'react';
+import { useTheme } from 'next-themes';
 import { useEntitlements } from '@/hooks/use-entitlements';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
@@ -44,12 +45,11 @@ export default function ErpLayout() {
   const { logout, licenseStatus, isHubOnline, hubLastCheck, checkHubConnectivity, syncLicenseWithHub, refreshLicenseStatus, user, offlineDaysLeft, licenseCacheUpdatedAt } = useAuth();
   const queryClient = useQueryClient();
 
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const { theme, resolvedTheme, setTheme } = useTheme();
 
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    document.documentElement.classList.toggle('dark');
+    const current = resolvedTheme ?? theme;
+    setTheme(current === 'dark' ? 'light' : 'dark');
   };
 
   const formatDate = (iso?: string) => {
@@ -327,12 +327,12 @@ export default function ErpLayout() {
               </Button>
             </Link>
              <Button variant="ghost" size="icon" onClick={toggleTheme}>
-                               {theme === 'light' ? (
-                                 <Moon className="h-5 w-5" />
-                               ) : (
-                                 <Sun className="h-5 w-5" />
-                               )}
-                             </Button>
+               {(resolvedTheme ?? theme) === 'dark' ? (
+                 <Sun className="h-5 w-5" />
+               ) : (
+                 <Moon className="h-5 w-5" />
+               )}
+             </Button>
                              
                              <Button variant="ghost" size="icon" onClick={logout} title="Sair">
                                <LogOut className="h-5 w-5" />

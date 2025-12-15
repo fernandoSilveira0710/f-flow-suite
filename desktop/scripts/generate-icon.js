@@ -25,5 +25,4 @@ async function main() {
     process.exit(1);
   }
 }
-
 main();
