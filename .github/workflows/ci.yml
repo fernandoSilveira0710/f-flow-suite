@@ -206,6 +206,14 @@ jobs:
         with:
           node-version: '20.x'
 
+      - name: Debug Node and sales-api excerpt
+        shell: pwsh
+        run: |
+          node -v
+          npm -v
+          Write-Host "--- sales-api.ts lines 160..200 ---"
+          Get-Content src/lib/sales-api.ts | Select-Object -Index 160..200
+
       - name: Build ERP frontend (root)
         run: |
           npm ci
