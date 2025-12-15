@@ -29,11 +29,8 @@ npm run check:all
 Após o setup, você terá:
 - **Frontend ERP**: http://localhost:8080/erp/login
 - **Site Institucional**: http://localhost:5173
-- **Hub API**: http://localhost:8081 (NestJS + PostgreSQL)
-- **Client-local API**: http://localhost:3002 (NestJS + SQLite)
-- **Prisma Studio HUB**: http://localhost:5555 (Base de dados do HUB)
-- **Prisma Studio Client-Local**: http://localhost:5556 (Base de dados local)
-- **Adminer**: http://localhost:8080 (PostgreSQL UI)
+- **Hub API**: http://localhost:3001 (NestJS + PostgreSQL)
+- **Client-local API**: http://localhost:8081 (NestJS + SQLite)
 - **PostgreSQL**: localhost:5432
 
 ### 👥 Usuários de Teste
@@ -66,8 +63,8 @@ Após o setup, você terá:
 | **ERP Login** | http://localhost:8080/erp/login | Interface de login do ERP |
 | **ERP Dashboard** | http://localhost:8080/erp/dashboard | Dashboard principal do ERP |
 | **Site Institucional** | http://localhost:5173 | Site público da empresa |
-| **Hub API** | http://localhost:8081 | API do HUB (autenticação, licenças) |
-| **Client-Local API** | http://localhost:3002 | API local (POS, estoque, grooming) |
+| **Hub API** | http://localhost:3001 | API do HUB (autenticação, licenças) |
+| **Client-Local API** | http://localhost:8081 | API local (POS, estoque, grooming) |
 | **Prisma Studio HUB** | http://localhost:5555 | Interface do banco HUB |
 | **Prisma Studio Local** | http://localhost:5556 | Interface do banco local |
 | **Adminer** | http://localhost:8080 | Interface PostgreSQL |
@@ -75,6 +72,10 @@ Após o setup, você terá:
 ### Scripts principais
 | Script | Descrição |
 | ------ | --------- |
+| `npm run dev:all` | Sobe ERP (8080), client-local (8081) e hub (3001) juntos |
+| `npm run dev` | Sobe apenas o ERP (8080) |
+| `npm run dev:client` | Sobe apenas o client-local (8081) |
+| `npm run dev:hub` | Sobe apenas o hub (3001) |
 | `npm run dev:up` | Sobe PostgreSQL + Adminer via Docker |
 | `npm run dev:down` | Para e remove containers Docker |
 | `npm run check:all` | Executa lint + typecheck em todos os pacotes |
@@ -82,13 +83,15 @@ Após o setup, você terá:
 | `npm run check:client` | Lint + typecheck apenas no Client-local |
 | `npm run check:web` | Lint + typecheck apenas no Frontend |
 
+Observação: as portas padrão são 8080 (ERP), 8081 (client-local) e 3001 (hub). Se um serviço já estiver rodando, finalize antes de usar `dev:all` para evitar duplicação.
+
 ### Teste de saúde
 ```bash
 # Verificar se o Hub está funcionando
-curl http://localhost:8081/health
+curl http://localhost:3001/health
 
 # Verificar se o Client-local está funcionando  
-curl http://localhost:3002/pos/sales -X POST -H "Content-Type: application/json" -d "{}"
+curl http://localhost:8081/pos/sales -X POST -H "Content-Type: application/json" -d "{}"
 ```
 
 ### Configuração de ambiente
@@ -174,6 +177,49 @@ LICENSE_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-
 ```
 (O conteúdo da chave privada deve ser colado em uma única linha com `\n`.)
 
+### Deploy no Render com Neon (PostgreSQL)
+
+Este passo a passo prepara apenas o Hub para rodar no Render usando um banco Neon Postgres.
+
+1) Criar o banco no Neon
+- Acesse `https://neon.tech` e crie um projeto novo (Postgres 17, região próxima).
+- Copie a `Connection string` no formato: `postgresql://<user>:<password>@<host>:5432/<database>`.
+
+2) Ajustes no código do Hub
+- O arquivo `hub/prisma/schema.prisma` foi atualizado para `provider = "postgresql"`.
+- As migrações existentes são específicas de SQLite. Para a primeira implantação, use `db push` no Render para criar o schema diretamente no Postgres (sem rodar migrações antigas).
+
+3) Criar o serviço Web no Render
+- Tipo: `Web Service`.
+- Root directory: `hub`.
+- Build command:
+  - `npm ci && npm run build && npx prisma generate && npx prisma db push`
+- Start command:
+  - `node dist/main.js`
+- Health check path:
+  - `/health`
+
+4) Variáveis de ambiente no Render
+- `DATABASE_URL`: URL copiada do Neon.
+- `NODE_ENV`: `production`.
+- `PORT`: `3001` (o Hub escuta essa porta por padrão).
+- `LICENSING_ENFORCED`: `false` (opcional para facilitar a primeira subida; defina `true` quando tiver as chaves).
+- `LICENSE_PUBLIC_KEY_PEM`: chave pública em PEM (uma única linha com `\n`).
+- `OIDC_REQUIRED`: `false` (ligue apenas se já tiver OIDC configurado).
+
+5) Primeira implantação
+- Clique em Deploy; o step de build executa `prisma db push` e cria as tabelas no Neon.
+- Após subir, acesse a URL do serviço e valide `GET /health`.
+
+6) Migrações (opcional para o futuro)
+- Se quiser voltar a usar migrações com Postgres: apague as migrações antigas de SQLite e gere uma migração inicial nova com Postgres.
+- Localmente: `cd hub && npx prisma migrate dev --name init_postgres`.
+- No Render, troque o build step para `npx prisma migrate deploy` quando o diretório `hub/prisma/migrations` estiver com migrações de Postgres válidas.
+
+7) Observações
+- A aplicação já está pronta para Postgres; garanta que `DATABASE_URL` aponte para o Neon.
+- Se usar Docker no Render, adapte o `docker-entrypoint.sh` para `prisma db push` na primeira implantação, ou mantenha `migrate deploy` após regenerar migrações para Postgres.
+
 #### Coleção Postman
 Arquivos em `postman/`:
 - `F-Flow-Hub.postman_collection.json`
@@ -225,7 +271,7 @@ LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY----
 
 **Fluxo de Autenticação Offline:**
 1. **Hub Indisponível**: Frontend detecta que o Hub não está acessível
-2. **Fallback Automático**: Sistema tenta autenticação no client-local (localhost:3001)
+2. **Fallback Automático**: Sistema tenta autenticação no client-local (localhost:8081)
 3. **Validação Local**: Client-local valida credenciais usando dados em cache
 4. **Verificação de Licença**: Valida licença local e período de graça
 5. **Acesso Limitado**: Usuário acessa funcionalidades offline disponíveis
@@ -317,7 +363,7 @@ npm run start:dev
 NODE_ENV=development
 PORT=3001
 DATABASE_URL="file:./local.db"
-HUB_BASE_URL=http://localhost:8081
+HUB_BASE_URL=http://localhost:3001
 LICENSE_FILE=./license.jwt
 LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
 DEVICE_ID=<guid-da-maquina>
@@ -356,7 +402,7 @@ POST /sync/push/pending
 Envia todos os eventos não processados para o Hub e os marca como processados:
 ```bash
 # Exemplo de uso
-curl -X POST http://localhost:3001/sync/push/pending
+curl -X POST http://localhost:8081/sync/push/pending
 # Resposta: número de eventos sincronizados
 ```
 
@@ -389,7 +435,7 @@ Busca comandos pendentes do Hub para execução local.
 
 1. **Criar uma venda** (gera evento `sale.created.v1`):
 ```bash
-curl -X POST http://localhost:3001/pos/sales \
+curl -X POST http://localhost:8081/pos/sales \
   -H "Content-Type: application/json" \
   -d '{
     "operator": "Operador Teste",
@@ -406,17 +452,17 @@ curl -X POST http://localhost:3001/pos/sales \
 
 2. **Verificar eventos pendentes**:
 ```bash
-curl http://localhost:3001/sync/events
+curl http://localhost:8081/sync/events
 ```
 
 3. **Sincronizar com o Hub**:
 ```bash
-curl -X POST http://localhost:3001/sync/push/pending
+curl -X POST http://localhost:8081/sync/push/pending
 ```
 
 4. **Confirmar processamento**:
 ```bash
-curl http://localhost:3001/sync/events
+curl http://localhost:8081/sync/events
 # Verificar se "processed": true
 ```
 

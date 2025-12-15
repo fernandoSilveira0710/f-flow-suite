@@ -35,7 +35,7 @@ export class ResourcesService {
       orderBy: { name: 'asc' },
     });
 
-    return resources.map(resource => this.mapToResponseDto(resource));
+    return resources.map((resource: any) => this.mapToResponseDto(resource));
   }
 
   async findOne(id: string): Promise<ResourceResponseDto> {

@@ -1,11 +1,18 @@
 {
   "name": "vite_react_shadcn_ts",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=20 <21"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev:erp": "npm run dev",
+    "dev:client": "set CLIENT_HTTP_PORT=8081&& set NODE_ENV=development&& npm --prefix client-local run start:dev",
+    "dev:hub": "npm --prefix hub run start:dev",
+    "dev:all": "concurrently -k -n ERP,CLIENT,HUB \"npm run dev\" \"npm run dev:client\" \"npm run dev:hub\"",
+    "build": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -17,7 +24,9 @@
     "check:all": "npm run check:hub && npm run check:client && npm run check:web",
     "check:hub": "cd hub && npm run lint && npm run typecheck",
     "check:client": "cd client-local && npm run lint && npm run typecheck",
-    "check:web": "npm run lint && npx tsc --noEmit"
+    "check:web": "npm run lint && npx tsc --noEmit",
+    "build:render": "cd hub && npm ci --include=dev && npm run build && npm run prisma:generate",
+    "sync:version": "node ./scripts/sync-version.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -70,6 +79,7 @@
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^13.0.0",
     "vaul": "^0.9.9",
+    "xlsx": "^0.18.5",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -85,12 +95,14 @@
     "@vitest/coverage-v8": "^2.1.8",
     "@vitest/ui": "^2.1.8",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
     "jsdom": "^25.0.1",
     "lovable-tagger": "^1.1.10",
+    "pkg": "^5.8.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",

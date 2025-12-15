@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -9,13 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Form,
   FormControl,
@@ -27,7 +20,7 @@ import {
 } from '@/components/ui/form';
 import { ArrowLeft, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
-import { createPaymentMethod, PaymentMethodType } from '@/lib/payments-api';
+import { createPaymentMethod, getPaymentMethod, updatePaymentMethod, PaymentMethodType } from '@/lib/payments-api';
 
 const formSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
@@ -40,11 +33,6 @@ const formSchema = z.object({
   jurosPorParcelaPct: z.number().min(0).max(100).optional(),
   descontoFixoPct: z.number().min(0).max(100).optional(),
   taxaFixa: z.number().min(0).optional(),
-  integracaoProvider: z.enum(['nenhum', 'maquininha', 'gateway']).optional(),
-  referenciaExterna: z.string().optional(),
-  imprimeComprovante: z.boolean(),
-  contabilizaNoCaixa: z.boolean(),
-  permiteSangria: z.boolean(),
   valorMin: z.number().min(0).optional(),
   valorMax: z.number().min(0).optional(),
   somenteSeCaixaAberto: z.boolean(),
@@ -63,14 +51,18 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function NovoPagamento() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEdit = !!id;
   const [loading, setLoading] = useState(false);
+  const [loadingItem, setLoadingItem] = useState(false);
+  const [loadedName, setLoadedName] = useState<string | null>(null);
   const [testValue, setTestValue] = useState('100.00');
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       nome: '',
-      tipo: 'CASH',
+      tipo: 'OTHER',
       ativo: true,
       ordem: 1,
       permiteTroco: false,
@@ -79,11 +71,6 @@ export default function NovoPagamento() {
       jurosPorParcelaPct: 0,
       descontoFixoPct: 0,
       taxaFixa: 0,
-      integracaoProvider: 'nenhum',
-      referenciaExterna: '',
-      imprimeComprovante: false,
-      contabilizaNoCaixa: false,
-      permiteSangria: false,
       valorMin: undefined,
       valorMax: undefined,
       somenteSeCaixaAberto: true,
@@ -91,7 +78,6 @@ export default function NovoPagamento() {
     },
   });
 
-  const watchTipo = form.watch('tipo');
   const watchPermiteParcelas = form.watch('permiteParcelas');
   const watchDescontoFixoPct = form.watch('descontoFixoPct');
   const watchJurosPorParcelaPct = form.watch('jurosPorParcelaPct');
@@ -101,44 +87,95 @@ export default function NovoPagamento() {
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      await createPaymentMethod({
-        nome: data.nome,
-        tipo: data.tipo as PaymentMethodType,
-        ativo: data.ativo,
-        ordem: data.ordem,
-        permiteTroco: data.permiteTroco,
-        permiteParcelas: data.permiteParcelas,
-        maxParcelas: data.permiteParcelas ? data.maxParcelas : undefined,
-        jurosPorParcelaPct: data.permiteParcelas ? data.jurosPorParcelaPct : undefined,
-        descontoFixoPct: data.descontoFixoPct,
-        taxaFixa: data.taxaFixa,
-        integracao: {
-          provider: data.integracaoProvider,
-          referenciaExterna: data.referenciaExterna,
-          imprimeComprovante: data.imprimeComprovante,
-        },
-        regrasCaixa: {
-          contabilizaNoCaixa: data.contabilizaNoCaixa,
-          permiteSangria: data.permiteSangria,
-        },
-        restricoes: {
-          valorMin: data.valorMin,
-          valorMax: data.valorMax,
-          somenteSeCaixaAberto: data.somenteSeCaixaAberto,
-        },
-        visibilidade: {
-          mostrarNoPDV: data.mostrarNoPDV,
-        },
-      });
-
-      toast.success('Método de pagamento criado com sucesso');
-      navigate('/erp/configuracoes/pagamentos');
+      if (isEdit && id) {
+        await updatePaymentMethod(id, {
+          nome: data.nome,
+          tipo: data.tipo as PaymentMethodType,
+          ativo: data.ativo,
+          ordem: data.ordem,
+          permiteTroco: data.permiteTroco,
+          permiteParcelas: data.permiteParcelas,
+          maxParcelas: data.permiteParcelas ? data.maxParcelas : undefined,
+          jurosPorParcelaPct: data.permiteParcelas ? data.jurosPorParcelaPct : undefined,
+          descontoFixoPct: data.descontoFixoPct,
+          taxaFixa: data.taxaFixa,
+          restricoes: {
+            valorMin: data.valorMin,
+            valorMax: data.valorMax,
+            somenteSeCaixaAberto: data.somenteSeCaixaAberto,
+          },
+          visibilidade: {
+            mostrarNoPDV: data.mostrarNoPDV,
+          },
+        });
+        toast.success('Método de pagamento atualizado com sucesso');
+      } else {
+        await createPaymentMethod({
+          nome: data.nome,
+          tipo: data.tipo as PaymentMethodType,
+          ativo: data.ativo,
+          ordem: data.ordem,
+          permiteTroco: data.permiteTroco,
+          permiteParcelas: data.permiteParcelas,
+          maxParcelas: data.permiteParcelas ? data.maxParcelas : undefined,
+          jurosPorParcelaPct: data.permiteParcelas ? data.jurosPorParcelaPct : undefined,
+          descontoFixoPct: data.descontoFixoPct,
+          taxaFixa: data.taxaFixa,
+          restricoes: {
+            valorMin: data.valorMin,
+            valorMax: data.valorMax,
+            somenteSeCaixaAberto: data.somenteSeCaixaAberto,
+          },
+          visibilidade: {
+            mostrarNoPDV: data.mostrarNoPDV,
+          },
+        });
+        toast.success('Método de pagamento criado com sucesso');
+      }
+      navigate('/erp/settings/payments');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Erro ao criar método');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const loadItem = async () => {
+      if (!isEdit || !id) return;
+      setLoadingItem(true);
+      try {
+        const pm = await getPaymentMethod(id);
+        if (!pm) {
+          toast.error('Método de pagamento não encontrado');
+          return;
+        }
+        setLoadedName(pm.nome);
+        form.reset({
+          nome: pm.nome || '',
+          tipo: (pm.tipo as PaymentMethodType) || 'OTHER',
+          ativo: pm.ativo ?? true,
+          ordem: pm.ordem ?? 1,
+          permiteTroco: pm.permiteTroco ?? false,
+          permiteParcelas: pm.permiteParcelas ?? false,
+          maxParcelas: pm.maxParcelas ?? 1,
+          jurosPorParcelaPct: pm.jurosPorParcelaPct ?? 0,
+          descontoFixoPct: pm.descontoFixoPct ?? 0,
+          taxaFixa: pm.taxaFixa ?? 0,
+          valorMin: pm.restricoes?.valorMin ?? undefined,
+          valorMax: pm.restricoes?.valorMax ?? undefined,
+          somenteSeCaixaAberto: pm.restricoes?.somenteSeCaixaAberto ?? true,
+          mostrarNoPDV: pm.visibilidade?.mostrarNoPDV ?? true,
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Falha ao carregar método');
+      } finally {
+        setLoadingItem(false);
+      }
+    };
+    loadItem();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, id]);
 
   const calculateTest = () => {
     const value = parseFloat(testValue);
@@ -166,13 +203,13 @@ export default function NovoPagamento() {
   return (
     <div>
       <PageHeader
-        title="Novo Método de Pagamento"
-        description="Configure um novo meio de pagamento para o PDV"
+        title={isEdit ? 'Editar Método de Pagamento' : 'Novo Método de Pagamento'}
+        description={isEdit ? (loadedName ? `Editando: ${loadedName}` : 'Carregando dados...') : 'Configure um novo meio de pagamento para o PDV'}
       />
 
       <Button
         variant="ghost"
-        onClick={() => navigate('/erp/configuracoes/pagamentos')}
+        onClick={() => navigate('/erp/settings/payments')}
         className="mb-6"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -202,31 +239,7 @@ export default function NovoPagamento() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="tipo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="CASH">Dinheiro</SelectItem>
-                          <SelectItem value="DEBIT">Débito</SelectItem>
-                          <SelectItem value="CREDIT">Crédito</SelectItem>
-                          <SelectItem value="PIX">PIX</SelectItem>
-                          <SelectItem value="VOUCHER">Vale</SelectItem>
-                          <SelectItem value="OTHER">Outro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Tipo removido da UI; tipo padrão 'OTHER' será usado para persistência */}
 
                 <FormField
                   control={form.control}
@@ -300,11 +313,7 @@ export default function NovoPagamento() {
                       <FormDescription>Cliente pode receber troco (típico de dinheiro)</FormDescription>
                     </div>
                     <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={watchTipo !== 'CASH'}
-                      />
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
                     </FormControl>
                   </FormItem>
                 )}
@@ -463,129 +472,9 @@ export default function NovoPagamento() {
             </CardContent>
           </Card>
 
-          {/* Integração */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Integração (Mock)</CardTitle>
-              <CardDescription>Configurações de integração com sistemas externos</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="integracaoProvider"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Provider</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="nenhum">Nenhum</SelectItem>
-                          <SelectItem value="maquininha">Maquininha</SelectItem>
-                          <SelectItem value="gateway">Gateway</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+          {/* Integração removida */}
 
-                <FormField
-                  control={form.control}
-                  name="referenciaExterna"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Referência Externa</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: ID da conta" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="imprimeComprovante"
-                render={({ field }) => (
-                  <FormItem className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <FormLabel>Imprime Comprovante</FormLabel>
-                      <FormDescription>Gerar comprovante automaticamente</FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Regras de Caixa */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Regras de Caixa</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="contabilizaNoCaixa"
-                render={({ field }) => (
-                  <FormItem className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <FormLabel>Contabiliza no Caixa</FormLabel>
-                      <FormDescription>Entra no fechamento como dinheiro em caixa</FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="permiteSangria"
-                render={({ field }) => (
-                  <FormItem className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <FormLabel>Permite Sangria</FormLabel>
-                      <FormDescription>Habilitar retiradas de caixa</FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={watchTipo !== 'CASH'}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="somenteSeCaixaAberto"
-                render={({ field }) => (
-                  <FormItem className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <FormLabel>Somente se Caixa Aberto</FormLabel>
-                      <FormDescription>Exigir caixa aberto para usar este método</FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+          {/* Regras de Caixa removidas */}
 
           {/* Teste Rápido */}
           <Card>
@@ -639,14 +528,14 @@ export default function NovoPagamento() {
           </Card>
 
           <div className="flex gap-4">
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || loadingItem}>
               <DollarSign className="mr-2 h-4 w-4" />
-              Criar Método
+              {isEdit ? 'Salvar Alterações' : 'Criar Método'}
             </Button>
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate('/erp/configuracoes/pagamentos')}
+              onClick={() => navigate('/erp/settings/payments')}
             >
               Cancelar
             </Button>

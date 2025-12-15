@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { EventsService } from '../common/events.service';
 import { SaleResponseDto, CreateSaleDto, UpdateSaleDto } from './dto';
 
 export interface SaleCreatedEventPayload {
@@ -26,7 +27,7 @@ export interface SaleCreatedEventPayload {
 export class SalesService {
   private readonly logger = new Logger(SalesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly eventsService: EventsService) {}
 
   async upsertFromEvent(tenantId: string, eventPayload: SaleCreatedEventPayload): Promise<void> {
     this.logger.log(`Upserting sale ${eventPayload.id} for tenant: ${tenantId}`);
@@ -73,20 +74,16 @@ export class SalesService {
         create: {
           id: eventPayload.id,
           tenantId: tenant.id,
-          code: eventPayload.code,
-          date: createdAt,
-          operator: eventPayload.operator,
+          saleNumber: eventPayload.code,
+          saleDate: createdAt,
           total: eventPayload.total,
-          paymentMethod: eventPayload.paymentMethod,
           status: eventPayload.status || 'completed',
           createdAt: createdAt,
           updatedAt: updatedAt,
         },
         update: {
-          code: eventPayload.code,
-          operator: eventPayload.operator,
+          saleNumber: eventPayload.code,
           total: eventPayload.total,
-          paymentMethod: eventPayload.paymentMethod,
           status: eventPayload.status || 'completed',
           updatedAt: new Date(),
         },
@@ -96,7 +93,6 @@ export class SalesService {
       await tx.saleItem.deleteMany({
         where: {
           saleId: sale.id,
-          tenantId: tenant.id,
         },
       });
 
@@ -105,10 +101,9 @@ export class SalesService {
         await tx.saleItem.create({
           data: {
             id: item.id,
-            tenantId: tenant.id,
             saleId: sale.id,
             productId: item.productId,
-            qty: item.qty,
+            quantity: item.qty,
             unitPrice: item.unitPrice,
             subtotal: item.subtotal,
           },
@@ -136,7 +131,7 @@ export class SalesService {
     if (createSaleDto.code) {
       const existingSale = await this.prisma.sale.findFirst({
         where: {
-          code: createSaleDto.code,
+          saleNumber: createSaleDto.code,
           tenantId: tenant.id,
         },
       });
@@ -156,11 +151,9 @@ export class SalesService {
         data: {
           id: saleId,
           tenantId: tenant.id,
-          code: createSaleDto.code || `SALE-${Date.now()}`,
-          date: now,
-          operator: createSaleDto.operator,
+          saleNumber: createSaleDto.code || `SALE-${Date.now()}`,
+          saleDate: now,
           total: createSaleDto.total,
-          paymentMethod: createSaleDto.paymentMethod,
           status: createSaleDto.status || 'completed',
           createdAt: now,
           updatedAt: now,
@@ -173,10 +166,9 @@ export class SalesService {
         await tx.saleItem.create({
           data: {
             id: uuidv4(),
-            tenantId: tenant.id,
             saleId: sale.id,
             productId: item.productId,
-            qty: item.qty,
+            quantity: item.qty,
             unitPrice: item.unitPrice,
             subtotal: item.subtotal,
           },
@@ -187,7 +179,14 @@ export class SalesService {
     });
 
     this.logger.log(`Successfully created sale ${saleId}`);
-    return this.findOneByTenant(tenantId, saleId);
+    const createdSale = await this.findOneByTenant(tenantId, saleId);
+    await this.eventsService.createEvent(tenantId, {
+      eventType: 'sale.created.v1',
+      entityType: 'sale',
+      entityId: createdSale.id,
+      data: createdSale,
+    });
+    return createdSale;
   }
 
   async update(tenantId: string, saleId: string, updateSaleDto: UpdateSaleDto): Promise<SaleResponseDto> {
@@ -216,10 +215,10 @@ export class SalesService {
     }
 
     // Check if new code conflicts with existing sales (if code is being updated)
-    if (updateSaleDto.code && updateSaleDto.code !== existingSale.code) {
+    if (updateSaleDto.code && updateSaleDto.code !== existingSale.saleNumber) {
       const codeConflict = await this.prisma.sale.findFirst({
         where: {
-          code: updateSaleDto.code,
+          saleNumber: updateSaleDto.code,
           tenantId: tenant.id,
           id: { not: saleId },
         },
@@ -237,10 +236,8 @@ export class SalesService {
       await tx.sale.update({
         where: { id: saleId },
         data: {
-          ...(updateSaleDto.code && { code: updateSaleDto.code }),
-          ...(updateSaleDto.operator && { operator: updateSaleDto.operator }),
+          ...(updateSaleDto.code && { saleNumber: updateSaleDto.code }),
           ...(updateSaleDto.total !== undefined && { total: updateSaleDto.total }),
-          ...(updateSaleDto.paymentMethod && { paymentMethod: updateSaleDto.paymentMethod }),
           ...(updateSaleDto.status && { status: updateSaleDto.status }),
           updatedAt: now,
         },
@@ -252,7 +249,6 @@ export class SalesService {
         await tx.saleItem.deleteMany({
           where: {
             saleId: saleId,
-            tenantId: tenant.id,
           },
         });
 
@@ -262,13 +258,11 @@ export class SalesService {
           await tx.saleItem.create({
             data: {
               id: uuidv4(),
-              tenantId: tenant.id,
               saleId: saleId,
               productId: itemDto.productId,
-              qty: itemDto.qty,
+              quantity: itemDto.qty,
               unitPrice: itemDto.unitPrice,
               subtotal: itemDto.subtotal,
-              createdAt: now,
             },
           });
         }
@@ -276,7 +270,14 @@ export class SalesService {
     });
 
     this.logger.log(`Successfully updated sale ${saleId}`);
-    return this.findOneByTenant(tenantId, saleId);
+    const updatedSale = await this.findOneByTenant(tenantId, saleId);
+    await this.eventsService.createEvent(tenantId, {
+      eventType: 'sale.updated.v1',
+      entityType: 'sale',
+      entityId: saleId,
+      data: updatedSale,
+    });
+    return updatedSale;
   }
 
   async remove(tenantId: string, saleId: string): Promise<void> {
@@ -309,7 +310,6 @@ export class SalesService {
       await tx.saleItem.deleteMany({
         where: {
           saleId: saleId,
-          tenantId: tenant.id,
         },
       });
 
@@ -337,21 +337,21 @@ export class SalesService {
 
     return sales.map((sale: any) => ({
       id: sale.id,
-      code: sale.code,
-      operator: sale.operator,
-      paymentMethod: sale.paymentMethod,
+      code: sale.saleNumber,
+      operator: '',
+      paymentMethod: '',
       status: sale.status,
       total: Number(sale.total),
-      customerId: undefined,
+      customerId: sale.customerId ?? undefined,
       createdAt: sale.createdAt.toISOString(),
       updatedAt: sale.updatedAt.toISOString(),
       items: sale.items.map((item: any) => ({
         id: item.id,
         productId: item.productId,
-        qty: item.qty,
+        qty: item.quantity,
         unitPrice: Number(item.unitPrice),
         subtotal: Number(item.subtotal),
-        createdAt: item.createdAt.toISOString(),
+        createdAt: sale.saleDate.toISOString(),
       })),
     }));
   }
@@ -375,21 +375,21 @@ export class SalesService {
 
     return {
       id: sale.id,
-      code: sale.code,
-      operator: sale.operator,
-      paymentMethod: sale.paymentMethod,
+      code: sale.saleNumber,
+      operator: '',
+      paymentMethod: '',
       status: sale.status,
       total: Number(sale.total),
-      customerId: undefined,
+      customerId: sale.customerId ?? undefined,
       createdAt: sale.createdAt.toISOString(),
       updatedAt: sale.updatedAt.toISOString(),
       items: sale.items.map((item: any) => ({
         id: item.id,
         productId: item.productId,
-        qty: item.qty,
+        qty: item.quantity,
         unitPrice: Number(item.unitPrice),
         subtotal: Number(item.subtotal),
-        createdAt: item.createdAt.toISOString(),
+        createdAt: sale.saleDate.toISOString(),
       })),
     };
   }

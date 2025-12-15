@@ -1,239 +1,62 @@
-Kit de arranque completo para você subir o Hub (cloud) e o Cliente local (on-premise) com licenças, entitlements, SQLite local, Postgres multi-tenant com RLS e sincronização via outbox.
-
-Visão geral da arquitetura
-
-Três mundos trabalham juntos:
-
-1. App do cliente (on-premise/loja) – precisa operar offline, integrar periféricos (leitor de código de barras, impressora), ser rápido e resiliente.
-2. Site institucional (internet) – marketing, landing pages, pricing, documentação, geração de leads.
-3. Hub de Licenças 2F (cloud) – autenticação central, licenças/assentos/planos, billing, telemetria, sync opcional de dados agregados e distribuição de atualizações.
-
-Equilíbrio custo/simplicidade/robustez:
-- Banco local (cliente): SQLite com WAL e backups diários.
-- Banco central (hub): PostgreSQL multi-tenant com RLS.
-- Sincronização opcional/assíncrona por agente local (REST ou gRPC + fila SQS/Kafka). Envia apenas “eventos de domínio” (outbox/oplog) e recebe “comandos” (licenças, feature flags, tabelas mestres).
-- Autenticação centralizada no Hub (OIDC/OAuth2). App local usa refresh tokens vinculados ao device e armazena licença assinada (JWS) para modo offline.
-- Entitlements/feature flags entregues pelo Hub com cache local (TTL + verificação periódica).
-
-Componentes
-
-Cliente (loja)
-- Frontend: app React/Vite/TypeScript.
-- Backend local: mini-API NestJS/Express rodando como serviço (Windows Service ou systemd).
-- Banco local: SQLite único com WAL ativo.
-- Agente de Sync: worker que lê a outbox, publica eventos e aplica comandos do Hub.
-- Periféricos: impressoras fiscais/recibos, leitores de código; tratados pelo backend local para evitar drivers no browser.
-
-Hub 2F (cloud)
-- API de licenças e identidade (Nest/Go/.NET).
-- Integração com IdP (Auth0/Keycloak/Cognito) gerando JWT curta duração + refresh device-bound.
-- Gestão de tenants, planos, assentos, estados de licença (trial/ativa/grace/suspensa), entitlements.
-- Webhooks de pagamento, billing (Stripe/Asaas/Pagar.me).
-- Banco: PostgreSQL multi-tenant + RLS.
-- Mensageria: SQS/Kafka para filas de eventos e reprocessamento.
-- Painel interno 2F: auditoria, suporte, resets, revogações.
-- Data Lake opcional para BI agregando dados anonimizados.
-
-Site institucional
-- Aplicação separada (Next.js/SSR) que conversa com o Hub apenas para trials, pricing e onboarding.
-
-Banco de dados
-
-Local (cliente) – SQLite
-- Tabelas operacionais do PDV, estoque, grooming, agenda (mesma modelagem sugerida anteriormente).
-- Controle de sync: `oplog_outbox`, `sync_state`, `inbox_commands` (idempotência).
-- Backups: arquivo .db diário com retenção curta (7–30 dias). Export CSV/JSON on-demand.
-
-Central (hub) – PostgreSQL
-- Modelo multi-tenant com `tenant_id` em todas as tabelas.
-- Policies RLS garantem isolamento.
-- Schemas recomendados: `core`, `billing`, `sync`, `analytics`.
-- Índices por `tenant_id`, datas (ex.: `occurred_at` em vendas) e status (ex.: grooming `stage`).
-
-Autenticação e licenças
-
-Fluxo de login e ativação
-1. Usuário autentica no Hub (OIDC).
-2. App local solicita ativação; Hub emite License Token (JWS) com tenant_id, plan_id, entitlements, max_seats, device_id, expiry, grace_period e assinatura.
-3. App armazena token criptografado e valida offline com chave pública do Hub.
-4. Heartbeat periódico renova refresh/token e reporta saúde + consumo de assentos.
-5. Em caso de falta de conexão, opera em modo grace por N dias; após expirar, entra em modo restrito (consultas/export apenas).
-
-Entitlements (feature flags)
-- Embutidos no License Token (ex.: `{ "pdv": true, "grooming": true, "max_users": 5 }`).
-- Front e backend local aplicam gating de telas/regras.
-- Cache com TTL e fallback offline.
-
-Assentos e dispositivos
-- Controle por usuário e/ou dispositivo.
-- Refresh token device-bound mitiga vazamentos.
-- Troca de máquina: fluxo de desvincular dispositivo pelo Hub/Admin.
-
-Estrutura de repositório
-
-```
-f-flow-suite/
-├─ hub/                         # API cloud (NestJS + Postgres)
-│  ├─ src/
-│  │  ├─ app.module.ts
-│  │  ├─ main.ts
-│  │  ├─ common/env.ts
-│  │  ├─ auth/                  # OIDC proxy + JWS de licença
-│  │  ├─ tenants/
-│  │  ├─ licenses/
-│  │  ├─ entitlements/
-│  │  ├─ sync/                  # inbox/outbox + webhooks
-│  │  └─ health/health.controller.ts
-│  ├─ prisma/
-│  │  ├─ schema.prisma          # Postgres multi-tenant + RLS
-│  │  └─ migrations/
-│  ├─ sql/
-│  │  ├─ 001-base.sql           # seeds + policies
-│  │  └─ 002-rls-policies.sql
-│  ├─ .env.example
-│  └─ package.json
-└─ client-local/                # API local (NestJS + SQLite) + Sync Agent
-   ├─ src/
-   │  ├─ app.module.ts
-   │  ├─ main.ts                # serviço Windows/systemd
-   │  ├─ common/env.ts
-   │  ├─ pos/
-   │  ├─ inventory/
-   │  ├─ grooming/
-   │  ├─ licensing/
-   │  └─ sync-agent/
-   ├─ prisma/
-   │  ├─ schema.prisma          # SQLite
-   │  └─ migrations/
-   ├─ .env.example
-   └─ package.json
-```
-
-Prisma – Hub (Postgres)
-- `hub/prisma/schema.prisma` com modelos: `Org`, `Tenant`, `User`, `License`, `Device`, `OutboxEvent`, `InboxCommand`, etc.
-- `sql/001-base.sql` para seeds e dados de suporte.
-- `sql/002-rls-policies.sql` com políticas RLS por `tenant_id`.
-
-Prisma – Cliente Local (SQLite)
-- `client-local/prisma/schema.prisma`: tabelas `sale`, `saleItem`, `inventory`, `outboxEvent`, `inboxCommand`, `syncState`, `paymentMethodLocal`, etc.
-- Migrações acompanham schema.
-
-Sync Agent (client-local/src/sync-agent)
-
-`sync.service.ts`
-```ts
-@Injectable()
-export class SyncService {
-  constructor(private prisma: PrismaClient, private http: SyncHttpClient, private log: Logger) {}
-
-  async pushOutbox() {
-    const events = await this.prisma.outboxEvent.findMany({ where: { sentAt: null }, take: 100 });
-    if (!events.length) return;
-    await this.http.post('/sync/events', { events });
-    const ids = events.map(e => e.id);
-    await this.prisma.outboxEvent.updateMany({
-      where: { id: { in: ids } },
-      data: { sentAt: new Date() }
-    });
-  }
-
-  async pullCommands() {
-    const { commands } = await this.http.get('/sync/commands?limit=100');
-    for (const cmd of commands) {
-      const exists = await this.prisma.inboxCommand.findUnique({ where: { id: cmd.id } });
-      if (exists) continue;
-      if (cmd.type === 'payment_method.upsert') {
-        for (const m of cmd.payload.items) {
-          await this.prisma.paymentMethodLocal.upsert({
-            where: { code: m.code },
-            create: { code: m.code, label: m.label, active: m.active, position: m.position },
-            update: { label: m.label, active: m.active, position: m.position }
-          });
-        }
-      }
-      await this.prisma.inboxCommand.create({
-        data: { id: cmd.id, type: cmd.type, payload: cmd.payload, appliedAt: new Date() }
-      });
-    }
-  }
-}
-```
-
-POS – gravação com outbox (`client-local/src/pos/sales.service.ts`)
-```ts
-@Injectable()
-export class SalesService {
-  constructor(private prisma: PrismaClient) {}
-
-  async createSale(dto: { code: string; operator: string; items: { productId: string; qty: number; unitPrice: number }[]; payment: string; }) {
-    return this.prisma.$transaction(async (tx) => {
-      const total = dto.items.reduce((s, i) => s + i.qty * i.unitPrice, 0);
-      const sale = await tx.sale.create({ data: { code: dto.code, operator: dto.operator, total, payment: dto.payment, status: 'paid' } });
-      for (const it of dto.items) {
-        await tx.saleItem.create({ data: { saleId: sale.id, productId: it.productId, qty: it.qty, unitPrice: it.unitPrice, subtotal: it.qty * it.unitPrice } });
-        await tx.inventory.update({ where: { productId: it.productId }, data: { qty: { decrement: it.qty } } });
-      }
-      await tx.outboxEvent.create({ data: { aggregate: 'sales', type: 'created', payload: { id: sale.id, code: sale.code, total, payment: dto.payment, items: dto.items } } });
-      return sale;
-    });
-  }
-}
-```
-
-Arquivos `.env` de exemplo
-
-`hub/.env.example`
-```
-NODE_ENV=production
-PORT=8080
-DATABASE_URL=postgresql://user:pass@host:5432/fflow
-LICENSE_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-OIDC_ISSUER_URL=https://...
-OIDC_AUDIENCE=fflow
-OIDC_CLIENT_ID=...
-OIDC_CLIENT_SECRET=...
-```
-
-`client-local/.env.example`
-```
-NODE_ENV=production
-PORT=3001
-DATABASE_URL="file:./local.db"
-HUB_BASE_URL=https://hub.2fsolutions.com.br/api
-LICENSE_FILE=./license.jwt
-LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
-DEVICE_ID=<guid-da-maquina>
-```
-
-Comandos iniciais
-```
-# Hub
-cd hub
-npm install
-npx prisma migrate dev
-psql $DATABASE_URL -f sql/002-rls-policies.sql
-npm run start:dev
-
-# Cliente local
-cd ../client-local
-npm install
-npx prisma migrate dev
-npm run start:dev
-```
-
-Implementações Concluídas
-- ✅ OIDC Authentication: Implementado OidcJwtStrategy com validação JWKS
-- ✅ License Guard: Validação de tokens de licença em rotas sensíveis
-- ✅ Dual Authentication: Combinação OIDC + License para máxima segurança
-- ✅ Environment Flags: OIDC_REQUIRED e LICENSING_ENFORCED para controle granular
-- ✅ Integration Tests: Cenários completos de autenticação e autorização
-- ✅ Postman Collection: Testes automatizados para todos os cenários
-- ✅ Documentation: README atualizado com configuração e rollback
-
-Próximos incrementos
-- CRUD de métodos de pagamento no Hub + comando de distribuição p/ lojas.
-- Fila (SQS/Kafka) entre `/sync/events` e processamento assíncrono no Hub.
-- Relatórios: materialized views por `tenant_id` no Postgres.
-- Atualização automática do app local (code signing) + migrações idempotentes.
-- Observabilidade: Sentry + Prometheus/Grafana.
-- Frontend Integration: Substituir mocks por chamadas autenticadas ao Hub.
+🚀 INICIANDO PROCESSO DE LOGIN NO COMPONENTE
+login.tsx:66 📧 Email: appsuporte.silveira@gmail.com
+login.tsx:67 🔑 Senha fornecida: SIM
+login.tsx:80 ⏳ Estado de loading ativado
+login.tsx:83 🔐 Chamando função login do AuthContext...
+auth-context.tsx:237 🔐 INÍCIO DO LOGIN - Email: appsuporte.silveira@gmail.com
+auth-context.tsx:242 📡 ETAPA 1: Tentando autenticação no Hub...
+auth-context.tsx:250 🌐 Fazendo requisição para Hub: https://f-flow-suite.onrender.com/public/login
+auth-context.tsx:259 📡 Resposta do Hub - Status: 201 OK: true
+auth-context.tsx:277 ✅ Hub disponível e resposta OK - processando...
+auth-context.tsx:279 📋 Dados do usuário recebidos do Hub: {userId: 'f7468f8e-2876-4fe6-961f-faf765f4f3e6', email: 'appsuporte.silveira@gmail.com', displayName: 'Fernando Silveira', tenantId: 'b2e3ad73-7cb3-4814-b77a-57d2e62f07bc'}
+auth-context.tsx:293 🔄 Sincronizando dados com client-local...
+auth-context.tsx:308 🔄 Sincronização - Status: 201 OK: true
+auth-context.tsx:314 🎫 Verificando licenças no Hub...
+auth-context.tsx:317 🎫 URL de validação de licença: https://f-flow-suite.onrender.com/licenses/validate?tenantId=b2e3ad73-7cb3-4814-b77a-57d2e62f07bc
+auth-context.tsx:319 🎫 Resposta da licença - Status: 200 OK: true
+auth-context.tsx:323 🎫 Dados da licença: {valid: true, licensed: true, planKey: undefined, expiresAt: undefined}
+auth-context.tsx:332 ✅ Licença válida - fazendo login completo...
+auth-context.tsx:340 💾 Persistindo credenciais offline no client-local...
+protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: true, requireAuth: true, …}
+protected-route.tsx:137 ⏳ PROTECTED ROUTE - Mostrando loading...
+protected-route.tsx:34 🛡️ PROTECTED ROUTE useEffect - Verificando condições...
+auth-context.tsx:354 💾 Credenciais offline persistidas: {success: true, message: 'Credenciais persistidas', userId: 'b0d08609-fe8c-4e2b-8ef7-080ebf432c18'}
+auth-context.tsx:364 🔑 Ativando licença no client-local...
+auth-context.tsx:378 🔑 Licença ativada com sucesso: {success: true, message: 'Licensing not enforced in development mode'}
+auth-context.tsx:388 💾 Persistindo licença no client-local...
+auth-context.tsx:400 💾 Licença persistida com sucesso
+auth-context.tsx:407 🔄 Iniciando sincronização de planos após login...
+plan-sync.service.ts:31 🔄 Iniciando sincronização de planos após login... {tenantId: 'b2e3ad73-7cb3-4814-b77a-57d2e62f07bc', userId: 'f7468f8e-2876-4fe6-961f-faf765f4f3e6'}
+plan-sync.service.ts:41 ✅ Plano obtido do Hub: starter
+plan-sync.service.ts:54 ✅ Client-local sincronizado com sucesso
+plan-sync.service.ts:65 ✅ Cache do client-local atualizado com sucesso
+plan-sync.service.ts:74 🎉 Sincronização concluída com sucesso. Plano: starter
+auth-context.tsx:414 ✅ Sincronização de planos concluída: Sincronização concluída com sucesso. Plano: starter
+auth-context.tsx:438 🔄 Forçando atualização do cache de licença após login...
+auth-context.tsx:102 🔍 Verificando status da licença - DIRETO do client-local...
+auth-context.tsx:106 🏢 Tenant ID: b2e3ad73-7cb3-4814-b77a-57d2e62f07bc
+auth-context.tsx:129 📊 Status data from client-local: {valid: true, status: 'development', cached: true, planKey: 'starter', expiresAt: '2026-11-20T14:54:25.099Z', …}
+protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: true, requireAuth: true, …}
+protected-route.tsx:137 ⏳ PROTECTED ROUTE - Mostrando loading...
+auth-context.tsx:184 🔧 Install data from client-local: {isInstalled: true, hasLicense: false, planKey: 'development'}
+auth-context.tsx:213 ✅ Novo license status: {isValid: true, isInstalled: true, plan: 'max', expiresAt: '2026-11-20T14:54:25.099Z'}
+auth-context.tsx:441 🎉 LOGIN CONCLUÍDO COM SUCESSO!
+auth-context.tsx:674 🏁 Finalizando processo de login...
+login.tsx:85 🔐 Resultado do login: SUCESSO
+login.tsx:88 ✅ Login bem-sucedido - verificando se deve mostrar modal de planos...
+login.tsx:92 📋 Flag show_plans_modal: null
+login.tsx:99 🎯 Navegando para dashboard...
+login.tsx:114 🏁 Finalizando processo no componente - desativando loading
+protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
+protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo
+protected-route.tsx:34 🛡️ PROTECTED ROUTE useEffect - Verificando condições...
+protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
+protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo
+protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/configuracoes', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
+protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo
+protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/settings/organization', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
+protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo
+protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
+protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo
+protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
+protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo

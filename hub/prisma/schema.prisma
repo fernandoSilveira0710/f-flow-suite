@@ -28,6 +28,7 @@ model Tenant {
   groomingTickets GroomingTicket[]
   inbox           InboxCommand[]
   inventory       Inventory[]
+  inventoryAdjustments InventoryAdjustment[]
   licenses        License?
   orders          Order[]
   outbox          OutboxEvent[]
@@ -163,11 +164,13 @@ model Product {
   category      String?
   salePrice     Float
   costPrice     Float?
+  stockQty      Int            @default(0)
   active        Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   groomingItems GroomingItem[]
   inventory     Inventory[]
+  inventoryAdjustments InventoryAdjustment[]
   orderItems    OrderItem[]
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   saleItems     SaleItem[]
@@ -445,6 +448,26 @@ model Inventory {
   @@unique([tenantId, productId, location])
   @@index([tenantId, productId])
   @@index([tenantId, location])
+}
+
+model InventoryAdjustment {
+  id           String   @id @default(uuid())
+  tenantId     String
+  productId    String
+  productName  String
+  productSku   String?
+  delta        Int
+  reason       String?
+  previousStock Int?
+  newStock     Int?
+  adjustedAt   DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product      Product? @relation(fields: [productId], references: [id])
+
+  @@index([tenantId, productId])
+  @@index([tenantId, adjustedAt])
 }
 
 model Order {

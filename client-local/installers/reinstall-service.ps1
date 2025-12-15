@@ -23,7 +23,10 @@ try {
     
     # Then, run install
     Write-Host "Step 2: Installing updated service..."
-    & "$PSScriptRoot\install-windows.ps1" -ServiceName $ServiceName
+    $node = "C:\Program Files\nodejs\node.exe"
+    if (-not (Test-Path $node)) { $node = "C:\Program Files (x86)\nodejs\node.exe" }
+    $script = Resolve-Path (Join-Path $PSScriptRoot "..\dist\main.js")
+    & "$PSScriptRoot\install-windows.ps1" -ServiceName $ServiceName -NodePath $node -ScriptPath $script
     
     Write-Host "Reinstallation completed successfully!" -ForegroundColor Green
     

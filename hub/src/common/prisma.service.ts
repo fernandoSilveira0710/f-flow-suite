@@ -1,9 +1,20 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
+  private readonly logger = new Logger(PrismaService.name);
+
   async onModuleInit() {
-    await this.$connect();
+    try {
+      const url = process.env.DATABASE_URL ?? '';
+      const prefix = url.includes('://') ? url.split('://')[0] + '://' : '(unset)';
+      this.logger.log(`DATABASE_URL prefix: ${prefix}`);
+      await this.$connect();
+      this.logger.log('Prisma connected');
+    } catch (err) {
+      // Não bloquear o bootstrap do Hub se o banco não estiver acessível
+      this.logger.error('Falha ao conectar ao banco (Prisma). Continuando sem DB.', err as any);
+    }
   }
 }

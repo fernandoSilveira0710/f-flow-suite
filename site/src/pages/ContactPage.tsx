@@ -1,5 +1,7 @@
 import Header from '../components/Header'
 import Footer from '../components/Footer'
+import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { 
   Mail, 
   Phone, 
@@ -10,11 +12,43 @@ import {
 } from 'lucide-react'
 
 const ContactPage = () => {
+  const [sendStatus, setSendStatus] = useState<'idle'|'sending'|'sent'|'error'>('idle')
+  const [feedback, setFeedback] = useState<string>('')
+
+  const handleContactSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setSendStatus('sending')
+    setFeedback('')
+    const form = e.currentTarget
+    const data = new FormData(form)
+    const firstName = (data.get('firstName') || '') as string
+    const lastName = (data.get('lastName') || '') as string
+    const email = (data.get('email') || '') as string
+    const phone = (data.get('phone') || '') as string
+    const subject = (data.get('subject') || 'Contato') as string
+    const message = (data.get('message') || '') as string
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_HUB_API_URL}/public/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstName, lastName, email, phone, subject, message })
+      })
+      if (!res.ok) throw new Error(await res.text())
+      setSendStatus('sent')
+      setFeedback('Mensagem enviada! Vamos responder em até 24 horas.')
+      form.reset()
+    } catch (err) {
+      console.error('Falha ao enviar contato:', err)
+      setSendStatus('error')
+      setFeedback('Não foi possível enviar sua mensagem agora. Tente novamente mais tarde ou envie um email para contato@2fsolution.online.')
+    }
+  }
   const contactInfo = [
     {
       icon: Mail,
       title: 'Email',
-      value: 'contato@fflowsuite.com',
+      value: 'contato@2fsolution.online',
       description: 'Resposta em até 24 horas'
     },
     {
@@ -42,19 +76,19 @@ const ContactPage = () => {
       icon: MessageSquare,
       title: 'Suporte Técnico',
       description: 'Problemas com instalação, configuração ou uso do sistema',
-      email: 'suporte@fflowsuite.com'
+      email: 'contato@2fsolution.online'
     },
     {
       icon: Mail,
       title: 'Vendas',
       description: 'Informações sobre planos, preços e licenças',
-      email: 'vendas@fflowsuite.com'
+      email: 'contato@2fsolution.online'
     },
     {
       icon: Phone,
       title: 'Comercial',
       description: 'Parcerias, integrações e soluções personalizadas',
-      email: 'comercial@fflowsuite.com'
+      email: 'contato@2fsolution.online'
     }
   ]
 
@@ -70,8 +104,8 @@ const ContactPage = () => {
               Entre em Contato
             </h1>
             <p className="mt-6 text-lg leading-8 text-gray-600 max-w-3xl mx-auto">
-              Estamos aqui para ajudar você. Entre em contato conosco para suporte técnico, 
-              informações comerciais ou qualquer dúvida sobre o F-Flow Suite.
+              Estamos aqui para ajudar você. Entre em contato para suporte técnico, 
+              informações comerciais ou qualquer dúvida. A 2F Solutions atende você.
             </p>
           </div>
         </div>
@@ -111,7 +145,7 @@ const ContactPage = () => {
                 Envie uma Mensagem
               </h2>
               
-              <form className="space-y-6">
+              <form className="space-y-6" onSubmit={handleContactSubmit}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
@@ -197,11 +231,18 @@ const ContactPage = () => {
 
                 <button
                   type="submit"
-                  className="w-full btn-primary flex items-center justify-center"
+                  className="w-full btn-primary flex items-center justify-center disabled:opacity-60"
+                  disabled={sendStatus === 'sending'}
                 >
                   <Send className="mr-2 h-4 w-4" />
-                  Enviar Mensagem
+                  {sendStatus === 'sending' ? 'Enviando...' : 'Enviar Mensagem'}
                 </button>
+
+                {feedback && (
+                  <p className={`text-sm mt-3 ${sendStatus === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                    {feedback}
+                  </p>
+                )}
               </form>
             </div>
 
@@ -245,12 +286,12 @@ const ContactPage = () => {
                 <p className="text-gray-600 mb-4">
                   Antes de entrar em contato, verifique se sua dúvida já foi respondida em nossa seção de FAQ.
                 </p>
-                <a
-                  href="/docs#faq"
+                <Link
+                  to="/docs#faq"
                   className="text-primary-600 hover:text-primary-700 font-medium"
                 >
                   Ver FAQ →
-                </a>
+                </Link>
               </div>
             </div>
           </div>
@@ -279,7 +320,7 @@ const ContactPage = () => {
                 Ligar Agora: (11) 9999-9999
               </a>
               <a
-                href="mailto:emergencia@fflowsuite.com"
+                href="mailto:contato@2fsolution.online"
                 className="bg-white text-red-600 border border-red-600 hover:bg-red-50 px-6 py-3 rounded-md font-semibold transition-colors"
               >
                 Email de Emergência

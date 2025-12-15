@@ -13,22 +13,24 @@ async function bootstrap() {
   // Configurar CORS para permitir requisições do frontend
   const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:8080',
-    process.env.CLIENT_LOCAL_API_URL || 'http://localhost:3001',
+    process.env.CLIENT_LOCAL_API_URL || 'http://localhost:8081',
     process.env.SITE_URL || 'http://localhost:5173',
     // Incluir variações com 127.0.0.1 para compatibilidade
     (process.env.FRONTEND_URL || 'http://localhost:8080').replace('localhost', '127.0.0.1'),
-    (process.env.CLIENT_LOCAL_API_URL || 'http://localhost:3001').replace('localhost', '127.0.0.1'),
+    (process.env.CLIENT_LOCAL_API_URL || 'http://localhost:8081').replace('localhost', '127.0.0.1'),
     (process.env.SITE_URL || 'http://localhost:5173').replace('localhost', '127.0.0.1'),
   ];
 
   app.enableCors({
-    origin: allowedOrigins,
+    // Em desenvolvimento, refletir qualquer origin da requisição
+    origin: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'x-license-token'],
-    credentials: true
+    credentials: true,
+    optionsSuccessStatus: 204,
+    maxAge: 86400,
   });
 
-  const port = process.env.PORT ? Number(process.env.PORT) : 8080;
+  const port = process.env.PORT ? Number(process.env.PORT) : 3001;
   await app.listen(port);
 
   const logger = new Logger('Bootstrap');

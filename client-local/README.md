@@ -7,7 +7,7 @@ O **F-Flow Client Local** é um executável multiplataforma que fornece uma API 
 - **Executável Multiplataforma**: Binários para Windows, macOS e Linux
 - **Banco SQLite Embutido**: Database local com migrations automáticas
 - **Paths por SO**: Resolve automaticamente diretórios de dados e logs conforme o sistema operacional
-- **Servidor NestJS**: API REST em `127.0.0.1:3001`
+- **Servidor NestJS**: API REST em `127.0.0.1:8081`
 - **Instalação como Serviço**: Pode ser instalado como serviço do sistema operacional
 - **Logs Estruturados**: Logs em JSON com rotação diária
 - **Configuração Flexível**: Suporte a variáveis de ambiente e configuração automática
@@ -66,17 +66,20 @@ npm run start:dev
 npm run build
 ```
 
-### Gerar Executáveis
+### Distribuição (Windows)
 
-```bash
-# Gera binários para todas as plataformas
-npm run build:pkg
-
-# Os executáveis serão criados em:
-# - build/f-flow-client-win.exe (Windows)
-# - build/f-flow-client-macos (macOS)
-# - build/f-flow-client-linux (Linux)
-```
+- A distribuição agora é feita via instalador Electron (NSIS one-click).
+- Gere os builds locais antes de empacotar:
+  - `client-local`: `npm run build` → `client-local/dist/main.js`
+  - `ERP (raiz do projeto)`: `npm run build` → `dist/`
+- Em seguida, no diretório `desktop`:
+  ```bash
+  cd desktop
+  npm i
+  npm run dist
+  ```
+- O instalador será gerado em `desktop/dist/FFlowSuite_Setup_<versao>.exe`.
+- Para instalar, execute o `FFlowSuite_Setup_<versao>.exe` normalmente.
 
 ## 🔧 Configuração
 
@@ -87,7 +90,7 @@ Copie `.env.example` para `.env` e configure:
 ```bash
 # Servidor Local
 LOCAL_SERVER_ENABLED=true
-PORT=3001
+CLIENT_HTTP_PORT=8081
 
 # Paths Customizados (opcional)
 LOCAL_DATA_DIR=/custom/data/path
@@ -97,11 +100,15 @@ LOCAL_LOG_DIR=/custom/logs/path
 DATABASE_URL="file:./local.db"
 
 # Hub Integration
-HUB_BASE_URL=http://localhost:3000
+HUB_BASE_URL=http://localhost:3001
 
 # Licenciamento
 LICENSE_FILE=./license.jwt
 LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----..."
+
+# Migrações do Prisma
+SKIP_MIGRATIONS=false
+MAINTENANCE_TOKEN=change-me-strong-token
 ```
 
 ### Configurações Importantes
@@ -114,14 +121,14 @@ LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----..."
 
 ### Windows
 
-```powershell
-# Executar como Administrador
-cd installers
-.\install-windows.ps1
+Instalação via Electron (NSIS):
 
-# Desinstalar
-.\uninstall-windows.ps1
+```powershell
+# Executar o instalador gerado
+Start-Process desktop\dist\FFlowSuite_Setup_1.0.30.exe
 ```
+
+O instalador Electron unifica a inicialização do Client‑Local e do ERP, dispensando serviços do Windows e ações elevadas.
 
 ### macOS
 
@@ -195,6 +202,26 @@ systemctl --user stop f-flow-client-local
 journalctl --user -u f-flow-client-local -f
 ```
 
+## 🗄️ Migrações do Banco (Prisma)
+
+- Em desenvolvimento, as migrations são aplicadas via Prisma CLI.
+- Em binários empacotados, as migrations `.sql` são aplicadas automaticamente na primeira inicialização quando `SKIP_MIGRATIONS=false`.
+- O instalador para Windows copia `client-local/prisma/migrations` para `{app}\prisma\migrations` e define `SKIP_MIGRATIONS=false`.
+
+### Executar migrações manualmente (Admin)
+
+- Endpoint: `POST /maintenance/migrate`
+- Header: `x-admin-token: {MAINTENANCE_TOKEN}`
+- Respostas:
+  - `200 OK`: Migrações executadas com sucesso
+  - `401 Unauthorized`: Token inválido ou ausente
+  - `500`: Erro ao aplicar migrações
+
+### Variáveis relacionadas
+
+- `SKIP_MIGRATIONS`: Se `true`, ignora migrações na inicialização.
+- `MAINTENANCE_TOKEN`: Token necessário para chamar o endpoint administrativo de migrações.
+
 ## 🧪 Testes
 
 ```bash
@@ -218,7 +245,7 @@ Os logs são estruturados em formato JSON e incluem:
   "time": "2024-01-01T12:00:00.000Z",
   "service": "f-flow-client-local",
   "context": "Bootstrap",
-  "message": "Server started on http://127.0.0.1:3001",
+  "message": "Server started on http://127.0.0.1:8081",
   "requestId": "abc123"
 }
 ```
@@ -332,7 +359,7 @@ LICENSE_PUBLIC_KEY_PEM="-----BEGIN PUBLIC KEY-----..."  # Chave pública para va
 
 #### Cenário 2: Teste Direto da API
 ```bash
-curl -X POST http://127.0.0.1:3001/auth/offline-login \
+curl -X POST http://127.0.0.1:8081/auth/offline-login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "fernando@2fsolutions.com.br",
@@ -343,7 +370,7 @@ curl -X POST http://127.0.0.1:3001/auth/offline-login \
 #### Cenário 3: Verificação de Licença
 ```bash
 # Verificar status da licença local
-curl http://127.0.0.1:3001/health/license
+curl http://127.0.0.1:8081/health/license
 ```
 
 ### 📊 Monitoramento
@@ -373,7 +400,7 @@ curl http://127.0.0.1:3001/health/license
 ### Health Check
 
 ```bash
-GET http://127.0.0.1:3001/health
+GET http://127.0.0.1:8081/health
 ```
 
 Resposta:
@@ -388,7 +415,7 @@ Resposta:
 ### Health Dependencies
 
 ```bash
-GET http://127.0.0.1:3001/health/deps
+GET http://127.0.0.1:8081/health/deps
 ```
 
 Resposta:
@@ -408,7 +435,7 @@ Resposta:
 ### Dashboard
 
 ```bash
-GET http://127.0.0.1:3001/dashboard/summary
+GET http://127.0.0.1:8081/dashboard/summary
 ```
 
 Resposta:
@@ -441,15 +468,15 @@ Resposta:
 
 ```bash
 # Obter todas as feature flags
-GET http://127.0.0.1:3001/feature-flags
+GET http://127.0.0.1:8081/feature-flags
 
 # Verificar feature específica
-GET http://127.0.0.1:3001/feature-flags/pos
-GET http://127.0.0.1:3001/feature-flags/grooming
-GET http://127.0.0.1:3001/feature-flags/appointments
-GET http://127.0.0.1:3001/feature-flags/inventory
-GET http://127.0.0.1:3001/feature-flags/customers
-GET http://127.0.0.1:3001/feature-flags/reports
+GET http://127.0.0.1:8081/feature-flags/pos
+GET http://127.0.0.1:8081/feature-flags/grooming
+GET http://127.0.0.1:8081/feature-flags/appointments
+GET http://127.0.0.1:8081/feature-flags/inventory
+GET http://127.0.0.1:8081/feature-flags/customers
+GET http://127.0.0.1:8081/feature-flags/reports
 ```
 
 Resposta (todas as flags):
@@ -697,13 +724,13 @@ npm run start:dev
 ### 3. Testar Endpoints (PowerShell)
 ```powershell
 # Verificar status da instalação
-Invoke-RestMethod -Uri "http://localhost:3001/licensing/install/status" -Method GET
+Invoke-RestMethod -Uri "http://localhost:8081/licensing/install/status" -Method GET
 
 # Ativar licença (simulação)
-Invoke-RestMethod -Uri "http://localhost:3001/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "test-tenant", "deviceId": "test-device"}'
+Invoke-RestMethod -Uri "http://localhost:8081/licensing/activate" -Method POST -ContentType "application/json" -Body '{"tenantId": "test-tenant", "deviceId": "test-device"}'
 
 # Verificar licença atual
-Invoke-RestMethod -Uri "http://localhost:3001/licensing/license" -Method GET
+Invoke-RestMethod -Uri "http://localhost:8081/licensing/license" -Method GET
 ```
 
 ### 4. Modo Produção (com enforcement)
@@ -806,12 +833,11 @@ Para voltar ao modo de desenvolvimento:
 
 ## 📋 Critérios de Aceite
 
-- ✅ `npm run build:pkg` gera executáveis para Win/Mac/Linux
+- ✅ Instalador Electron (NSIS) gera pacote para Windows
 - ✅ Primeira execução cria diretórios e executa migrations
 - ✅ `GET /health` retorna `{ status: 'ok' }`
-- ✅ Instalação como serviço funciona em todos os SOs
 - ✅ Logs estruturados com rotação
-- ✅ Desinstalação limpa sem afetar dados do usuário
+- ✅ Desinstalação limpa via desinstalador do NSIS sem afetar dados do usuário
 
 ## 🤝 Contribuição
 

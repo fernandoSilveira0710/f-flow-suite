@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>FflowBootstrapperApp</AssemblyName>
+    <RootNamespace>FflowBootstrapperApp</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="BootstrapperCore">
+      <!-- WiX v3.14 coloca BootstrapperCore.dll em SDK -->
+      <HintPath>$(WixToolsetDir)\SDK\BootstrapperCore.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

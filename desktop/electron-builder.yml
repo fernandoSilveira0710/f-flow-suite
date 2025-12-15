@@ -1,0 +1,35 @@
+appId: com.2fsolutions.fflowsuite
+productName: F-Flow Suite
+artifactName: 'FFlowSuite_Setup_${version}.exe'
+directories:
+  output: dist
+files:
+  - dist/**/*
+win:
+  target:
+    - nsis
+  legalTrademarks: '2F Solutions'
+  signAndEditExecutable: false
+forceCodeSigning: false
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  deleteAppDataOnUninstall: false
+extraResources:
+  - from: ../dist
+    to: erp-dist
+    filter:
+      - '**/*'
+  - from: ../client-local/.env.production
+    to: client-local/.env.production
+    filter:
+      - '**/*'
+  - from: ../client-local/dist
+    to: client-local/dist
+    filter:
+      - '**/*'
+  - from: ../client-local/node_modules
+    to: client-local/node_modules
+    filter:
+      - '**/*'

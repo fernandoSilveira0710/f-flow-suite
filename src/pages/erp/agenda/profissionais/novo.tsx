@@ -66,14 +66,14 @@ export default function NovoProfissional() {
 
     const professionalData: CreateProfessionalDto = {
       name: nome.trim(),
-      role: tipo === 'PROFISSIONAL' ? 'Professional' : 'Resource',
+      serviceIds: funcoes,
       active: ativo,
     };
 
     const professional = createProfessional(professionalData);
 
     toast({
-      title: `${tipo === 'PROFISSIONAL' ? 'Profissional' : 'Recurso'} criado`,
+      title: 'Profissional criado',
       description: `${professional.name} foi cadastrado com sucesso`,
     });
 
@@ -93,8 +93,8 @@ export default function NovoProfissional() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <PageHeader
-          title="Novo Profissional/Recurso"
-          description="Cadastre um profissional ou recurso"
+          title="Novo Profissional"
+          description="Cadastre um profissional"
         />
       </div>
 

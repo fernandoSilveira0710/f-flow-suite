@@ -2,7 +2,7 @@ import { IsString, IsOptional, IsEmail, IsBoolean, IsDateString } from 'class-va
 
 export class CreateCustomerDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsOptional()
   @IsString()

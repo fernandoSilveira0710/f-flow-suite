@@ -111,15 +111,16 @@ export class LicensingController {
         };
       }
 
-      // Mapear o plano 'enterprise' (desenvolvimento) para 'max'
-      let planKey = license.plan;
-      if (planKey === 'enterprise') {
+      // Normalizar nomes vindos do Hub para chaves canônicas
+      const raw = (license.plan || '').toLowerCase();
+      let planKey: 'starter' | 'pro' | 'max';
+      if (['starter', 'basic', 'básico', 'basico', 'free'].includes(raw)) {
+        planKey = 'starter';
+      } else if (['pro', 'professional', 'profissional'].includes(raw)) {
+        planKey = 'pro';
+      } else if (['max', 'enterprise', 'premium', 'development'].includes(raw)) {
         planKey = 'max';
-      }
-
-      // Garantir que o planKey seja válido
-      const validPlans = ['starter', 'pro', 'max'];
-      if (!validPlans.includes(planKey)) {
+      } else {
         planKey = 'starter';
       }
 
@@ -138,7 +139,7 @@ export class LicensingController {
   }
 
   @Post('update-cache')
-  async updateCache(@Body() updateData: { tenantId: string; planKey: string; lastChecked: string; updatedAt: string }) {
+  async updateCache(@Body() updateData: { tenantId: string; planKey: string; lastChecked?: string; updatedAt?: string; expiresAt?: string; graceDays?: number }) {
     try {
       this.logger.log(`Updating license cache for tenant ${updateData.tenantId}: ${updateData.planKey}`);
       const result = await this.licensingService.updateLicenseCache(updateData);
@@ -236,8 +237,12 @@ export class LicensingController {
         tenantId: tenantId,
         showWarning: ['not_registered', 'not_licensed', 'offline_grace', 'expired'].includes(result.status),
         requiresSetup: result.status === 'not_configured',
-        canStart: ['active', 'development', 'offline_grace'].includes(result.status)
-      };
+        canStart: ['active', 'development', 'offline_grace'].includes(result.status),
+        // extended fields for frontend offline handling
+        lastChecked: (result as any).lastChecked,
+        updatedAt: (result as any).updatedAt,
+        graceDays: (result as any).graceDays,
+      } as any;
     } catch (error: any) {
       this.logger.error('Failed to get license status', error);
       return {
@@ -248,7 +253,34 @@ export class LicensingController {
         showWarning: true,
         requiresSetup: false,
         canStart: false
-      };
+      } as any;
+    }
+  }
+
+  /**
+   * Exposes the raw license token (JWT) stored locally for authenticated Hub calls.
+   */
+  @Get('token')
+  async getLicenseToken(@Headers('x-tenant-id') headerTenantId?: string) {
+    try {
+      const tenantId = headerTenantId || this.configService.get<string>('TENANT_ID', 'default-tenant');
+      this.logger.log(`Retrieving raw license token for tenant: ${tenantId}`);
+
+      const token = await this.licensingService.getRawLicenseToken(tenantId);
+      if (!token) {
+        throw new HttpException('No license token found', HttpStatus.NOT_FOUND);
+      }
+
+      return { token };
+    } catch (error: any) {
+      this.logger.error('Failed to retrieve license token', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        `Failed to retrieve license token: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 }

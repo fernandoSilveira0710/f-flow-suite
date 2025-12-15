@@ -2,6 +2,7 @@
  * Schedule (Agenda) Mock API
  * Persistência via localStorage
  */
+import { API_URLS } from './env';
 
 // Types
 export interface Customer {
@@ -141,7 +142,7 @@ function uuid(): string {
 
 // API Helper
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const baseUrl = 'http://localhost:3001';
+  const baseUrl = API_URLS.CLIENT_LOCAL;
   const response = await fetch(`${baseUrl}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
@@ -311,7 +312,7 @@ function initMockData() {
           professionalId: mockStaff[0].id,
           startTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(), // 2 horas a partir de agora
           endTime: new Date(Date.now() + 3.5 * 60 * 60 * 1000).toISOString(), // 3.5 horas a partir de agora
-          status: 'AGENDADO',
+          status: 'SCHEDULED',
           notes: 'Primeiro agendamento de exemplo',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -327,7 +328,7 @@ function initMockData() {
           professionalId: mockStaff[1].id,
           startTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 horas a partir de agora
           endTime: new Date(Date.now() + 4.75 * 60 * 60 * 1000).toISOString(), // 4.75 horas a partir de agora
-          status: 'CONFIRMADO',
+          status: 'CONFIRMED',
           notes: 'Segundo agendamento de exemplo',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

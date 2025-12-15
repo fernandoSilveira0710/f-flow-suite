@@ -1,0 +1,18 @@
+<service>
+  <id>F-Flow-Client-Local</id>
+  <name>F-Flow Client Local Service</name>
+  <description>F-Flow Client Local Service</description>
+  <executable>C:\Program Files\F-Flow\ClientLocal\runtime\node\node.exe</executable>
+  <arguments>dist\main.js --service</arguments>
+  <workingdirectory>C:\Program Files\F-Flow\ClientLocal</workingdirectory>
+  <logpath>C:\ProgramData\FFlow\logs\client-local</logpath>
+  <startmode>Automatic</startmode>
+  <stoptimeout>15 sec</stoptimeout>
+  <resetfailure>1 hour</resetfailure>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="20 sec"/>
+  <onfailure action="reboot" delay="1 day"/>
+  <env name="PRISMA_CLIENT_ENGINE_TYPE" value="library"/>
+  <env name="PRISMA_QUERY_ENGINE_LIBRARY" value="C:\Program Files\F-Flow\ClientLocal\node_modules\.prisma\client\query_engine-windows.dll.node"/>
+  <env name="DATABASE_URL" value="file:C:\ProgramData\FFlow\data\client-local\client.db"/>
+</service>

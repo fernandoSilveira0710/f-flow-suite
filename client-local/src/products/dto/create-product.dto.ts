@@ -10,6 +10,10 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
   sku?: string;
 
   @IsOptional()
@@ -50,4 +54,13 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  marginPct?: number;
+
+  @IsOptional()
+  @IsString()
+  expiryDate?: string;
 }

@@ -11,11 +11,14 @@ export class HealthController {
 
   @Get()
   check() {
+    const envVersion = this.configService.get<string>('APP_VERSION')
+      ?? this.configService.get<string>('VITE_APP_VERSION');
+    const version = envVersion || undefined;
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
       service: 'f-flow-client-local',
-      version: '1.0.0',
+      version,
     };
   }
 

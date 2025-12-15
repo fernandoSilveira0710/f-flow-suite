@@ -3,8 +3,8 @@
  * Usado para redirecionar rotas antigas/PT para as rotas EN oficiais
  */
 export const SETTINGS_ALIASES: Record<string, string> = {
-  '/erp/configuracoes': '/erp/settings/organization',
-  '/erp/configurações': '/erp/settings/organization',
+  '/erp/configuracoes': '/erp/settings',
+  '/erp/configurações': '/erp/settings',
   '/erp/configuracoes/organizacao': '/erp/settings/organization',
   '/erp/configuracoes/usuarios': '/erp/settings/users',
   '/erp/configuracoes/papeis': '/erp/settings/roles',
@@ -15,7 +15,8 @@ export const SETTINGS_ALIASES: Record<string, string> = {
   '/erp/configuracoes/banho-tosa': '/erp/settings/grooming',
   '/erp/configuracoes/estoque': '/erp/settings/inventory',
   '/erp/configuracoes/metodos-pagamento': '/erp/settings/payments',
-  '/erp/configuracoes/notificacoes': '/erp/settings/notifications',
+  '/erp/configuracoes/categorias': '/erp/settings/categories',
+  '/erp/configuracoes/notificacoes': '/erp/settings/organization',
   '/erp/configuracoes/importar-exportar': '/erp/settings/import-export',
 };
 
@@ -24,7 +25,7 @@ export const SETTINGS_ALIASES: Record<string, string> = {
  */
 export const SETTINGS_LABELS: Record<string, string> = {
   organization: 'Organização',
-  users: 'Usuários & Assentos',
+  users: 'Usuários',
   roles: 'Papéis & Permissões',
   billing: 'Plano & Faturamento',
   licenses: 'Licenças & Ativação',
@@ -33,6 +34,7 @@ export const SETTINGS_LABELS: Record<string, string> = {
   grooming: 'Banho & Tosa',
   inventory: 'Estoque',
   payments: 'Métodos de Pagamento',
+  categories: 'Categorias',
   notifications: 'Notificações',
   'import-export': 'Importar/Exportar',
 };

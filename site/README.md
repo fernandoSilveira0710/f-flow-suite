@@ -1,6 +1,6 @@
-# F-Flow Suite - Site Institucional
+# F-Flow Suite - Site Institucional (2F Solutions)
 
-Site institucional do F-Flow Suite, desenvolvido com React, TypeScript, Vite e Tailwind CSS.
+Site institucional do F-Flow Suite, desenvolvido por 2F Solutions com React, TypeScript, Vite e Tailwind CSS.
 
 ## 🚀 Tecnologias
 
@@ -104,7 +104,7 @@ npm run lint
 - Seção de benefícios
 - Call to action final
 
-### Funcionalidades (`/funcionalidades`)
+### Recursos (`/recursos`)
 - Detalhamento das funcionalidades principais
 - Funcionalidades adicionais
 - Call to action
@@ -181,6 +181,20 @@ theme: {
 - Imagens devem ser adicionadas na pasta `public/`
 - Ícones utilizam a biblioteca Lucide React
 
+## 📌 Escopo Atual do Produto
+
+- PDV básico para operações do dia a dia
+- Gestão de estoque com cadastro de produtos e categorias
+- Clientes (cadastro básico)
+- Instalação local e funcionamento offline após instalação
+- Interface responsiva, atualizações e suporte
+
+Em desenvolvimento (não disponível ainda):
+
+- CRM avançado
+- Agendamentos
+- Relatórios avançados
+
 ## 🤝 Contribuição
 
 1. Faça um fork do projeto
@@ -191,4 +205,4 @@ theme: {
 
 ## 📄 Licença
 
-Este projeto é parte do F-Flow Suite e está sob a mesma licença do projeto principal.
+Este projeto é parte do F-Flow Suite (2F Solutions) e está sob a mesma licença do projeto principal.

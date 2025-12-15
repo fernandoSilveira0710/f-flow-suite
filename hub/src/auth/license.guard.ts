@@ -3,36 +3,38 @@ import { Request } from 'express';
 import * as jwt from 'jsonwebtoken';
 
 type LicenseJwtPayload = {
-  tenant_id: string;
-  plan_id: string;
-  entitlements: Record<string, unknown>;
-  max_seats: number;
-  device_id?: string;
+  tid: string; // tenant id
+  did?: string; // device id
+  plan: string; // plan name/key
+  planId?: string; // plan UUID
+  ent?: Record<string, unknown>; // entitlements/features
+  maxSeats?: number;
+  maxDevices?: number;
   exp?: number;
+  grace?: number;
+  iat?: number;
   iss?: string;
-  aud?: string;
 };
 
 @Injectable()
 export class LicenseGuard implements CanActivate {
   private readonly logger = new Logger(LicenseGuard.name);
-  private readonly licensingEnforced: boolean;
-  private readonly publicKey: string;
 
-  constructor() {
-    this.licensingEnforced = process.env.LICENSING_ENFORCED !== 'false';
-    this.publicKey = process.env.LICENSE_PUBLIC_KEY_PEM || '';
-
-    if (this.licensingEnforced && !this.publicKey) {
-      throw new Error('LICENSE_PUBLIC_KEY_PEM is required when LICENSING_ENFORCED=true');
-    }
-  }
+  constructor() {}
 
   canActivate(context: ExecutionContext): boolean {
+    const licensingEnforced = process.env.LICENSING_ENFORCED !== 'false';
+
     // If licensing is not enforced, allow access
-    if (!this.licensingEnforced) {
+    if (!licensingEnforced) {
       this.logger.debug('License validation disabled (LICENSING_ENFORCED=false)');
       return true;
+    }
+
+    const publicKey = process.env.LICENSE_PUBLIC_KEY_PEM || '';
+    if (!publicKey) {
+      this.logger.warn('Missing LICENSE_PUBLIC_KEY_PEM while licensing is enforced');
+      throw new ForbiddenException('Missing or invalid license token');
     }
 
     const request = context.switchToHttp().getRequest<Request>();
@@ -57,32 +59,43 @@ export class LicenseGuard implements CanActivate {
 
     try {
       // Validate and decode the license token
-      const payload = jwt.verify(token, this.publicKey, {
+      const payload = jwt.verify(token, publicKey, {
         algorithms: ['RS256', 'RS512', 'ES256'],
         ignoreExpiration: false,
       }) as LicenseJwtPayload;
 
+      // Normalize required fields to support legacy tokens
+      const normalizedTid = (payload as any).tid ?? (payload as any).tenant_id ?? (payload as any).tenantId;
+      const normalizedPlan = (payload as any).plan ?? (payload as any).plan_id ?? (payload as any).planKey;
+      const normalizedPlanId = (payload as any).planId ?? (payload as any).plan_id ?? undefined;
+
       // Basic validation of required fields
-      if (!payload.tid || !payload.plan) {
-        this.logger.warn('License token missing required fields (tid, plan)');
-        throw new ForbiddenException('Invalid license token format');
+      if (!normalizedTid || !normalizedPlan) {
+        this.logger.warn('License token missing required fields (tid/tenant_id, plan/plan_id)');
+        throw new ForbiddenException('Missing or invalid license token');
       }
 
-      // Attach license payload to request for use in controllers
-      (request as any).license = payload;
+      // Attach normalized license payload to request for use in controllers
+      (request as any).license = {
+        ...payload,
+        tid: normalizedTid,
+        plan: normalizedPlan,
+        planId: normalizedPlanId,
+      };
 
-      this.logger.debug(`License validated for tenant: ${payload.tid}, plan: ${payload.plan}${payload.planId ? ` (${payload.planId})` : ''}`);
+      this.logger.debug(`License validated for tenant: ${normalizedTid}, plan: ${normalizedPlan}${normalizedPlanId ? ` (${normalizedPlanId})` : ''}`);
       return true;
 
     } catch (error) {
-      if (error instanceof jwt.JsonWebTokenError) {
-        this.logger.warn('Invalid license token:', error.message);
-        throw new ForbiddenException('Missing or invalid license token');
-      }
-      
+      // Check expiration first because TokenExpiredError extends JsonWebTokenError
       if (error instanceof jwt.TokenExpiredError) {
         this.logger.warn('License token expired');
         throw new ForbiddenException('License token expired');
+      }
+
+      if (error instanceof jwt.JsonWebTokenError) {
+        this.logger.warn('Invalid license token:', (error as Error).message);
+        throw new ForbiddenException('Missing or invalid license token');
       }
 
       this.logger.error('License validation error:', error);

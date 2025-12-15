@@ -43,8 +43,11 @@ model Product {
   sku                  String?               @unique
   name                 String
   description          String?
+  imageUrl             String?
   salePrice            Decimal
   costPrice            Decimal?
+  marginPct            Float?
+  expiryDate           DateTime?
   stockQty             Int                   @default(0)
   category             String?
   barcode              String?               @unique
@@ -66,6 +69,9 @@ model InventoryAdjustment {
   productId String
   delta     Int
   reason    String
+  notes     String?
+  document  String?
+  unitCost  Decimal?
   createdAt DateTime @default(now())
   product   Product  @relation(fields: [productId], references: [id])
 
@@ -254,12 +260,28 @@ model User {
   active      Boolean  @default(true)
   tenantId    String?
   hubUserId   String?
+  pin         String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  authCache   AuthCache?
 
   @@index([email])
   @@index([active])
   @@index([tenantId])
+}
+
+model AuthCache {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  email         String
+  passwordHash  String
+  lastHubAuthAt DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([email])
 }
 
 model Role {
@@ -357,4 +379,32 @@ model LicenseToken {
   @@index([tenantId])
   @@index([deviceId])
   @@index([expiresAt])
+}
+
+model PaymentMethod {
+  id                       String   @id @default(uuid())
+  tenantId                 String
+  name                     String
+  type                     String
+  active                   Boolean  @default(true)
+  ordem                    Int      @default(0)
+  permiteTroco             Boolean  @default(false)
+  permiteParcelas          Boolean  @default(false)
+  maxParcelas              Int?
+  jurosPorParcelaPct       Float?
+  descontoFixoPct          Float?
+  taxaFixa                 Float?
+  integrationSettings      String?
+  valorMin                 Float?
+  valorMax                 Float?
+  mostrarNoPDV             Boolean  @default(true)
+  somenteSeCaixaAberto     Boolean  @default(true)
+  contabilizaNoCaixa       Boolean  @default(true)
+  permiteSangria           Boolean  @default(false)
+  visivelSomenteParaRoles  String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId, active])
 }

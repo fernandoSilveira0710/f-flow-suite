@@ -15,7 +15,7 @@ const InstallationPage = () => {
               Guia de Instalação
             </h1>
             <p className="text-lg text-gray-600">
-              Siga este guia passo a passo para instalar o F-Flow Suite no seu computador
+              Siga este guia para instalação, ativação inicial online e operação offline segura.
             </p>
           </div>
 
@@ -53,8 +53,9 @@ const InstallationPage = () => {
                     Adquira sua Licença
                   </h3>
                   <p className="text-gray-600 mb-4">
-                    Primeiro, você precisa adquirir uma licença através do nosso site. 
-                    Após o pagamento, você receberá um email com os dados de acesso.
+                    Primeiro, adquira um plano no nosso site. 
+                    Após a criação da conta e confirmação, você receberá um email de boas‑vindas 
+                    com os detalhes da conta e o link para download do instalador.
                   </p>
                   <a
                     href={`${import.meta.env.VITE_SITE_URL}/planos`}
@@ -75,18 +76,47 @@ const InstallationPage = () => {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Baixe o Instalador
+                    Baixar o Instalador pelo site (opcional)
                   </h3>
                   <p className="text-gray-600 mb-4">
-                    Após a compra, você receberá um link para download do instalador. 
-                    O arquivo tem aproximadamente 150MB.
+                    Você também pode baixar diretamente pelo nosso canal oficial. Clique em <strong>Download</strong> na página
+                    e escolha a versão de <strong>Windows</strong>. Mesmo assim, você receberá o email de boas‑vindas com o link
+                    e instruções para ativação.
                   </p>
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <p className="text-sm text-gray-600">
-                      <strong>Arquivo:</strong> f-flow-suite-installer.exe<br />
-                      <strong>Tamanho:</strong> ~150MB<br />
-                      <strong>Versão:</strong> 1.0.0
-                    </p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <a
+                      href="https://2fsolutions.itch.io/f-flow"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-outline inline-flex items-center"
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Abrir página de download
+                    </a>
+                  </div>
+                  {/* Embed oficial do itch.io para facilitar o download imediato */}
+                  <div className="mt-6 flex justify-center">
+                    <iframe
+                      frameBorder="0"
+                      src="https://itch.io/embed/4054583"
+                      width="552"
+                      height="167"
+                      title="f-flow - download via itch.io"
+                    >
+                      <a href="https://2fsolutions.itch.io/f-flow">f-flow by 2fsolutions</a>
+                    </iframe>
+                  </div>
+                  <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-yellow-800">
+                          No momento, o serviço roda apenas <strong>em uma máquina</strong> por licença.
+                          A ativação vincula sua licença ao dispositivo escolhido. Para trocar de máquina,
+                          entre em contato com o suporte.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -95,6 +125,29 @@ const InstallationPage = () => {
               <div className="flex items-start">
                 <div className="bg-primary-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-4 mt-1">
                   3
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    Receba e Baixe o Instalador (via Email)
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    O instalador é enviado por email com um botão de download. 
+                    Utilize o link do email para baixar o arquivo. O instalador tem aproximadamente 150MB.
+                  </p>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-600">
+                      <strong>Arquivo:</strong> f-flow-suite-installer.exe<br />
+                      <strong>Tamanho:</strong> ~150MB<br />
+                      <strong>Versão:</strong> {import.meta.env.VITE_APP_VERSION}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 4 */}
+              <div className="flex items-start">
+                <div className="bg-primary-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-4 mt-1">
+                  4
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -117,36 +170,6 @@ const InstallationPage = () => {
                 </div>
               </div>
 
-              {/* Step 4 */}
-              <div className="flex items-start">
-                <div className="bg-primary-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-4 mt-1">
-                  4
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Ative sua Licença
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    Na primeira execução, o sistema solicitará os dados da licença que 
-                    você recebeu por email.
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                      <span className="text-gray-700">Tenant ID</span>
-                    </div>
-                    <div className="flex items-center">
-                      <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                      <span className="text-gray-700">Chave de Licença</span>
-                    </div>
-                    <div className="flex items-center">
-                      <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                      <span className="text-gray-700">URL de Download</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Step 5 */}
               <div className="flex items-start">
                 <div className="bg-primary-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-4 mt-1">
@@ -154,22 +177,86 @@ const InstallationPage = () => {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Pronto para Usar!
+                    Ative sua Licença (Login Online)
                   </h3>
                   <p className="text-gray-600 mb-4">
-                    Após a ativação, o sistema estará pronto para uso. Você pode começar 
-                    cadastrando seus dados básicos.
+                    Na primeira execução, conecte‑se à internet e faça login com seu 
+                    email e senha cadastrados. O sistema se comunica com nosso servidor de licenças (Hub)
+                    para validar e vincular sua licença ao dispositivo automaticamente.
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                      <span className="text-gray-700">Email da conta</span>
+                    </div>
+                    <div className="flex items-center">
+                      <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                      <span className="text-gray-700">Senha de acesso</span>
+                    </div>
+                    <div className="flex items-start">
+                      <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
+                      <span className="text-gray-700">
+                        Conexão com internet é obrigatória apenas nesta ativação inicial para validação no Hub.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 6 */}
+              <div className="flex items-start">
+                <div className="bg-primary-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-4 mt-1">
+                  6
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    Operação Offline Segura
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Após a ativação online, o sistema pode operar sem internet por um período limitado.
+                    Mantenha a conexão com o Hub periodicamente para renovar a validação.
                   </p>
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-start">
                       <CheckCircle className="h-5 w-5 text-green-600 mr-2 mt-0.5" />
                       <div>
                         <p className="text-sm text-green-800">
-                          O sistema funcionará offline após a instalação. Conexão com internet 
-                          é necessária apenas para atualizações.
+                          Limite de uso offline: por padrão até 5 dias sem contato com o Hub
+                          (configurável). Se excedido, o sistema solicita login online e pode encerrar
+                          sessões ativas.
+                        </p>
+                        <p className="text-xs text-green-700 mt-2">
+                          Dica: o aplicativo mostra "Restam X dias offline" na barra superior quando o Hub está indisponível.
                         </p>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Offline Policy */}
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Política de Operação Offline</h2>
+            <div className="space-y-6">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <h3 className="font-semibold text-gray-900 mb-2">Como funciona</h3>
+                <ul className="text-gray-700 space-y-2">
+                  <li>• Ativação inicial exige login online para validar a licença no Hub.</li>
+                  <li>• Após ativado, o sistema utiliza o token de licença local para operar offline.</li>
+                  <li>• Existe um período máximo sem comunicação com o Hub (padrão 5 dias, configurável via ambiente).</li>
+                  <li>• Há também um período de graça da licença local; expirada e fora da graça, o acesso é bloqueado.</li>
+                </ul>
+              </div>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+                <div className="flex items-start">
+                  <AlertCircle className="h-5 w-5 text-yellow-700 mr-2 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-yellow-800">
+                      Se ultrapassar o limite de dias offline sem sincronizar com o Hub,
+                      o login offline é bloqueado e será necessário reconectar e fazer login online.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -195,25 +282,26 @@ const InstallationPage = () => {
 
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
                 <h3 className="font-semibold text-gray-900 mb-2">
-                  Licença não Ativa
+                  Não consigo ativar / fazer login
                 </h3>
                 <p className="text-gray-600 mb-2">
-                  Verifique se os dados da licença foram inseridos corretamente.
+                  Verifique sua conexão com a internet e confirme email/senha.
+                  A ativação inicial requer comunicação com o Hub.
                 </p>
                 <p className="text-sm text-gray-500">
-                  Copie e cole os dados exatamente como recebidos no email
+                  Se o Hub estiver indisponível, tente novamente mais tarde ou use o modo offline se já estiver validado.
                 </p>
               </div>
 
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
                 <h3 className="font-semibold text-gray-900 mb-2">
-                  Sistema não Inicia
+                  Bloqueio por excesso de tempo offline
                 </h3>
                 <p className="text-gray-600 mb-2">
-                  Verifique se todos os requisitos do sistema foram atendidos.
+                  O sistema bloqueia o login offline após exceder o limite de dias sem o Hub (padrão 5).
                 </p>
                 <p className="text-sm text-gray-500">
-                  Entre em contato com o suporte se o problema persistir
+                  Reconecte à internet e faça login online para revalidar sua licença.
                 </p>
               </div>
             </div>

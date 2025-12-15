@@ -29,6 +29,7 @@ const RenewalPage = () => {
   const [plans, setPlans] = useState<Plan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<string>('')
   const [hubOnline, setHubOnline] = useState(false)
+  const [token, setToken] = useState<string | null>(null)
   
   // Dados do formulário de login
   const [email, setEmail] = useState('')
@@ -53,7 +54,8 @@ const RenewalPage = () => {
     if (!hubOnline) return
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_HUB_API_URL}/plans`)
+      // Usar endpoint público do Hub para evitar LicenseGuard
+      const response = await fetch(`${import.meta.env.VITE_HUB_API_URL}/public/plans?active=true`)
       if (response.ok) {
         const hubPlans = await response.json()
         setPlans(hubPlans.map((plan: any) => ({
@@ -98,6 +100,7 @@ const RenewalPage = () => {
           name: result.user.displayName || result.user.email.split('@')[0],
           tenantId: result.user.tenant.id
         })
+        setToken(result.access_token)
         
         await loadPlans()
         setStep('plans')
@@ -126,6 +129,8 @@ const RenewalPage = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'x-tenant-id': user.tenantId,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           planKey: planId

@@ -21,11 +21,8 @@ const Header = () => {
       <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" aria-label="Top">
         <div className="flex w-full items-center justify-between py-6">
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">F</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">F-Flow Suite</span>
+            <Link to="/" className="flex items-center">
+              <img src="/brand/2F-large.png" alt="2F Solutions" className="h-24 w-auto" />
             </Link>
           </div>
 
@@ -44,14 +41,12 @@ const Header = () => {
                 {item.name}
               </Link>
             ))}
-            <a
-              href={`${import.meta.env.VITE_SITE_URL}/planos`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to="/precos"
               className="btn-primary px-4 py-2"
             >
               Começar Agora
-            </a>
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -85,14 +80,13 @@ const Header = () => {
                 </Link>
               ))}
               <div className="px-3 py-2">
-                <a
-                  href={`${import.meta.env.VITE_SITE_URL}/planos`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  to="/precos"
                   className="btn-primary px-4 py-2 w-full text-center"
+                  onClick={() => setIsMenuOpen(false)}
                 >
                   Começar Agora
-                </a>
+                </Link>
               </div>
             </div>
           </div>

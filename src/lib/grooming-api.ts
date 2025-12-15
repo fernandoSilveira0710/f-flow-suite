@@ -132,7 +132,8 @@ export interface GroomPrefs {
 }
 
 // ============ API CONFIGURATION ============
-const API_BASE_URL = 'http://127.0.0.1:3001';
+import { API_URLS } from './env';
+const API_BASE_URL = API_URLS.CLIENT_LOCAL;
 
 // ============ API HELPER ============
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -474,9 +475,9 @@ export function duplicateGroomService(id: string): GroomService | undefined {
 // ============ PROFESSIONALS API ============
 export function getProfessionals(): Professional[] {
   const professionals = getStorage<Professional[]>('grooming_professionals', [
-    { id: uuid(), name: 'Maria Silva', role: 'Tosadora', phone: '(11) 99999-1111', email: 'maria@petshop.com', active: true },
-    { id: uuid(), name: 'João Santos', role: 'Banhista', phone: '(11) 99999-2222', email: 'joao@petshop.com', active: true },
-    { id: uuid(), name: 'Ana Costa', role: 'Veterinária', phone: '(11) 99999-3333', email: 'ana@petshop.com', active: true },
+    { id: uuid(), name: 'Maria Silva', role: 'Tosadora', phone: '(11) 99999-1111', email: 'maria@2fsolutions.com', active: true },
+    { id: uuid(), name: 'João Santos', role: 'Banhista', phone: '(11) 99999-2222', email: 'joao@2fsolutions.com', active: true },
+    { id: uuid(), name: 'Ana Costa', role: 'Veterinária', phone: '(11) 99999-3333', email: 'ana@2fsolutions.com', active: true },
   ]);
   return Array.isArray(professionals) ? professionals : [];
 }

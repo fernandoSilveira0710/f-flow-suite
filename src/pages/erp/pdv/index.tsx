@@ -57,6 +57,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/contexts/auth-context';
 import {
   getCurrentSession,
   createSession,
@@ -69,11 +71,13 @@ import {
   getCart,
   clearCart,
   applyDiscount,
-  applyItemDiscount,
   searchProducts,
   getSales,
   refundSale,
   createSale,
+  updateCartItemDiscount,
+  finalizeCartItem,
+  unfinalizeCartItem,
   CartItem,
   Session,
   Sale,
@@ -83,6 +87,7 @@ import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { useBarcodeScanner } from '@/hooks/use-barcode-scanner';
 import { ProductImage } from '@/components/products/product-image';
 import { cn } from '@/lib/utils';
+import { getUsablePaymentMethods, PaymentMethod, calculatePaymentTotal } from '@/lib/payments-api';
 
 export default function PdvPage() {
   const navigate = useNavigate();
@@ -102,6 +107,10 @@ export default function PdvPage() {
   const [showOpenSession, setShowOpenSession] = useState(false);
   const [showCloseSession, setShowCloseSession] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  // Editar quantidade (F3/F4)
+  const [showEditQty, setShowEditQty] = useState(false);
+  const [editQtyValue, setEditQtyValue] = useState('');
+  const editQtyInputRef = useRef<HTMLInputElement>(null);
   
   // Search
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -113,6 +122,7 @@ export default function PdvPage() {
   
   // History
   const [sales, setSales] = useState<Sale[]>([]);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   
   // Scanner
   const scannerInputRef = useRef<HTMLInputElement>(null);
@@ -131,12 +141,31 @@ export default function PdvPage() {
   // Checkout
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [installments, setInstallments] = useState(1);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  // Split payments
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitPayments, setSplitPayments] = useState<{ method?: string; amount: string; installments?: number }[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     loadSession();
     loadCart();
     loadSales();
   }, []);
+
+  // Carrega métodos de pagamento dinâmicos (ativos e visíveis no PDV)
+  useEffect(() => {
+    (async () => {
+      try {
+        const caixaAberto = session?.status === 'Aberto';
+        const role = user?.roleId || 'vendedor';
+        const list = await getUsablePaymentMethods(role, !!caixaAberto);
+        setPaymentMethods(list);
+      } catch (err) {
+        // silencioso no PDV; falhas serão tratadas quando abrir o checkout
+      }
+    })();
+  }, [session?.status, user?.roleId]);
 
   useEffect(() => {
     // Check scanner focus periodically
@@ -145,6 +174,25 @@ export default function PdvPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Ajusta parcelas conforme o método selecionado
+  useEffect(() => {
+    const method = paymentMethods.find((m) => m.nome === paymentMethod);
+    if (!method || !method.permiteParcelas) {
+      if (installments !== 1) setInstallments(1);
+      return;
+    }
+    const max = method.maxParcelas || 12;
+    if (installments > max) setInstallments(max);
+  }, [paymentMethod, paymentMethods]);
+
+  // Reset split state when opening checkout
+  useEffect(() => {
+    if (showCheckout) {
+      setSplitMode(false);
+      setSplitPayments([]);
+    }
+  }, [showCheckout]);
 
   const loadSession = () => {
     const currentSession = getCurrentSession();
@@ -193,26 +241,51 @@ export default function PdvPage() {
     }
   };
 
+  // Permitir colar ou digitar + Enter no input do scanner
+  const handleScannerPaste = async (e: any) => {
+    const text = e.clipboardData?.getData('text')?.trim();
+    if (!text) return;
+    e.preventDefault();
+    await handleScan(text);
+    if (scannerInputRef.current) scannerInputRef.current.value = '';
+  };
+
+  const handleScannerKeyDown = async (e: any) => {
+    if (e.key !== 'Enter') return;
+    const code = (e.currentTarget?.value || '').trim();
+    if (!code) return;
+    e.preventDefault();
+    await handleScan(code);
+    e.currentTarget.value = '';
+  };
+
   useBarcodeScanner({
     onScan: handleScan,
-    enabled: activeTab === 'vender' && !showSearch && !showDiscountItem && !showDiscountGlobal && !showCheckout && !showOpenSession && !showCloseSession,
+    enabled: activeTab === 'vender' && !showSearch && !showDiscountItem && !showDiscountGlobal && !showCheckout && !showOpenSession && !showCloseSession && !showEditQty,
   });
 
   // Keyboard shortcuts
-  const anyModalOpen = showHelp || showSearch || showDiscountItem || showDiscountGlobal || showCancelSale || showOpenSession || showCloseSession || showCheckout;
+  const anyModalOpen = showHelp || showSearch || showDiscountItem || showDiscountGlobal || showCancelSale || showOpenSession || showCloseSession || showCheckout || showEditQty;
   
   useKeyboardShortcuts([
     { key: 'F1', handler: () => setShowHelp(true), disabled: anyModalOpen },
     { key: 'F2', handler: () => setShowSearch(true), disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'F3', handler: () => {
-      if (selectedItemIndex >= 0 && cart[selectedItemIndex]) {
-        // Focus quantity input (implementation depends on UI)
-        toast.info('Editar quantidade do item selecionado');
+      if (activeTab !== 'vender') return;
+      if (selectedItemIndex < 0 || !cart[selectedItemIndex]) {
+        toast.error('Selecione um item do carrinho');
+        return;
       }
+      setEditQtyValue(String(cart[selectedItemIndex].qtd));
+      setShowEditQty(true);
     }, disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'F4', handler: () => {
-      // Finalizar item (confirm edit)
-      toast.info('Item finalizado');
+      if (activeTab !== 'vender') return;
+      if (showEditQty) {
+        handleConfirmEditQty();
+        return;
+      }
+      handleFinalizeItem();
     }, disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'F5', handler: () => {
       scannerInputRef.current?.focus();
@@ -240,13 +313,35 @@ export default function PdvPage() {
     { key: 'F8', handler: () => setShowDiscountGlobal(true), disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'F9', handler: () => {
       if (cart.length > 0 && session?.status === 'Aberto') {
-        setPaymentMethod('PIX');
+        const pix = paymentMethods.find((m) => m.tipo === 'PIX' && m.ativo && m.visibilidade?.mostrarNoPDV !== false);
+        if (!pix) {
+          toast.error('Nenhum método PIX configurado para o PDV');
+          return;
+        }
+        setPaymentMethod(pix.nome);
         setShowCheckout(true);
       }
     }, disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'F10', handler: () => {
       if (cart.length > 0 && session?.status === 'Aberto') {
-        setShowCheckout(true);
+        (async () => {
+          try {
+            let methods = paymentMethods;
+            if (methods.length === 0) {
+              const role = user?.roleId || 'vendedor';
+              const caixaAberto = session?.status === 'Aberto';
+              methods = await getUsablePaymentMethods(role, !!caixaAberto);
+              setPaymentMethods(methods);
+            }
+            if (methods.length === 0) {
+              toast.error('Nenhum método de pagamento configurado no PDV');
+              return;
+            }
+            setShowCheckout(true);
+          } catch {
+            toast.error('Falha ao carregar métodos de pagamento');
+          }
+        })();
       } else if (cart.length === 0) {
         toast.error('Carrinho vazio');
       } else {
@@ -255,13 +350,27 @@ export default function PdvPage() {
     }, disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'F11', handler: () => {
       if (cart.length > 0 && session?.status === 'Aberto') {
-        setPaymentMethod('Cartão Crédito');
+        const credit = paymentMethods.find((m) => m.tipo === 'CREDIT' && m.ativo && m.visibilidade?.mostrarNoPDV !== false);
+        if (!credit) {
+          toast.error('Nenhum cartão de crédito configurado para o PDV');
+          return;
+        }
+        setPaymentMethod(credit.nome);
         setShowCheckout(true);
       }
     }, disabled: anyModalOpen || activeTab !== 'vender' },
     { key: 'F12', handler: () => {
-      // Estornar venda selecionada
-      toast.info('F12: Estornar venda selecionada');
+      if (activeTab !== 'historico') return;
+      const sale = sales.find((s) => s.id === selectedSaleId);
+      if (!sale) {
+        toast.error('Selecione uma venda no histórico');
+        return;
+      }
+      if (sale.status !== 'completed') {
+        toast.error('Apenas vendas concluídas podem ser estornadas');
+        return;
+      }
+      handleRefund(sale.id);
     }, disabled: anyModalOpen || activeTab !== 'historico' },
     { key: 'Delete', handler: () => {
       if (selectedItemIndex >= 0 && cart[selectedItemIndex]) {
@@ -303,6 +412,35 @@ export default function PdvPage() {
     }
   };
 
+  const handleConfirmEditQty = async () => {
+    if (selectedItemIndex < 0 || !cart[selectedItemIndex]) {
+      toast.error('Nenhum item selecionado');
+      return;
+    }
+    const item = cart[selectedItemIndex];
+    const qtd = parseInt(editQtyValue);
+    if (isNaN(qtd) || qtd <= 0) {
+      toast.error('Quantidade inválida');
+      return;
+    }
+    await handleUpdateQtd(item.id, qtd);
+    setShowEditQty(false);
+    setEditQtyValue('');
+    toast.success('Quantidade atualizada');
+  };
+
+  const handleFinalizeItem = async () => {
+    if (selectedItemIndex >= 0 && cart[selectedItemIndex]) {
+      const updated = await finalizeCartItem(cart[selectedItemIndex].id);
+      setCart(updated);
+      setSelectedItemIndex(-1);
+      toast.success('Item finalizado');
+    } else {
+      toast.info('Nenhum item selecionado');
+    }
+    setTimeout(() => scannerInputRef.current?.focus(), 0);
+  };
+
   const handleRemoveItem = async (itemId: string) => {
     try {
       const updatedCart = await removeFromCart(itemId);
@@ -333,7 +471,7 @@ export default function PdvPage() {
         ? (item.qtd * item.produto.preco * value) / 100
         : value;
 
-      const updatedCart = await applyItemDiscount(item.produto.id, discountAmount);
+      const updatedCart = await updateCartItemDiscount(item.id, discountAmount);
       setCart(updatedCart);
       toast.success('Desconto aplicado');
       setShowDiscountItem(false);
@@ -422,7 +560,19 @@ export default function PdvPage() {
         return;
       }
 
-      await closeSession(closeObservacao);
+      const payload = {
+        totalVendas: sessionTotals?.totalVendas || 0,
+        totalDinheiro: sessionTotals?.totalDinheiro || 0,
+        totalCartao: sessionTotals?.totalCartao || 0,
+        totalPix: sessionTotals?.totalPix || 0,
+        totalOutros: sessionTotals?.totalOutros || 0,
+        totalSangria: sessionTotals?.totalSangria || 0,
+        totalSuprimento: sessionTotals?.totalSuprimento || 0,
+        saldoFinalCalculado: sessionTotals?.saldoFinalCalculado || 0,
+        observacao: closeObservacao?.trim() || undefined,
+      };
+
+      await closeSession(payload);
       setSession(null);
       setShowCloseSession(false);
       toast.success('Caixa fechado com sucesso!');
@@ -470,13 +620,91 @@ export default function PdvPage() {
   };
 
   const handleCheckout = async () => {
-    if (!paymentMethod) {
-      toast.error('Selecione a forma de pagamento');
-      return;
-    }
-
     try {
-      const sale = await createSale(cart, paymentMethod, paymentMethod === 'Cartão Crédito' ? installments : undefined, discount);
+      if (!splitMode) {
+        if (!paymentMethod) {
+          toast.error('Selecione a forma de pagamento');
+          return;
+        }
+        const method = paymentMethods.find((m) => m.nome === paymentMethod);
+        if (!method) {
+          toast.error('Forma de pagamento inválida ou não configurada');
+          return;
+        }
+        const sale = await createSale(
+          cart,
+          method.nome,
+          method.permiteParcelas ? installments : undefined,
+          discount
+        );
+        setCart([]);
+        setDiscount(0);
+        setCouponCode('');
+        setSelectedItemIndex(-1);
+        setShowCheckout(false);
+        toast.success(`Venda #${sale.id} finalizada!`);
+        loadSession();
+        loadSales();
+        setPaymentMethod('');
+        setInstallments(1);
+        return;
+      }
+
+      // Split mode validation
+      if (splitPayments.length === 0) {
+        toast.error('Adicione ao menos uma forma de pagamento');
+        return;
+      }
+
+      const parseAmount = (v: string) => {
+        if (!v) return 0;
+        const cleaned = v.replace(',', '.').replace(/[^\d.]/g, '');
+        const n = parseFloat(cleaned);
+        return Number.isFinite(n) ? Number(n.toFixed(2)) : 0;
+      };
+
+      const payments = splitPayments
+        .map(p => ({ method: p.method?.trim() || '', amount: parseAmount(p.amount), installments: p.installments || 1 }))
+        .filter(p => p.method && p.amount > 0);
+
+      if (payments.length === 0) {
+        toast.error('Preencha os valores e selecione as formas de pagamento');
+        return;
+      }
+
+      const sum = Number(payments.reduce((s, p) => s + p.amount, 0).toFixed(2));
+      const due = Number(total.toFixed(2));
+      if (Math.abs(sum - due) > 0.01) {
+        toast.error(`A soma dos pagamentos (R$ ${sum.toFixed(2)}) deve ser igual ao total (R$ ${due.toFixed(2)})`);
+        return;
+      }
+
+      // Validate methods
+      for (const p of payments) {
+        const m = paymentMethods.find(x => x.nome === p.method);
+        if (!m) {
+          toast.error(`Forma inválida: ${p.method}`);
+          return;
+        }
+        if (!m.permiteParcelas && p.installments && p.installments !== 1) {
+          toast.error(`"${m.nome}" não permite parcelas`);
+          return;
+        }
+        if (m.permiteParcelas && p.installments && m.maxParcelas && p.installments > m.maxParcelas) {
+          toast.error(`Parcelas acima do permitido em "${m.nome}"`);
+          return;
+        }
+      }
+
+      const pmFallback = payments[0]?.method || paymentMethod || 'SPLIT';
+      const sale = await createSale(
+        cart,
+        pmFallback,
+        undefined,
+        discount,
+        payments
+      );
+
       setCart([]);
       setDiscount(0);
       setCouponCode('');
@@ -487,6 +715,8 @@ export default function PdvPage() {
       loadSales();
       setPaymentMethod('');
       setInstallments(1);
+      setSplitPayments([]);
+      setSplitMode(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Erro ao finalizar venda');
     }
@@ -495,22 +725,77 @@ export default function PdvPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
   const total = Math.max(subtotal - discount, 0);
 
-  // Calculate session totals
+  // Calculate session totals using API sales
   const sessionTotals = session && session.status === 'Aberto' ? (() => {
-    const allSales = JSON.parse(localStorage.getItem('2f.pos.sales') || '[]');
-    const sessionSales = allSales.filter((s: any) => 
-      session.vendasIds.includes(s.id) && s.status === 'Pago'
+    const normalize = (m: string) => (m || '').toUpperCase();
+    const isCash = (m: string) => ['DINHEIRO', 'CASH'].includes(normalize(m));
+    const isPix = (m: string) => normalize(m) === 'PIX';
+    const isCard = (m: string) => {
+      const n = normalize(m);
+      return n.includes('CART') || n.includes('CARD') || n.includes('CREDIT') || n.includes('CRÉDIT') || n.includes('DEBIT');
+    };
+
+    const sessionSales = sales.filter((s: any) =>
+      session.vendasIds.includes(s.id) && (s.status === 'completed')
     );
-    
-    const totalVendas = sessionSales.reduce((sum: number, s: any) => sum + s.total, 0);
-    const totalDinheiro = sessionSales.filter((s: any) => s.pagamento === 'Dinheiro').reduce((sum: number, s: any) => sum + s.total, 0);
-    const totalCartao = sessionSales.filter((s: any) => s.pagamento.includes('Cartão')).reduce((sum: number, s: any) => sum + s.total, 0);
-    const totalPix = sessionSales.filter((s: any) => s.pagamento === 'PIX').reduce((sum: number, s: any) => sum + s.total, 0);
+
+    const totalVendas = sessionSales.reduce((sum: number, s: any) => sum + (s.total || 0), 0);
+
+    let totalDinheiro = 0;
+    let totalCartao = 0;
+    let totalPix = 0;
+    let totalOutros = 0;
+    let totalNoCaixa = 0;
+
+    const typeFromName = (name: string): 'cash' | 'card' | 'pix' | 'other' => {
+      const pm = paymentMethods.find(m => m.nome === name);
+      const t = pm?.tipo?.toUpperCase();
+      if (t === 'CASH') return 'cash';
+      if (t === 'PIX') return 'pix';
+      if (t === 'CREDIT' || t === 'DEBIT') return 'card';
+      if (isCash(name)) return 'cash';
+      if (isPix(name)) return 'pix';
+      if (isCard(name)) return 'card';
+      return 'other';
+    };
+
+    const countsInCash = (name: string): boolean => {
+      const pm = paymentMethods.find(m => m.nome === name);
+      if (pm && pm.regrasCaixa && typeof pm.regrasCaixa.contabilizaNoCaixa === 'boolean') {
+        return !!pm.regrasCaixa.contabilizaNoCaixa;
+      }
+      // Fallback: manter comportamento anterior quando não configurado
+      return isCash(name);
+    };
+
+    for (const s of sessionSales) {
+      if (s.payments && s.payments.length > 0) {
+        for (const p of s.payments) {
+          const amt = p.amount || 0;
+          const t = typeFromName(p.method);
+          if (t === 'cash') totalDinheiro += amt;
+          else if (t === 'pix') totalPix += amt;
+          else if (t === 'card') totalCartao += amt;
+          else totalOutros += amt;
+
+          if (countsInCash(p.method)) totalNoCaixa += amt;
+        }
+      } else {
+        const amt = s.total || 0;
+        if (isCash(s.paymentMethod)) totalDinheiro += amt;
+        else if (isPix(s.paymentMethod)) totalPix += amt;
+        else if (isCard(s.paymentMethod)) totalCartao += amt;
+        else totalOutros += amt;
+
+        if (countsInCash(s.paymentMethod)) totalNoCaixa += amt;
+      }
+    }
+
     const totalSangria = session.cash.filter(c => c.tipo === 'SANGRIA').reduce((sum, c) => sum + c.valor, 0);
     const totalSuprimento = session.cash.filter(c => c.tipo === 'SUPRIMENTO').reduce((sum, c) => sum + c.valor, 0);
-    const saldoFinalCalculado = session.saldoInicial + totalSuprimento - totalSangria + totalDinheiro;
-    
-    return { totalVendas, totalDinheiro, totalCartao, totalPix, totalSangria, totalSuprimento, saldoFinalCalculado, qtdVendas: sessionSales.length };
+    const saldoFinalCalculado = session.saldoInicial + totalSuprimento - totalSangria + totalNoCaixa;
+
+    return { totalVendas, totalDinheiro, totalCartao, totalPix, totalOutros, totalSangria, totalSuprimento, saldoFinalCalculado, qtdVendas: sessionSales.length };
   })() : null;
 
   return (
@@ -597,10 +882,19 @@ export default function PdvPage() {
                             <TableRow 
                               key={item.produto.id}
                               className={cn(
-                                "cursor-pointer",
-                                selectedItemIndex === index && "bg-muted"
+                                "cursor-pointer transition-colors",
+                                selectedItemIndex === index && "bg-primary/10 border-l-4 border-primary",
+                                item.finalized && "opacity-60"
                               )}
-                              onClick={() => setSelectedItemIndex(index)}
+                              onClick={async () => {
+                                if (item.finalized) {
+                                  const updated = await unfinalizeCartItem(item.id);
+                                  setCart(updated);
+                                  toast.info('Item reativado');
+                                }
+                                setSelectedItemIndex(index);
+                                setTimeout(() => scannerInputRef.current?.focus(), 0);
+                              }}
                             >
                               <TableCell className="font-medium">
                                 <div className="flex items-center gap-2">
@@ -620,6 +914,7 @@ export default function PdvPage() {
                                     size="icon"
                                     variant="ghost"
                                     className="h-6 w-6"
+                                    disabled={item.finalized}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       if (item.qtd > 1) handleUpdateQtd(item.id, item.qtd - 1);
@@ -632,6 +927,7 @@ export default function PdvPage() {
                                     size="icon"
                                     variant="ghost"
                                     className="h-6 w-6"
+                                    disabled={item.finalized}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleUpdateQtd(item.id, item.qtd + 1);
@@ -643,13 +939,19 @@ export default function PdvPage() {
                               </TableCell>
                               <TableCell className="text-right">R$ {item.produto.preco.toFixed(2)}</TableCell>
                               <TableCell className="text-right font-semibold">
-                                R$ {item.subtotal.toFixed(2)}
+                                <div className="flex flex-col items-end leading-tight">
+                                  <span>R$ {item.subtotal.toFixed(2)}</span>
+                                  {item.itemDiscount && item.itemDiscount > 0 && (
+                                    <span className="text-xs text-red-600">- R$ {item.itemDiscount.toFixed(2)}</span>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <Button
                                   size="icon"
                                   variant="ghost"
                                   className="h-8 w-8"
+                                  disabled={item.finalized}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleRemoveItem(item.id);
@@ -689,6 +991,8 @@ export default function PdvPage() {
                     className="border-green-600 focus:ring-green-600 text-lg h-12"
                     autoFocus
                     disabled={session?.status !== 'Aberto'}
+                    onPaste={handleScannerPaste}
+                    onKeyDown={handleScannerKeyDown}
                   />
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                     <div className="flex items-center justify-between">
@@ -764,11 +1068,13 @@ export default function PdvPage() {
                         toast.error('Carrinho vazio');
                       } else if (session?.status !== 'Aberto') {
                         toast.error('Caixa não está aberto');
+                      } else if (paymentMethods.length === 0) {
+                        toast.error('Nenhum método de pagamento configurado no PDV');
                       } else {
                         setShowCheckout(true);
                       }
                     }}
-                    disabled={cart.length === 0 || session?.status !== 'Aberto'}
+                    disabled={cart.length === 0 || session?.status !== 'Aberto' || paymentMethods.length === 0}
                   >
                     Finalizar Venda (F10)
                   </Button>
@@ -830,7 +1136,11 @@ export default function PdvPage() {
                       </TableRow>
                     ) : (
                       sales.map((sale) => (
-                        <TableRow key={sale.id}>
+                        <TableRow
+                          key={sale.id}
+                          onClick={() => setSelectedSaleId(sale.id)}
+                          className={selectedSaleId === sale.id ? 'bg-muted cursor-pointer' : 'cursor-pointer'}
+                        >
                           <TableCell className="font-medium">{sale.id}</TableCell>
                           <TableCell>{new Date(sale.createdAt).toLocaleString('pt-BR')}</TableCell>
                           <TableCell>{sale.operator}</TableCell>
@@ -849,7 +1159,7 @@ export default function PdvPage() {
                               <Button size="sm" variant="outline">
                                 Imprimir
                               </Button>
-                              {sale.status === 'Pago' && (
+                              {sale.status === 'completed' && (
                                 <Button
                                   size="sm"
                                   variant="destructive"
@@ -976,7 +1286,7 @@ export default function PdvPage() {
                         {session.cash.filter(c => c.tipo === 'SANGRIA').map(c => (
                           <div key={c.id} className="text-xs flex justify-between">
                             <span className="text-muted-foreground">
-                              {new Date(c.dataISO).toLocaleTimeString('pt-BR')}
+                              {new Date(c.timestamp).toLocaleTimeString('pt-BR')}
                             </span>
                             <span className="font-medium">R$ {c.valor.toFixed(2)}</span>
                           </div>
@@ -1029,7 +1339,7 @@ export default function PdvPage() {
                         {session.cash.filter(c => c.tipo === 'SUPRIMENTO').map(c => (
                           <div key={c.id} className="text-xs flex justify-between">
                             <span className="text-muted-foreground">
-                              {new Date(c.dataISO).toLocaleTimeString('pt-BR')}
+                              {new Date(c.timestamp).toLocaleTimeString('pt-BR')}
                             </span>
                             <span className="font-medium">R$ {c.valor.toFixed(2)}</span>
                           </div>
@@ -1208,6 +1518,33 @@ export default function PdvPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Quantity Dialog */}
+      <Dialog open={showEditQty} onOpenChange={setShowEditQty}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Quantidade</DialogTitle>
+            <DialogDescription>Informe a quantidade desejada para o item selecionado</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Quantidade</Label>
+              <Input
+                ref={editQtyInputRef}
+                value={editQtyValue}
+                onChange={(e) => setEditQtyValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmEditQty(); }}
+                inputMode="numeric"
+                placeholder="Ex.: 1, 2, 3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditQty(false)}>Cancelar</Button>
+            <Button onClick={handleConfirmEditQty}>Aplicar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Item Discount Dialog */}
       <Dialog open={showDiscountItem} onOpenChange={setShowDiscountItem}>
         <DialogContent>
@@ -1215,7 +1552,7 @@ export default function PdvPage() {
             <DialogTitle>Desconto no Item</DialogTitle>
             <DialogDescription>
               {selectedItemIndex >= 0 && cart[selectedItemIndex] 
-                ? `Aplicar desconto em: ${cart[selectedItemIndex].nome}`
+                ? `Aplicar desconto em: ${cart[selectedItemIndex]?.produto?.nome ?? cart[selectedItemIndex]?.produto?.sku ?? ''}`
                 : 'Selecione um item primeiro'}
             </DialogDescription>
           </DialogHeader>
@@ -1435,35 +1772,158 @@ export default function PdvPage() {
                 <span className="text-3xl font-bold text-green-600">R$ {total.toFixed(2)}</span>
               </div>
             </div>
-            <div>
-              <Label>Forma de Pagamento</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="Cartão Débito">Cartão Débito</SelectItem>
-                  <SelectItem value="Cartão Crédito">Cartão Crédito</SelectItem>
-                  <SelectItem value="PIX">PIX</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {paymentMethod === 'Cartão Crédito' && (
+
+            {/* Toggle split */}
+            <div className="flex items-center justify-between border rounded-lg p-3">
               <div>
-                <Label>Parcelas</Label>
-                <Select value={installments.toString()} onValueChange={(v) => setInstallments(parseInt(v))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
-                      <SelectItem key={n} value={n.toString()}>
-                        {n}x de R$ {(total / n).toFixed(2)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Dividir pagamento em até 2 formas</Label>
+                <p className="text-xs text-muted-foreground">Ex.: parte em dinheiro e o restante no cartão</p>
+              </div>
+              <Switch checked={splitMode} onCheckedChange={setSplitMode} />
+            </div>
+
+            {!splitMode ? (
+              <>
+                <div>
+                  <Label>Forma de Pagamento</Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentMethods.length === 0 ? (
+                        <SelectItem value="__no_methods__" disabled>Nenhum método disponível</SelectItem>
+                      ) : (
+                        paymentMethods.map((m) => (
+                          <SelectItem key={m.id} value={m.nome}>{m.nome}</SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {(() => {
+                  const method = paymentMethods.find((m) => m.nome === paymentMethod);
+                  if (!method || !method.permiteParcelas) return null;
+                  const max = method.maxParcelas || 12;
+                  return (
+                    <div>
+                      <Label>Parcelas</Label>
+                      <Select value={installments.toString()} onValueChange={(v) => setInstallments(parseInt(v))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: max }, (_, i) => i + 1).map((n) => {
+                            const calc = calculatePaymentTotal(total, method, n);
+                            const per = calc.total / n;
+                            return (
+                              <SelectItem key={n} value={n.toString()}>
+                                {n}x de R$ {per.toFixed(2)}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })()}
+              </>
+            ) : (
+              <div className="space-y-4">
+                {splitPayments.map((p, idx) => {
+                  const selected = p.method ? paymentMethods.find(m => m.nome === p.method) : undefined;
+                  const max = selected?.maxParcelas || 12;
+                  const installmentsValue = (p.installments || 1).toString();
+                  return (
+                    <div key={idx} className="grid md:grid-cols-3 gap-3 items-end border rounded-lg p-3">
+                      <div className="md:col-span-1">
+                        <Label>Método #{idx + 1}</Label>
+                        <Select value={p.method || ''} onValueChange={(v) => {
+                          const next = [...splitPayments];
+                          next[idx] = { ...next[idx], method: v };
+                          if (!paymentMethods.find(m => m.nome === v)?.permiteParcelas) next[idx].installments = 1;
+                          setSplitPayments(next);
+                        }}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {paymentMethods.map((m) => (
+                              <SelectItem key={m.id} value={m.nome}>{m.nome}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="md:col-span-1">
+                        <Label>Valor</Label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={p.amount || ''}
+                          onChange={(e) => {
+                            const next = [...splitPayments];
+                            // sanitize to 2 decimals
+                            let raw = e.target.value.replace(',', '.').replace(/[^\d.]/g, '');
+                            const parts = raw.split('.');
+                            if (parts.length > 2) raw = parts[0] + '.' + parts.slice(1).join('');
+                            const [i, d] = raw.split('.');
+                            raw = d !== undefined ? `${i}.${d.slice(0,2)}` : i;
+                            next[idx] = { ...next[idx], amount: raw };
+                            setSplitPayments(next);
+                          }}
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        {selected?.permiteParcelas ? (
+                          <div>
+                            <Label>Parcelas</Label>
+                            <Select value={installmentsValue} onValueChange={(v) => {
+                              const next = [...splitPayments];
+                              next[idx] = { ...next[idx], installments: parseInt(v) };
+                              setSplitPayments(next);
+                            }}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
+                                  <SelectItem key={n} value={n.toString()}>
+                                    {n}x
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <div className="h-10" />
+                        )}
+                      </div>
+                      <div className="md:col-span-3 flex justify-end">
+                        {splitPayments.length > 1 && (
+                          <Button variant="outline" size="sm" onClick={() => setSplitPayments(splitPayments.filter((_, i) => i !== idx))}>Remover</Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (splitPayments.length >= 2) return;
+                      setSplitPayments([...splitPayments, { method: undefined, amount: '', installments: 1 }]);
+                    }}
+                  >
+                    Adicionar forma
+                  </Button>
+                  {(() => {
+                    const sum = splitPayments.reduce((acc, p) => acc + (parseFloat((p.amount || '0').replace(',', '.')) || 0), 0);
+                    const rest = Number((total - sum).toFixed(2));
+                    return <span className={cn('text-sm', Math.abs(rest) < 0.01 ? 'text-green-600' : 'text-amber-600')}>Resta: R$ {rest.toFixed(2)}</span>;
+                  })()}
+                </div>
               </div>
             )}
           </div>
@@ -1471,7 +1931,19 @@ export default function PdvPage() {
             <Button variant="outline" onClick={() => setShowCheckout(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCheckout} disabled={!paymentMethod}>
+            <Button
+              onClick={handleCheckout}
+              disabled={
+                (!splitMode && !paymentMethod) ||
+                (splitMode && (() => {
+                  if (splitPayments.length === 0) return true;
+                  const cleaned = splitPayments.filter(p => p.method && p.amount);
+                  if (cleaned.length === 0) return true;
+                  const sum = cleaned.reduce((acc, p) => acc + (parseFloat((p.amount || '0').replace(',', '.')) || 0), 0);
+                  return Math.abs(sum - total) > 0.01;
+                })())
+              }
+            >
               Confirmar Pagamento
             </Button>
           </DialogFooter>

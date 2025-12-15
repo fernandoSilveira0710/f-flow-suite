@@ -1,0 +1,15 @@
+<service>
+  <id>F-Flow-Client-Local</id>
+  <name>F-Flow Client Local Service</name>
+  <description>F-Flow Suite Client Local Server</description>
+  <executable>C:\Program Files\nodejs\node.exe</executable>
+  <arguments>"C:\Users\Fernando\Documents\2F\ SOLUTIONS\f-flow-suite\client-local\dist\main\.js" --service</arguments>
+  <workingdirectory>C:\Program Files\F-Flow Suite\client-local</workingdirectory>
+  <logpath>C:\ProgramData\FFlow\logs\client-local</logpath>
+  <env name="APP_VERSION" value="1.2.0" />
+  <env name="VITE_APP_VERSION" value="1.2.0" />
+  <startmode>Automatic</startmode>
+  <stoptimeout>15000</stoptimeout>
+  <resetfailure>86400</resetfailure>
+  <onfailure action="restart" delay="10 sec" />
+</service>

@@ -1,10 +1,13 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, ForbiddenException, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { PlansService } from '../plans/plans.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { LoginDto } from './dto/login.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { MailerService } from '../mailer/mailer.service';
+import { ContactDto } from './dto/contact.dto';
 
 @Injectable()
 export class PublicService {
@@ -12,7 +15,10 @@ export class PublicService {
     private readonly prisma: PrismaService,
     private readonly plansService: PlansService,
     private readonly jwtService: JwtService,
+    private readonly mailer: MailerService,
   ) {}
+
+  private readonly logger = new Logger(PublicService.name);
 
   async registerTenant(registerTenantDto: RegisterTenantDto) {
     const { name, email, password, planId } = registerTenantDto;
@@ -66,6 +72,37 @@ export class PublicService {
 
       return { tenant, user };
     });
+    // Try to enrich email with plan details
+    let planName: string | undefined;
+    let planPrice: number | undefined;
+    let planCurrency: string | undefined;
+    if (planId) {
+      try {
+        const plan = await this.plansService.findPlanById(planId);
+        planName = plan?.name;
+        planPrice = (plan as any)?.price;
+        planCurrency = (plan as any)?.currency || 'BRL';
+      } catch {}
+    }
+
+    // Fire-and-forget welcome email (non-blocking)
+    this.logger.log(`[PublicService] Cadastro concluído. Agendando envio de boas-vindas para ${email} (tenantId=${result.tenant.id}).`);
+    this.mailer
+      .sendWelcomeEmail({
+        to: email,
+        name: name || email.split('@')[0],
+        email,
+        tenantId: result.tenant.id,
+        planName,
+        planPrice,
+        planCurrency,
+      })
+      .then(() => {
+        this.logger.log(`[PublicService] Envio de boas-vindas disparado para ${email}.`);
+      })
+      .catch((err) => {
+        this.logger.error('[PublicService] Falha ao disparar email de boas-vindas', err as any);
+      });
 
     return {
       message: 'Tenant registered successfully',
@@ -111,7 +148,7 @@ export class PublicService {
         tenantId: user.tenantId,
         tenant: {
           id: user.tenant.id,
-          name: user.tenant.name,
+          name: user.tenant.slug,
           slug: user.tenant.slug,
         },
       },
@@ -120,5 +157,49 @@ export class PublicService {
 
   async getPlans() {
     return this.plansService.findAllPlans(true); // Only active plans for public endpoint
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    if (process.env.NODE_ENV !== 'development') {
+      throw new ForbiddenException('Password reset not allowed in current environment');
+    }
+
+    const { email, newPassword } = dto;
+
+    const user = await this.prisma.user.findFirst({ where: { email } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+    return { message: 'Password updated successfully' };
+  }
+
+  async contact(dto: ContactDto) {
+    const { firstName, lastName, email, phone, subject, message } = dto;
+    if (!email || !message) {
+      throw new BadRequestException('Email e mensagem são obrigatórios');
+    }
+    const fromName = [firstName, lastName].filter(Boolean).join(' ').trim() || undefined;
+
+    this.logger.log(`[PublicService] Recebida mensagem de contato de ${email}${fromName ? ` (${fromName})` : ''}.`);
+    // Dispara envio de contato em background para não bloquear a resposta HTTP
+    this.mailer
+      .sendContactEmail({
+        fromName,
+        fromEmail: email,
+        phone,
+        subject,
+        message,
+      })
+      .then(() => this.logger.log(`[PublicService] Email de contato disparado para ${email}.`))
+      .catch((err) => this.logger.error('[PublicService] Falha ao disparar email de contato', err as any));
+
+    return { status: 'ok' };
   }
 }

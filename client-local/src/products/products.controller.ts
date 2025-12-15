@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   ValidationPipe,
+  Query,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto, ProductResponseDto } from './dto';
@@ -20,7 +21,11 @@ export class ProductsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(
-    @Body(ValidationPipe) createProductDto: CreateProductDto,
+    @Body(new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    })) createProductDto: CreateProductDto,
   ): Promise<ProductResponseDto> {
     return this.productsService.create(createProductDto);
   }
@@ -38,14 +43,23 @@ export class ProductsController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @Body(ValidationPipe) updateProductDto: UpdateProductDto,
+    @Body(new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    })) updateProductDto: UpdateProductDto,
   ): Promise<ProductResponseDto> {
     return this.productsService.update(id, updateProductDto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string): Promise<void> {
-    return this.productsService.remove(id);
+  async remove(@Param('id') id: string, @Query('hard') hard?: string): Promise<void> {
+    return this.productsService.remove(id, hard === 'true');
+  }
+
+  @Get(':id/dependencies')
+  async getDependencies(@Param('id') id: string) {
+    return this.productsService.getDependencies(id);
   }
 }

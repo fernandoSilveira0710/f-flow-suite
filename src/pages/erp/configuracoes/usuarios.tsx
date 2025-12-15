@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Users, UserCheck } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -39,7 +39,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// Removido Tabs e toda a UI de Assentos
 import { useEntitlements } from '@/hooks/use-entitlements';
 import { UpgradeDialog } from '@/components/erp/upgrade-dialog';
 import { 
@@ -48,12 +48,7 @@ import {
   updateUser, 
   deleteUser, 
   getRoles, 
-  getSeats,
-  createSeat,
-  updateSeat,
-  deleteSeat,
-  User,
-  Seat 
+  User
 } from '@/lib/settings-api';
 
 export default function UsuariosPage() {
@@ -68,8 +63,7 @@ export default function UsuariosPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingSeat, setEditingSeat] = useState<Seat | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
-  const [deletingSeat, setDeletingSeat] = useState<Seat | null>(null);
-  const [formData, setFormData] = useState({ nome: '', email: '', roleId: '', ativo: true });
+  const [formData, setFormData] = useState({ nome: '', email: '', roleId: '', ativo: true, pin: '' });
   const { entitlements } = useEntitlements();
 
   useEffect(() => {
@@ -109,18 +103,14 @@ export default function UsuariosPage() {
       setFormData({ nome: '', email: '', roleId: roles[0]?.id || '', ativo: true });
       setShowDialog(true);
     }
+    setEditingUser(null);
+    setFormData({ nome: '', email: '', roleId: roles[0]?.id || '', ativo: true, pin: '' });
+    setShowDialog(true);
   };
 
-  const handleEdit = (item: User | Seat) => {
-    if (activeTab === 'users') {
-      const user = item as User;
-      setEditingUser(user);
-      setFormData({ nome: user.nome, email: user.email, roleId: user.roleId, ativo: user.ativo });
-    } else {
-      const seat = item as Seat;
-      setEditingSeat(seat);
-      setFormData({ nome: seat.nome, email: '', roleId: seat.roleId, ativo: seat.ativo });
-    }
+  const handleEdit = (user: User) => {
+    setEditingUser(user);
+    setFormData({ nome: user.nome, email: user.email, roleId: user.roleId, ativo: user.ativo, pin: user.pin || '' });
     setShowDialog(true);
   };
 
@@ -152,19 +142,16 @@ export default function UsuariosPage() {
 
   const handleDelete = async () => {
     try {
-      if (activeTab === 'users' && deletingUser) {
+      if (deletingUser) {
         await deleteUser(deletingUser.id);
         toast.success('Usuário excluído com sucesso');
-      } else if (activeTab === 'seats' && deletingSeat) {
-        await deleteSeat(deletingSeat.id);
-        toast.success('Assento excluído com sucesso');
       }
       setShowDeleteDialog(false);
       setDeletingUser(null);
       setDeletingSeat(null);
       loadData();
     } catch (error) {
-      toast.error(`Erro ao excluir ${activeTab === 'users' ? 'usuário' : 'assento'}`);
+      toast.error('Erro ao excluir usuário');
     }
   };
 
@@ -178,18 +165,16 @@ export default function UsuariosPage() {
   );
 
   const activeUsers = users.filter(u => u.ativo).length;
-  const activeSeats = seats.filter(s => s.ativo).length;
-
-  const currentCount = activeTab === 'users' ? users.length : seats.length;
+  const currentCount = users.length;
   const maxCount = entitlements.seatLimit;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold">Usuários & Assentos</h1>
+          <h1 className="text-2xl font-bold">Usuários</h1>
           <Badge variant="secondary" className="text-sm">
-            {currentCount} de {maxCount} {activeTab === 'users' ? 'usuários' : 'assentos'} em uso
+            {currentCount} de {maxCount} usuários em uso
           </Badge>
         </div>
         <Button onClick={handleCreate}>
@@ -197,29 +182,16 @@ export default function UsuariosPage() {
           {activeTab === 'users' ? 'Novo Usuário' : 'Novo Assento'}
         </Button>
       </div>
+      <div className="mt-4">
+        <Input
+          placeholder={'Buscar usuários...'}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-md"
+        />
+      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Usuários
-          </TabsTrigger>
-          <TabsTrigger value="seats" className="flex items-center gap-2">
-            <UserCheck className="h-4 w-4" />
-            Assentos
-          </TabsTrigger>
-        </TabsList>
-
-        <div className="mt-4">
-          <Input
-            placeholder={`Buscar ${activeTab === 'users' ? 'usuários' : 'assentos'}...`}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-md"
-          />
-        </div>
-
-        <TabsContent value="users" className="space-y-4">
+      <div className="space-y-4">
           <div className="border rounded-lg">
             <Table>
               <TableHeader>
@@ -266,65 +238,14 @@ export default function UsuariosPage() {
               </TableBody>
             </Table>
           </div>
-        </TabsContent>
-
-        <TabsContent value="seats" className="space-y-4">
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Papel</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSeats.map((seat) => (
-                  <TableRow key={seat.id}>
-                    <TableCell className="font-medium">{seat.nome}</TableCell>
-                    <TableCell>
-                      {roles.find(r => r.id === seat.roleId)?.nome || seat.roleId}
-                    </TableCell>
-                    <TableCell>
-                      {seat.ativo ? (
-                        <Badge variant="default">Ativo</Badge>
-                      ) : (
-                        <Badge variant="secondary">Inativo</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(seat)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setDeletingSeat(seat);
-                          setShowDeleteDialog(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-      </Tabs>
+      </div>
 
       {/* User/Seat Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {activeTab === 'users' 
-                ? (editingUser ? 'Editar Usuário' : 'Novo Usuário')
-                : (editingSeat ? 'Editar Assento' : 'Novo Assento')
-              }
+              {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
             </DialogTitle>
             <DialogDescription>
               Preencha os dados {activeTab === 'users' ? 'do usuário' : 'do assento'} abaixo
@@ -350,6 +271,21 @@ export default function UsuariosPage() {
                 />
               </div>
             )}
+            <div className="space-y-2">
+              <Label htmlFor="pin">PIN (4 dígitos)</Label>
+              <Input
+                id="pin"
+                type="password"
+                inputMode="numeric"
+                pattern="\\d{4}"
+                maxLength={4}
+                value={formData.pin}
+                onChange={(e) => {
+                  const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setFormData({ ...formData, pin: onlyDigits });
+                }}
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="roleId">Papel</Label>
               <Select
@@ -392,8 +328,8 @@ export default function UsuariosPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja remover {activeTab === 'users' ? 'o usuário' : 'o assento'} <strong>
-                {activeTab === 'users' ? deletingUser?.nome : deletingSeat?.nome}
+              Tem certeza que deseja remover o usuário <strong>
+                {deletingUser?.nome}
               </strong>?
               Esta ação não pode ser desfeita.
             </AlertDialogDescription>

@@ -65,18 +65,8 @@ jobs:
           - os: windows-latest
             platform: win32
             arch: x64
-            ext: .exe
+            ext: ''
             installer_ext: .msi
-          - os: macos-latest
-            platform: darwin
-            arch: x64
-            ext: ''
-            installer_ext: .dmg
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-            ext: ''
-            installer_ext: .AppImage
     
     steps:
       - name: Checkout code
@@ -101,34 +91,56 @@ jobs:
         working-directory: client-local
         run: npm run build
 
-      - name: Create binary with pkg
-        working-directory: client-local
-        run: npm run build:pkg
-
-      - name: Rename binary
-        shell: bash
-        working-directory: client-local
-        run: |
-          if [ "${{ matrix.platform }}" = "win32" ]; then
-            mv f-flow-client-win.exe f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
-          elif [ "${{ matrix.platform }}" = "darwin" ]; then
-            mv f-flow-client-macos f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}
-          else
-            mv f-flow-client-linux f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}
-          fi
-
-      # Windows Installer
-      - name: Create Windows Installer
+      # Build MSI (WiX) — sem pkg/Inno Setup
+      - name: Build MSI (WiX)
         if: matrix.platform == 'win32'
+        shell: pwsh
         run: |
-          # Install WiX Toolset
-          choco install wixtoolset -y
-          
-          # Create installer using WiX (simplified example)
-          echo "Creating Windows installer..."
-          # This would typically use a proper WiX configuration
-          # For now, we'll just copy the binary as a placeholder
-          cp client-local/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }} f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
+          # Build ERP frontend (gera ./dist na raiz)
+          npm ci
+          npm run build
+
+          # Preparar client-local
+          cd client-local
+          npm ci
+          npx prisma generate
+          npm run build
+          cd ..
+
+          # Baixar Node MSI para gerar o bootstrapper
+          $version = "18.19.1"
+          $msiUrl = "https://nodejs.org/dist/v$version/node-v$version-x64.msi"
+          New-Item -ItemType Directory -Force -Path "installers/wix" | Out-Null
+          Invoke-WebRequest -Uri $msiUrl -OutFile "installers/wix/node-v$version-x64.msi"
+
+          # Compilar MSI com WiX
+          pwsh installers/wix/build.ps1 -Version "${{ github.ref_name }}" -ProductName "F-Flow Suite" -Manufacturer "2F Solutions"
+
+      # Removido: renomeação de binários gerados por pkg
+
+      # Upload MSI (Windows)
+      - name: Upload Windows MSI Asset
+        if: matrix.platform == 'win32'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: installers/wix/FFlowSuite.msi
+          asset_name: FFlowSuite-${{ github.ref_name }}.msi
+          asset_content_type: application/octet-stream
+
+      # Upload Bootstrapper (Windows)
+      - name: Upload Windows Bootstrapper Asset
+        if: matrix.platform == 'win32'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: installers/wix/FFlowSuiteBootstrapper.exe
+          asset_name: FFlowSuiteBootstrapper-${{ github.ref_name }}.exe
+          asset_content_type: application/octet-stream
 
       # macOS Installer
       - name: Create macOS Installer
@@ -150,25 +162,21 @@ jobs:
           # For now, we'll just copy the binary as a placeholder
           cp client-local/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }} f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
 
-      - name: Upload Binary Asset
+      # Removido: upload de binários standalone (pkg)
+
+      # Opcional: Upload do bootstrapper, se gerado
+      - name: Upload Windows Bootstrapper Asset
+        if: matrix.platform == 'win32'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: client-local/f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
-          asset_name: f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}
+          asset_path: installers/wix/FFlowSuiteBootstrapper.exe
+          asset_name: FFlowSuiteBootstrapper-${{ github.ref_name }}.exe
           asset_content_type: application/octet-stream
 
-      - name: Upload Installer Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
-          asset_name: f-flow-client-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.installer_ext }}
-          asset_content_type: application/octet-stream
+      # Removido suporte a instaladores non-Windows (pkg/AppImage/DMG)
 
   build-hub-docker:
     name: Build and Push Hub Docker Image

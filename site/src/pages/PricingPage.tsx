@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
+import { Link } from 'react-router-dom'
 import { Check, Star } from 'lucide-react'
 
 interface HubPlan {
@@ -28,7 +29,7 @@ const PricingPage = () => {
       name: 'Básico',
       price: 19.99,
       currency: 'BRL',
-      description: 'Ideal para pet shops pequenos',
+      description: 'Ideal para comércios pequenos',
       maxSeats: 2,
       maxDevices: 1,
       featuresEnabled: JSON.stringify([
@@ -48,7 +49,7 @@ const PricingPage = () => {
       name: 'Profissional',
       price: 59.99,
       currency: 'BRL',
-      description: 'Para pet shops em crescimento',
+      description: 'Para comércios em crescimento',
       maxSeats: 5,
       maxDevices: 2,
       featuresEnabled: JSON.stringify([
@@ -236,8 +237,8 @@ const PricingPage = () => {
                 </ul>
 
                 <div className="text-center">
-                  <a
-                    href={plan.cta === 'Começar Teste' ? '/cadastro' : '/contato'}
+                  <Link
+                    to={plan.cta === 'Começar Teste' ? '/cadastro' : '/contato'}
                     className={`w-full py-3 px-6 rounded-lg font-semibold transition-colors inline-block ${
                       plan.popular
                         ? 'bg-primary-600 text-white hover:bg-primary-700'
@@ -245,7 +246,7 @@ const PricingPage = () => {
                     }`}
                   >
                     {plan.cta}
-                  </a>
+                  </Link>
                 </div>
               </div>
             ))}
@@ -327,12 +328,12 @@ const PricingPage = () => {
               Experimente gratuitamente por 30 dias. Sem compromisso, sem cartão de crédito.
             </p>
             <div className="mt-8">
-              <a
-                href="/cadastro"
+              <Link
+                to="/cadastro"
                 className="bg-white text-primary-600 hover:bg-gray-50 px-8 py-3 rounded-md font-semibold text-lg transition-colors"
               >
                 Começar Teste Gratuito
-              </a>
+              </Link>
             </div>
           </div>
         </div>

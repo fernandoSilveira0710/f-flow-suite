@@ -2,18 +2,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "next-themes";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import RequirePermission from "@/components/auth/require-permission";
 
-// Site pages
-import Home from "./pages/site/home";
-import Planos from "./pages/site/planos";
-import Contato from "./pages/site/contato";
-import Login from "./pages/site/login";
-import Cadastro from "./pages/site/cadastro";
-import Pagamento from "./pages/site/pagamento";
-import PagamentoSucesso from "./pages/site/pagamento/sucesso";
+// Site pages desabilitados no build dev para evitar erros
 
 // ERP Layout & Pages
 import ErpLayout from "./layouts/erp-layout";
@@ -78,45 +73,48 @@ import StockLabels from "./pages/erp/estoque/etiquetas";
 
 // Settings Layout & Pages
 import SettingsLayout from "./layouts/settings-layout";
+import SettingsIndexRedirect from "./pages/erp/settings/index-redirect";
 import OrganizacaoPage from "./pages/erp/configuracoes/organizacao";
 import UsuariosPage from "./pages/erp/configuracoes/usuarios";
 import PapeisPage from "./pages/erp/configuracoes/papeis";
 import PlanoPage from "./pages/erp/configuracoes/plano";
 import LicencasPage from "./pages/erp/configuracoes/licencas";
-import PosSettings from "./pages/settings/pos";
-import ScheduleSettings from "./pages/settings/schedule";
-import GroomingSettings from "./pages/settings/grooming";
-import InventorySettings from "./pages/settings/inventory";
-import UnitsSettings from "./pages/settings/units";
-import PaymentsIndex from "./pages/settings/payments/index";
-import NotificationsSettings from "./pages/settings/notifications";
-import ImportExportSettings from "./pages/settings/import-export";
+import RelatoriosAuditoriaPage from "./pages/erp/relatorios/auditoria";
+import RelatoriosHomePage from "./pages/erp/relatorios";
+import TrocarContaPage from "./pages/erp/configuracoes/trocar-conta";
+// Settings pages inexistentes removidos do build
 import NovoPagamento from "./pages/erp/configuracoes/pagamentos/novo";
+import PaymentsIndex from "./pages/erp/configuracoes/pagamentos/index";
+import NovaUnidade from "./pages/erp/configuracoes/unidades/novo";
+import UnitsIndex from "./pages/erp/configuracoes/unidades/index";
+import NovaCategoria from "./pages/erp/configuracoes/categorias/novo";
+import CategoriesIndex from "./pages/erp/configuracoes/categorias/index";
 import ConfiguracoesRedirect from "./pages/erp/configuracoes/index";
 import ConfiguracoesAlias from "./pages/erp/configuracoes/[...alias]";
+import ImportarExportarPage from "./pages/erp/configuracoes/importar-exportar";
 
-import NotFound from "./pages/NotFound";
+// Fallback simples inline para 404
+const SimpleNotFound = () => (
+  <div style={{ padding: 24 }}>
+    <h2>404</h2>
+    <p>Página não encontrada.</p>
+  </div>
+);
 
 const queryClient = new QueryClient();
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <Routes>
-              {/* Site Routes (Public) */}
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <Routes>
+              {/* Site Routes removidas; manter apenas redirect */}
               <Route path="/" element={<Navigate to="/erp/login" replace />} />
-              <Route path="/site" element={<Home />} />
-              <Route path="/site/planos" element={<Planos />} />
-              <Route path="/site/contato" element={<Contato />} />
-              <Route path="/site/login" element={<Login />} />
-              <Route path="/site/cadastro" element={<Cadastro />} />
-              <Route path="/site/pagamento" element={<Pagamento />} />
-              <Route path="/site/pagamento/sucesso" element={<PagamentoSucesso />} />
 
               {/* ERP Login (Public) */}
               <Route path="/erp/login" element={<ErpLogin />} />
@@ -131,24 +129,24 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             
             {/* Produtos */}
-            <Route path="produtos" element={<ProdutosIndex />} />
-            <Route path="produtos/novo" element={<ProdutosNovo />} />
-            <Route path="produtos/:id" element={<ProdutoDetalhe />} />
-            <Route path="produtos/:id/editar" element={<ProdutoEditar />} />
+            <Route path="produtos" element={<RequirePermission permission="products:read"><ProdutosIndex /></RequirePermission>} />
+            <Route path="produtos/novo" element={<RequirePermission permission="products:write"><ProdutosNovo /></RequirePermission>} />
+            <Route path="produtos/:id" element={<RequirePermission permission="products:read"><ProdutoDetalhe /></RequirePermission>} />
+            <Route path="produtos/:id/editar" element={<RequirePermission permission="products:write"><ProdutoEditar /></RequirePermission>} />
 
           {/* PDV Routes */}
-          <Route path="pdv" element={<PdvIndex />} />
-          <Route path="pdv/session" element={<PdvSession />} />
-          <Route path="pdv/checkout" element={<PdvCheckout />} />
-          <Route path="pdv/history" element={<PdvHistory />} />
+          <Route path="pdv" element={<RequirePermission permission="pos:read"><PdvIndex /></RequirePermission>} />
+          <Route path="pdv/session" element={<RequirePermission permission="pos:read"><PdvSession /></RequirePermission>} />
+          <Route path="pdv/checkout" element={<RequirePermission permission="pos:checkout"><PdvCheckout /></RequirePermission>} />
+          <Route path="pdv/history" element={<RequirePermission permission="pos:read"><PdvHistory /></RequirePermission>} />
           
           {/* Vendas */}
-          <Route path="vendas" element={<VendasIndex />} />
+          <Route path="vendas" element={<RequirePermission permission="sales:read"><VendasIndex /></RequirePermission>} />
           
           {/* Stock Routes */}
-          <Route path="estoque" element={<StockPosition />} />
-          <Route path="estoque/movimentacoes" element={<StockMovements />} />
-          <Route path="estoque/fornecedores" element={<StockSuppliers />} />
+          <Route path="estoque" element={<RequirePermission permission="stock:read"><StockPosition /></RequirePermission>} />
+          <Route path="estoque/movimentacoes" element={<RequirePermission permission="stock:read"><StockMovements /></RequirePermission>} />
+          <Route path="estoque/fornecedores" element={<RequirePermission permission="stock:read"><StockSuppliers /></RequirePermission>} />
           <Route path="estoque/pedidos-compra" element={<StubPage title="Pedidos de Compra" description="Gestão de pedidos" />} />
           <Route path="estoque/pedidos-compra/novo" element={<StubPage title="Novo Pedido" description="Criar pedido de compra" />} />
           <Route path="estoque/pedidos-compra/:id" element={<StubPage title="Detalhe do Pedido" description="Visualizar pedido" />} />
@@ -159,11 +157,26 @@ function App() {
           <Route path="estoque/preferencias" element={<StockSettings />} />
           <Route path="estoque/etiquetas" element={<StockLabels />} />
           
-          {/* Agenda Routes */}
-          <Route path="agenda" element={<AgendaIndex />} />
-          <Route path="agenda/novo" element={<NovoAgendamento />} />
-          <Route path="agenda/:id" element={<AgendamentoDetalhe />} />
-          <Route path="agenda/servicos" element={<ServicosIndex />} />
+          {/* Agenda - bloqueada */}
+          <Route path="agenda/*" element={<Navigate to="/erp/dashboard" replace />} />
+          
+          {/* New Customers Routes */}
+          <Route path="clientes" element={<ClientesIndexNew />} />
+          <Route path="clientes/novo" element={<NovoClienteNew />} />
+          <Route path="clientes/:id" element={<EditarClienteNew />} />
+          <Route path="clientes/:id/pets" element={<GerenciarPetsCliente />} />
+          <Route path="clientes/:id/pets/novo" element={<NovoPetCliente />} />
+          <Route path="clientes/:id/pets/:petId" element={<EditarPetCliente />} />
+          
+          {/* Grooming - bloqueado */}
+          <Route path="grooming/*" element={<Navigate to="/erp/dashboard" replace />} />
+          {/* Banho & Tosa (alias) - bloqueado */}
+          <Route path="banho-tosa" element={<Navigate to="/erp/dashboard" replace />} />
+          
+          {/* Agenda - bloqueada */}
+          {/* ... existing code ... */}
+          {/* Remover rotas específicas de Agenda */}
+          {/* (rotas como agenda/novo, agenda/:id, agenda/servicos, profissionais, clientes foram removidas) */}
           <Route path="agenda/servicos/novo" element={<NovoServico />} />
           <Route path="agenda/servicos/:id/editar" element={<EditarServico />} />
           <Route path="agenda/profissionais" element={<ProfissionaisIndex />} />
@@ -201,29 +214,64 @@ function App() {
           <Route path="grooming/profissionais/:id/editar" element={<EditarGroomingProfissional />} />
           <Route path="grooming/categories" element={<GroomingCategoriesIndex />} />
           
-          {/* Banho & Tosa (alias for Grooming) */}
-          <Route path="banho-tosa" element={<GroomingIndex />} />
-          <Route path="relatorios" element={<StubPage title="Relatórios" description="Relatórios e Análises" />} />
+          {/* Remover rotas específicas de Grooming */}
+          {/* (rotas como grooming, grooming/:id, grooming/new, services, pets, resources, tutors, profissionais, categories foram removidas) */}
+          <Route path="grooming/services/novo" element={<NovoGroomingService />} />
+          <Route path="grooming/services/:id/editar" element={<EditarGroomingService />} />
+          <Route path="grooming/pets" element={<GroomingPetsIndex />} />
+          <Route path="grooming/pets/novo" element={<NovoPet />} />
+          <Route path="grooming/pets/:id/editar" element={<EditarPet />} />
+          <Route path="grooming/resources" element={<GroomingResourcesIndex />} />
+          <Route path="grooming/resources/novo" element={<NovoRecurso />} />
+          <Route path="grooming/resources/:id/editar" element={<EditarRecurso />} />
+          <Route path="grooming/tutors" element={<TutorsIndex />} />
+          <Route path="grooming/tutors/novo" element={<NovoTutor />} />
+          <Route path="grooming/profissionais" element={<GroomingProfissionaisIndex />} />
+          <Route path="grooming/profissionais/novo" element={<NovoGroomingProfissional />} />
+          <Route path="grooming/profissionais/:id/editar" element={<EditarGroomingProfissional />} />
+          <Route path="grooming/categories" element={<GroomingCategoriesIndex />} />
           
-          {/* Settings Routes (EN - canonical) */}
-          <Route path="settings" element={<SettingsLayout />}>
-            <Route index element={<Navigate to="/erp/settings/organization" replace />} />
-            <Route path="organization" element={<OrganizacaoPage />} />
-            <Route path="users" element={<UsuariosPage />} />
-            <Route path="roles" element={<PapeisPage />} />
-            <Route path="billing" element={<PlanoPage />} />
-            <Route path="licenses" element={<LicencasPage />} />
-            <Route path="pos" element={<PosSettings />} />
-            <Route path="schedule" element={<ScheduleSettings />} />
-            <Route path="grooming" element={<GroomingSettings />} />
-            <Route path="inventory" element={<InventorySettings />} />
-            <Route path="units" element={<UnitsSettings />} />
-            <Route path="payments" element={<PaymentsIndex />} />
-            <Route path="payments/new" element={<NovoPagamento />} />
-            <Route path="payments/:id/edit" element={<NovoPagamento />} />
-            <Route path="notifications" element={<NotificationsSettings />} />
-            <Route path="import-export" element={<ImportExportSettings />} />
-          </Route>
+          {/* Agenda - bloqueada */}
+          <Route path="agenda/*" element={<Navigate to="/erp/dashboard" replace />} />
+          
+          {/* Banho & Tosa (alias e grooming) - bloqueadas */}
+          <Route path="banho-tosa" element={<Navigate to="/erp/dashboard" replace />} />
+          <Route path="grooming/*" element={<Navigate to="/erp/dashboard" replace />} />
+          
+          {/* Relatórios */}
+          <Route path="relatorios" element={<RequirePermission permission="reports:read"><RelatoriosHomePage /></RequirePermission>} />
+          <Route path="relatorios/auditoria" element={<RequirePermission permission="reports:read"><RelatoriosAuditoriaPage /></RequirePermission>} />
+
+          {/* Fallback interno do ERP */}
+          <Route path="*" element={<SimpleNotFound />} />
+          
+              {/* Settings Routes (EN - canonical) */}
+                <Route path="settings" element={<SettingsLayout />}>
+                  <Route index element={<SettingsIndexRedirect />} />
+                  <Route path="organization" element={<RequirePermission permission="settings:organization"><OrganizacaoPage /></RequirePermission>} />
+                  <Route path="users" element={<RequirePermission permission="settings:users"><UsuariosPage /></RequirePermission>} />
+                  <Route path="roles" element={<RequirePermission permission="settings:roles"><PapeisPage /></RequirePermission>} />
+                  <Route path="switch-account" element={<TrocarContaPage />} />
+                  <Route path="billing" element={<RequirePermission permission="settings:billing"><PlanoPage /></RequirePermission>} />
+                  <Route path="licenses" element={<RequirePermission permission="settings:licenses"><LicencasPage /></RequirePermission>} />
+                  {/* Payments index */}
+                  <Route path="payments" element={<RequirePermission permission="settings:payments"><PaymentsIndex /></RequirePermission>} />
+                  <Route path="payments/new" element={<RequirePermission permission="settings:payments"><NovoPagamento /></RequirePermission>} />
+                  <Route path="payments/:id/edit" element={<RequirePermission permission="settings:payments"><NovoPagamento /></RequirePermission>} />
+                  {/* Units of Measure */}
+                  <Route path="units" element={<RequirePermission permission="settings:units"><UnitsIndex /></RequirePermission>} />
+                  <Route path="units/new" element={<RequirePermission permission="settings:units"><NovaUnidade /></RequirePermission>} />
+                  <Route path="units/:id/edit" element={<RequirePermission permission="settings:units"><NovaUnidade /></RequirePermission>} />
+
+                  {/* Categories */}
+                  <Route path="categories" element={<RequirePermission permission="settings:categories"><CategoriesIndex /></RequirePermission>} />
+                  <Route path="categories/new" element={<RequirePermission permission="settings:categories"><NovaCategoria /></RequirePermission>} />
+                  <Route path="categories/:id/edit" element={<RequirePermission permission="settings:categories"><NovaCategoria /></RequirePermission>} />
+                  {/* Import/Export */}
+                  <Route path="import-export" element={<RequirePermission permission="settings:import-export"><ImportarExportarPage /></RequirePermission>} />
+            {/* Products (Settings) - removido */}
+                  <Route path="notifications" element={<Navigate to="/erp/settings/organization" replace />} />
+                </Route>
 
               {/* PT-BR Aliases (redirect to EN canonical) */}
               <Route path="configuracoes" element={<ConfiguracoesRedirect />} />
@@ -231,9 +279,10 @@ function App() {
             </Route>
 
               {/* 404 */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </TooltipProvider>
+              <Route path="*" element={<SimpleNotFound />} />
+              </Routes>
+            </TooltipProvider>
+          </ThemeProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

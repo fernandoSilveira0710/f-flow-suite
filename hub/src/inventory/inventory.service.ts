@@ -28,6 +28,31 @@ export class InventoryService {
     });
 
     this.logger.debug(`Created inventory adjustment record for product ${payload.productId}`);
+
+    // Update product stockQty to reflect the new stock after adjustment
+    try {
+      const product = await this.prisma.product.findFirst({
+        where: { id: payload.productId, tenantId },
+        select: { id: true },
+      });
+
+      if (!product) {
+        this.logger.warn(`Product ${payload.productId} not found for tenant ${tenantId}. Skipping stock update.`);
+        return;
+      }
+
+      await this.prisma.product.update({
+        where: { id: payload.productId },
+        data: {
+          stockQty: payload.newStock ?? undefined,
+          updatedAt: new Date(payload.adjustedAt),
+        },
+      });
+
+      this.logger.debug(`Updated product ${payload.productId} stockQty to ${payload.newStock}`);
+    } catch (error) {
+      this.logger.error(`Failed to update product stockQty: ${error}`);
+    }
   }
 
   async findAllByTenant(tenantId: string): Promise<InventoryAdjustmentResponseDto[]> {

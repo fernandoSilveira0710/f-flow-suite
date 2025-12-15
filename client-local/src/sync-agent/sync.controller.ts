@@ -36,7 +36,7 @@ export class SyncController {
     
     return {
       total: events.length,
-      events: events.map(event => ({
+      events: events.map((event: any) => ({
         id: event.id,
         eventType: event.eventType,
         payload: JSON.parse(event.payload),

@@ -1,6 +1,7 @@
 import pino from 'pino';
 import * as path from 'path';
 import { createStream } from 'rotating-file-stream';
+import fs from 'fs';
 
 export interface LoggerConfig {
   logDir: string;
@@ -146,4 +147,51 @@ export function createRequestLogger(logDir: string) {
 
     next();
   };
+}
+
+export function initFileLogger() {
+  try {
+    const programData = process.env.ProgramData || 'C:\\ProgramData';
+    const defaultDir = path.join(programData, 'FFlow', 'logs', 'client-local');
+    const logDir = process.env.LOCAL_LOG_DIR || defaultDir;
+
+    fs.mkdirSync(logDir, { recursive: true });
+    const logFile = path.join(logDir, 'client-local.log');
+    const stream = fs.createWriteStream(logFile, { flags: 'a' });
+    // Write initial line to confirm logger initialization
+    stream.write(`[${new Date().toISOString()}] INFO File logger initialized at ${logFile}\n`);
+
+    const format = (level: string, args: any[]) => {
+      const msg = args
+        .map((a) => (typeof a === 'string' ? a : (() => { try { return JSON.stringify(a); } catch { return String(a); } })()))
+        .join(' ');
+      return `[${new Date().toISOString()}] ${level} ${msg}\n`;
+    };
+
+    const origLog = console.log;
+    const origError = console.error;
+    const origWarn = console.warn;
+
+    console.log = (...args: any[]) => {
+      stream.write(format('INFO', args));
+      origLog(...args);
+    };
+    console.error = (...args: any[]) => {
+      stream.write(format('ERROR', args));
+      origError(...args);
+    };
+    console.warn = (...args: any[]) => {
+      stream.write(format('WARN', args));
+      origWarn(...args);
+    };
+
+    process.on('uncaughtException', (err: any) => {
+      stream.write(format('UNCAUGHT', [err?.stack || err?.message || String(err)]));
+    });
+    process.on('unhandledRejection', (reason: any) => {
+      stream.write(format('REJECTION', [String(reason)]));
+    });
+  } catch (e) {
+    // Swallow logging init errors to avoid breaking the app
+  }
 }

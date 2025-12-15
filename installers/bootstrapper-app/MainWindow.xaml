@@ -1,0 +1,38 @@
+<Window x:Class="FflowBootstrapperApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="F-Flow Suite" Height="360" Width="560" WindowStartupLocation="CenterScreen">
+  <Grid Background="#FAFAFA" Margin="24">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <StackPanel Orientation="Horizontal" Margin="0,0,0,16" VerticalAlignment="Top">
+      <Ellipse Width="64" Height="64" Fill="#E6F4EA" Stroke="#34A853" StrokeThickness="2"/>
+      <TextBlock x:Name="HeaderText" Text="Preparando instalação..." FontSize="22" FontWeight="Bold" Margin="16,8,0,0"/>
+    </StackPanel>
+
+    <StackPanel Grid.Row="1" Orientation="Vertical">
+      <TextBlock x:Name="BodyText" TextWrapping="Wrap" FontSize="14" Foreground="#333"
+                 Text="Verificando pré‑requisitos, detectando instalação existente e planejando ações."/>
+      <Border Height="6" Background="#EEE" CornerRadius="3">
+        <Rectangle x:Name="ProgressBar" Height="6" Fill="#1E66FF" Width="0" RadiusX="3" RadiusY="3"/>
+      </Border>
+      <TextBlock x:Name="VersionText" FontSize="12" Foreground="#666"/>
+    </StackPanel>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left">
+      <StackPanel.Resources>
+        <Style TargetType="Button">
+          <Setter Property="Margin" Value="0,0,12,0"/>
+        </Style>
+      </StackPanel.Resources>
+      <Button x:Name="OpenErpButton" Content="Abrir ERP" Width="160" Height="40"
+              Background="#1E66FF" Foreground="White" FontWeight="SemiBold"
+              Click="OpenErp_Click" Visibility="Collapsed"/>
+      <Button Content="Fechar" Width="120" Height="40" Click="Close_Click"/>
+    </StackPanel>
+  </Grid>
+</Window>

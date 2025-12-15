@@ -31,7 +31,7 @@ export class LicensingService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService
   ) {
-    this.hubBaseUrl = this.configService.get<string>('HUB_BASE_URL', process.env.HUB_API_URL || 'http://localhost:8081');
+    this.hubBaseUrl = this.configService.get<string>('HUB_BASE_URL', process.env.HUB_API_URL || 'http://localhost:3001');
     this.licensingEnforced = this.configService.get<string>('LICENSING_ENFORCED', 'false') === 'true';
     this.deviceId = this.configService.get<string>('DEVICE_ID', 'dev-device');
     
@@ -113,7 +113,7 @@ export class LicensingService implements OnModuleInit {
         message: 'License activated successfully',
         tenantId,
         deviceId,
-        planKey: decodedToken.plan,
+        planKey: this.normalizePlanKey(decodedToken.plan),
         expiresAt: new Date(decodedToken.exp * 1000).toISOString()
       };
     } catch (error: any) {
@@ -151,10 +151,10 @@ export class LicensingService implements OnModuleInit {
           }
         });
         
-        if (dbToken) {
+        if (dbToken && dbToken.token) {
           token = dbToken.token;
           // Sync token back to TokenStore for future use
-          await this.tokenStore.saveToken(dbToken.tenantId, dbToken.deviceId, token);
+          await this.tokenStore.saveToken(dbToken.tenantId, dbToken.deviceId, dbToken.token);
         }
       }
       
@@ -170,13 +170,14 @@ export class LicensingService implements OnModuleInit {
         // Validate the token
         const decodedToken = await this.validateAndDecodeToken(token);
         const now = Math.floor(Date.now() / 1000);
+        const normalizedPlan = this.normalizePlanKey(decodedToken.plan);
         
         // Check if token is still valid
         if (now <= decodedToken.exp) {
           return {
             isInstalled: true,
             hasLicense: true,
-            planKey: decodedToken.plan,
+            planKey: normalizedPlan,
             expiresAt: new Date(decodedToken.exp * 1000).toISOString()
           };
         }
@@ -188,7 +189,7 @@ export class LicensingService implements OnModuleInit {
           return {
             isInstalled: true,
             hasLicense: true,
-            planKey: decodedToken.plan,
+            planKey: normalizedPlan,
             expiresAt: new Date(decodedToken.exp * 1000).toISOString()
           };
         }
@@ -245,6 +246,84 @@ export class LicensingService implements OnModuleInit {
         isInstalled: false,
         hasLicense: false
       };
+    }
+  }
+
+  /**
+   * Normaliza o nome/chave do plano vindo do Hub/token para
+   * uma das chaves canônicas: 'starter' | 'pro' | 'max'.
+   */
+  private normalizePlanKey(raw?: string): 'starter' | 'pro' | 'max' {
+    const val = (raw || '').toLowerCase();
+    if (!val) return 'starter';
+
+    // Starter mappings
+    if ([
+      'starter', 'basic', 'básico', 'basico', 'free'
+    ].includes(val)) {
+      return 'starter';
+    }
+
+    // Pro mappings
+    if ([
+      'pro', 'professional', 'profissional'
+    ].includes(val)) {
+      return 'pro';
+    }
+
+    // Max / Enterprise mappings
+    if ([
+      'max', 'enterprise', 'premium', 'development'
+    ].includes(val)) {
+      return 'max';
+    }
+
+    // Fallback
+    return 'starter';
+  }
+
+  /**
+   * Retorna o token de licença bruto (JWT) armazenado localmente.
+   * Prioriza o TokenStore e faz fallback para o banco de dados.
+   * Em modo de desenvolvimento, tenta ler de arquivo se configurado.
+   */
+  async getRawLicenseToken(tenantId?: string, deviceId?: string): Promise<string | null> {
+    try {
+      // Primeiro tenta obter do armazenamento seguro
+      let token = await this.tokenStore.getToken(tenantId, deviceId || this.deviceId);
+
+      // Fallback: buscar do banco de dados se não encontrado
+      if (!token) {
+        const dbToken = await this.prisma.licenseToken.findFirst({
+          where: {
+            ...(tenantId ? { tenantId } : {}),
+            deviceId: deviceId || this.deviceId,
+            revokedAt: null,
+            expiresAt: { gt: new Date() }
+          },
+          orderBy: { issuedAt: 'desc' }
+        });
+
+        if (dbToken?.token) {
+          token = dbToken.token;
+          // Sincroniza de volta para o TokenStore para próximas leituras
+          await this.tokenStore.saveToken(dbToken.tenantId, dbToken.deviceId, dbToken.token);
+        }
+      }
+
+      // Em desenvolvimento, permitir token via arquivo de conveniência
+      if (!token && !this.licensingEnforced) {
+        const devTokenPath = this.configService.get<string>('LICENSE_DEV_FILE_PATH') || 'license.jwt';
+        const fileToken = this.loadLicenseFromFile(devTokenPath);
+        if (fileToken) {
+          return fileToken;
+        }
+      }
+
+      return token || null;
+    } catch (error) {
+      this.logger.warn('Falha ao obter token de licença bruto', error as Error);
+      return null;
     }
   }
 
@@ -529,8 +608,26 @@ export class LicensingService implements OnModuleInit {
     cached?: boolean;
     planKey?: string;
     expiresAt?: Date;
+    lastChecked?: Date;
+    updatedAt?: Date;
+    graceDays?: number;
   }> {
     try {
+      // Em modo desenvolvimento, considerar licença válida para não bloquear fluxo offline
+      if (!this.licensingEnforced) {
+        const cachedLicense = await this.getLicenseFromCache(tenantId);
+        return {
+          valid: true,
+          status: 'development',
+          cached: !!cachedLicense,
+          planKey: cachedLicense?.planKey || 'starter',
+          expiresAt: cachedLicense?.expiresAt,
+          lastChecked: cachedLicense?.lastChecked,
+          updatedAt: cachedLicense?.updatedAt,
+          graceDays: cachedLicense?.graceDays,
+        };
+      }
+
       // Primeiro tenta obter do cache
       const cachedLicense = await this.getLicenseFromCache(tenantId);
 
@@ -541,18 +638,36 @@ export class LicensingService implements OnModuleInit {
           // Obtém novamente do cache após atualização
           const updatedCache = await this.getLicenseFromCache(tenantId);
           if (updatedCache) {
-            return this.evaluateLicenseStatus(updatedCache, false);
+            const evalResult = this.evaluateLicenseStatus(updatedCache, false);
+            return {
+              ...evalResult,
+              lastChecked: updatedCache.lastChecked,
+              updatedAt: updatedCache.updatedAt,
+              graceDays: updatedCache.graceDays,
+            };
           }
         } catch (error) {
           this.logger.warn(`Não foi possível atualizar cache do Hub, usando cache local se disponível`);
           // Se falhou ao atualizar do Hub, usa cache local se disponível
           if (cachedLicense) {
-            return this.evaluateLicenseStatus(cachedLicense, true);
+            const evalResult = this.evaluateLicenseStatus(cachedLicense, true);
+            return {
+              ...evalResult,
+              lastChecked: cachedLicense.lastChecked,
+              updatedAt: cachedLicense.updatedAt,
+              graceDays: cachedLicense.graceDays,
+            };
           }
         }
       } else {
         // Cache está atualizado, usa ele
-        return this.evaluateLicenseStatus(cachedLicense, true);
+        const evalResult = this.evaluateLicenseStatus(cachedLicense, true);
+        return {
+          ...evalResult,
+          lastChecked: cachedLicense.lastChecked,
+          updatedAt: cachedLicense.updatedAt,
+          graceDays: cachedLicense.graceDays,
+        };
       }
 
       // Se chegou aqui, não há cache e não conseguiu conectar ao Hub
@@ -644,24 +759,36 @@ export class LicensingService implements OnModuleInit {
   /**
    * Atualiza o cache de licença com novos dados
    */
-  async updateLicenseCache(updateData: { tenantId: string; planKey: string; lastChecked: string; updatedAt: string }) {
+  async updateLicenseCache(updateData: { tenantId: string; planKey: string; lastChecked?: string; updatedAt?: string; expiresAt?: string; graceDays?: number }) {
     this.logger.log(`Updating license cache for tenant ${updateData.tenantId}: ${updateData.planKey}`);
-    
+
     try {
+      const now = new Date();
+      const lastChecked = updateData.lastChecked ? new Date(updateData.lastChecked) : now;
+      const updatedAt = updateData.updatedAt ? new Date(updateData.updatedAt) : now;
+      const expiresAt = updateData.expiresAt ? new Date(updateData.expiresAt) : undefined;
+      const graceDays = typeof updateData.graceDays === 'number' ? updateData.graceDays : undefined;
+
       const updatedCache = await this.prisma.licenseCache.upsert({
         where: { tenantId: updateData.tenantId },
         update: {
           planKey: updateData.planKey,
-          lastChecked: new Date(updateData.lastChecked),
-          updatedAt: new Date(updateData.updatedAt)
+          ...(expiresAt ? { expiresAt } : {}),
+          ...(typeof graceDays === 'number' ? { graceDays } : {}),
+          lastChecked,
+          updatedAt,
         },
         create: {
           tenantId: updateData.tenantId,
           planKey: updateData.planKey,
-          status: 'active', // Campo obrigatório
-          lastChecked: new Date(updateData.lastChecked),
-          updatedAt: new Date(updateData.updatedAt),
-          createdAt: new Date()
+          status: 'active',
+          ...(expiresAt ? { expiresAt } : {}),
+          ...(typeof graceDays === 'number' ? { graceDays } : { graceDays: 7 }),
+          lastChecked,
+          updatedAt,
+          createdAt: now,
+          licensed: true,
+          registered: true,
         }
       });
 

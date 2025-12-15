@@ -1,0 +1,97 @@
+name: Build Windows Installer on Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install root dependencies
+        run: |
+          npm ci
+
+      - name: Install client-local dependencies
+        working-directory: client-local
+        run: |
+          npm ci
+
+      - name: Build ERP frontend (Vite)
+        run: |
+          npm ci
+          npm run build
+
+      - name: Generate Prisma Client (client-local)
+        working-directory: client-local
+        env:
+          NODE_ENV: production
+        run: |
+          npm run prisma:generate
+
+      - name: Build client-local dist
+        working-directory: client-local
+        run: |
+          npm run build
+
+      # Removido: build de executáveis com pkg
+
+      # Removido: cópia manual de engine do Prisma para build com pkg
+
+      # Removido: build de executáveis com pkg
+
+      - name: Download Node.js portable (win-x64)
+        shell: pwsh
+        run: |
+          $version = "18.20.3"
+          $zipUrl = "https://nodejs.org/dist/v$version/node-v$version-win-x64.zip"
+          $outZip = "client-local/installers/windows/build/node-win-x64.zip"
+          New-Item -ItemType Directory -Force -Path (Split-Path $outZip -Parent) | Out-Null
+          Invoke-WebRequest -Uri $zipUrl -OutFile $outZip
+          Expand-Archive -Path $outZip -DestinationPath "client-local/installers/windows/build/" -Force
+          $expanded = "client-local/installers/windows/build/node-v$version-win-x64"
+          if (Test-Path $expanded) { Rename-Item -Path $expanded -NewName "node" -Force }
+
+      - name: Download Node MSI (para gerar bootstrapper)
+        shell: pwsh
+        run: |
+          $version = "18.19.1"
+          $msiUrl = "https://nodejs.org/dist/v$version/node-v$version-x64.msi"
+          New-Item -ItemType Directory -Force -Path "installers/wix" | Out-Null
+          Invoke-WebRequest -Uri $msiUrl -OutFile "installers/wix/node-v$version-x64.msi"
+
+      - name: Build MSI (WiX)
+        shell: pwsh
+        run: |
+          pwsh installers/wix/build.ps1 -Version "${{ github.event.release.tag_name }}" -ProductName "F-Flow Suite" -Manufacturer "2F Solutions"
+
+      - name: Upload MSI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: f-flow-windows-msi
+          path: installers\wix\FFlowSuite.msi
+
+      - name: Attach MSI to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installers\wix\FFlowSuite.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attach Bootstrapper to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installers\wix\FFlowSuiteBootstrapper.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

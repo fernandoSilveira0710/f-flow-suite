@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useState } from 'react';
+import { useTheme } from 'next-themes';
 import { useEntitlements } from '@/hooks/use-entitlements';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
@@ -21,9 +22,16 @@ import {
   Search,
   Package2,
   LogOut,
+  RefreshCw,
+  HelpCircle,
+  User as UserIcon,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { ENDPOINTS } from '@/lib/env';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function ErpLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -31,15 +39,49 @@ export default function ErpLayout() {
   const [blockedFeature, setBlockedFeature] = useState('');
   const [requiredPlan, setRequiredPlan] = useState('');
   const location = useLocation();
+  // Ocultar chrome (sidebar e header) na tela de troca de conta
+  const hideChrome = location.pathname.startsWith('/erp/settings/switch-account');
   const { entitlements, currentPlan } = useEntitlements();
-  const { logout } = useAuth();
+  const { logout, licenseStatus, isHubOnline, hubLastCheck, checkHubConnectivity, syncLicenseWithHub, refreshLicenseStatus, user, offlineDaysLeft, licenseCacheUpdatedAt } = useAuth();
+  const queryClient = useQueryClient();
 
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const { theme, resolvedTheme, setTheme } = useTheme();
 
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    document.documentElement.classList.toggle('dark');
+    const current = resolvedTheme ?? theme;
+    setTheme(current === 'dark' ? 'light' : 'dark');
+  };
+
+  const formatDate = (iso?: string) => {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+    } catch {
+      return iso;
+    }
+  };
+
+  const formatDateShort = (iso?: string) => {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    } catch {
+      return iso;
+    }
+  };
+
+  const handleRefreshHub = async () => {
+    const online = await checkHubConnectivity();
+    if (online) {
+      await syncLicenseWithHub();
+      // Após sincronizar com o Hub, também atualize o status local
+      await refreshLicenseStatus(true);
+    } else {
+      // Mesmo offline, atualize a visão do status local para refletir cache
+      await refreshLicenseStatus(true);
+    }
   };
 
   const menuItems = [
@@ -79,29 +121,15 @@ export default function ErpLayout() {
       feature: 'Controle de Estoque',
       plan: 'Starter',
     },
-    {
-      label: 'Agenda',
-      icon: Calendar,
-      path: '/erp/agenda',
-      enabled: entitlements.agenda,
-      feature: 'Agenda',
-      plan: 'Starter',
-    },
-    {
-      label: 'Banho & Tosa',
-      icon: Scissors,
-      path: '/erp/banho-tosa',
-      enabled: entitlements.banho_tosa,
-      feature: 'Banho & Tosa',
-      plan: 'Pro',
-    },
+    // Banho & Tosa removido (não visível para nenhum plano)
+    // Agenda removida (não visível para nenhum plano)
     {
       label: 'Relatórios',
       icon: BarChart3,
       path: '/erp/relatorios',
       enabled: entitlements.reports,
       feature: 'Relatórios',
-      plan: 'Pro',
+      plan: 'Max',
     },
   ];
 
@@ -116,27 +144,27 @@ export default function ErpLayout() {
   return (
     <div className="flex min-h-screen w-full">
       {/* Sidebar */}
-      <aside
-        className={cn(
-          'flex flex-col border-r bg-sidebar transition-all duration-300',
-          collapsed ? 'w-16' : 'w-64'
-        )}
-      >
+      {!hideChrome && (
+        <aside
+          className={cn(
+            'flex flex-col border-r bg-sidebar transition-all duration-300',
+            collapsed ? 'w-16' : 'w-64'
+          )}
+        >
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between px-4 border-b">
+        <div className="relative flex h-32 items-center justify-center px-4 border-b">
           {!collapsed && (
-            <Link to="/erp/dashboard" className="flex items-center gap-2 font-bold">
-              <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-                <Package2 className="h-5 w-5 text-sidebar-primary-foreground" />
-              </div>
-              <span>2F ERP</span>
+            <Link to="/erp/dashboard" className="flex items-center justify-center" onClick={() => {
+              queryClient.refetchQueries({ queryKey: ['dashboard', 'summary'], type: 'active' });
+            }}>
+              <img src="/brand/2F-large.png" alt="2F" className="h-full w-auto" />
             </Link>
           )}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setCollapsed(!collapsed)}
-            className="ml-auto"
+            className="absolute right-4"
           >
             {collapsed ? (
               <ChevronRight className="h-4 w-4" />
@@ -160,6 +188,10 @@ export default function ErpLayout() {
                   if (!item.enabled) {
                     e.preventDefault();
                     handleMenuClick(item);
+                    return;
+                  }
+                  if (item.path === '/erp/dashboard') {
+                    queryClient.refetchQueries({ queryKey: ['dashboard', 'summary'], type: 'active' });
                   }
                 }}
                 className={cn(
@@ -197,44 +229,120 @@ export default function ErpLayout() {
           <div className="p-4 border-t">
             <div className="rounded-lg bg-sidebar-accent p-3">
               <p className="text-xs text-sidebar-accent-foreground/70 mb-1">Plano Atual</p>
-              <p className="text-sm font-semibold capitalize">{currentPlan}</p>
+              {(() => {
+                const hubPlanLabels: Record<string, string> = {
+                  starter: 'Básico',
+                  pro: 'Profissional',
+                  max: 'Enterprise',
+                };
+                const label = hubPlanLabels[String(currentPlan)] || String(currentPlan);
+                return <p className="text-sm font-semibold capitalize">{label}</p>;
+              })()}
+              {/* Versão do cliente local / ERP */}
+              <p className="text-xs text-sidebar-accent-foreground/70 mt-1">
+                Versão: {import.meta.env.VITE_APP_VERSION}
+              </p>
               <Button variant="link" size="sm" className="p-0 h-auto mt-1" asChild>
-                <Link to="/planos">Fazer Upgrade</Link>
+                <a href={ENDPOINTS.SITE_RENOVACAO} target="_blank" rel="noopener noreferrer">Fazer Upgrade</a>
               </Button>
             </div>
           </div>
         )}
-      </aside>
+        </aside>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="h-16 border-b bg-background flex items-center justify-between px-6">
-          <div className="flex items-center gap-4 flex-1 max-w-md">
-            <Search className="h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Buscar..."
-              className="border-0 shadow-none focus-visible:ring-0"
-            />
-          </div>
+        {!hideChrome && (
+          <header className="h-16 border-b bg-background flex items-center justify-end px-6">
+        <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 pr-2">
+              <span className={`inline-flex items-center gap-2 rounded-md px-3 py-1 border ${isHubOnline ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                <span className={`h-2 w-2 rounded-full ${isHubOnline ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                <span className="text-xs font-medium">{isHubOnline ? 'Hub Online' : 'Hub Offline'}</span>
+              </span>
 
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={toggleTheme}>
-              {theme === 'light' ? (
-                <Moon className="h-5 w-5" />
+              {isHubOnline ? (
+                <span className="text-xs text-muted-foreground">Atualizado: {formatDate(hubLastCheck || undefined)}</span>
               ) : (
-                <Sun className="h-5 w-5" />
+                <>
+                  {hubLastCheck && (
+                    <span className="text-xs text-muted-foreground">
+                      Último online: {formatDate(hubLastCheck)}
+                    </span>
+                  )}
+                  {typeof offlineDaysLeft === 'number' && (
+                    <span className="text-xs text-muted-foreground">
+                      Restam {offlineDaysLeft} dias offline
+                    </span>
+                  )}
+                </>
               )}
-            </Button>
-            
-            <Button variant="ghost" size="icon" onClick={logout} title="Sair">
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
-        </header>
+
+              {licenseStatus?.expiresAt && (
+                <span className="text-xs text-muted-foreground">
+                  • Vencimento: {formatDateShort(licenseStatus.expiresAt)}
+                </span>
+              )}
+
+              {/* Removido botão de atualizar: status agora é verificado automaticamente a cada 10s */}
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" title="Ajuda">
+                      <HelpCircle className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <div className="space-y-1 text-xs">
+                      {isHubOnline ? (
+                        <>
+                          <p><strong>Hub Online</strong>: sincronização ativa.</p>
+                          <p>Atualizado: {formatDate(hubLastCheck || undefined)}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p><strong>Hub Offline</strong>: sistema usa dados em cache.</p>
+                          <p>Última atualização: {formatDate(licenseCacheUpdatedAt || undefined)}</p>
+                          <p>Modo offline permite até {import.meta.env.VITE_OFFLINE_MAX_DAYS ?? 5} dias. {typeof offlineDaysLeft === 'number' ? ` Restam ${offlineDaysLeft} dias.` : ''}</p>
+                          <p>Conecte ao Hub para renovar sincronização e licença.</p>
+                        </>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            {user && (
+              <div className="hidden sm:flex items-center gap-2 px-2 text-xs text-muted-foreground">
+                <UserIcon className="h-4 w-4" />
+                <span>Usuário: {user.name || user.email}</span>
+              </div>
+            )}
+            <Link to="/erp/settings/switch-account">
+              <Button variant="ghost" size="icon" title="Trocar conta">
+                <Users className="h-5 w-5" />
+              </Button>
+            </Link>
+             <Button variant="ghost" size="icon" onClick={toggleTheme}>
+               {(resolvedTheme ?? theme) === 'dark' ? (
+                 <Sun className="h-5 w-5" />
+               ) : (
+                 <Moon className="h-5 w-5" />
+               )}
+             </Button>
+                             
+                             <Button variant="ghost" size="icon" onClick={logout} title="Sair">
+                               <LogOut className="h-5 w-5" />
+                             </Button>
+                           </div>
+                         </header>
+        )}
 
         {/* Page Content */}
-        <main className="flex-1 p-6 overflow-auto">
+        <main className={cn('flex-1 overflow-auto', hideChrome ? 'p-0' : 'p-6')}>
           <Outlet />
         </main>
       </div>

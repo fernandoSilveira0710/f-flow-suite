@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/erp/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,32 +14,133 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { mockAPI } from '@/lib/mock-data';
+import { getProductById, updateProduct, type ProductResponse } from '@/lib/products-api';
+import { adjustStock } from '@/lib/stock-api';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import { ImageUpload } from '@/components/products/image-upload';
+import { mockAPI } from '@/lib/mock-data';
+import { Category, fetchCategories } from '@/lib/categories-api';
 
 export default function ProdutoEditar() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const product = id ? mockAPI.getProduct(id) : undefined;
-  const categories = mockAPI.getCategories();
+  const [product, setProduct] = useState<ProductResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
   const unitsOfMeasure = mockAPI.getUnitsOfMeasure();
+  const [currentStockEdit, setCurrentStockEdit] = useState<string>('');
 
   const [formData, setFormData] = useState({
-    name: product?.name || '',
-    description: product?.description || '',
-    sku: product?.sku || '',
-    barcode: product?.barcode || '',
-    categoryId: product?.categoryId || '',
-    unitOfMeasureId: product?.unitOfMeasureId || '',
-    price: product?.price.toString() || '',
-    cost: product?.cost.toString() || '',
-    stock: product?.stock.toString() || '',
-    minStock: product?.minStock?.toString() || '',
-    active: product?.active ?? true,
-    imageUrl: product?.imageUrl,
+    name: '',
+    description: '',
+    sku: '',
+    barcode: '',
+    categoryId: '',
+    unitOfMeasureId: '',
+    price: '',
+    cost: '',
+    minStock: '',
+    active: true,
+    imageUrl: undefined as string | undefined,
+    marginPct: '',
+    expiryDate: '',
   });
+
+  useEffect(() => {
+    let mounted = true;
+    console.info('[ProdutoEditar] Tela de edição aberta', { id });
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+    (async () => {
+      try {
+        console.info('[ProdutoEditar] Iniciando carregamento do produto', { id });
+        const p = await getProductById(id);
+        if (mounted) {
+          setProduct(p);
+          console.info('[ProdutoEditar] Produto carregado com sucesso', { id: p.id, name: p.name });
+          const selectedCategoryId = p.category
+            ? (categories.find(c => c.name === p.category)?.id || '')
+            : '';
+          const selectedUnitId = p.unit
+            ? (unitsOfMeasure.find(u => u.abbreviation === p.unit)?.id || '')
+            : '';
+          setFormData({
+            name: p.name || '',
+            description: p.description || '',
+            sku: p.sku || '',
+            barcode: p.barcode || '',
+            categoryId: selectedCategoryId,
+            unitOfMeasureId: selectedUnitId,
+            price: p.price.toFixed(2),
+            cost: (p.cost ?? 0).toFixed(2),
+            minStock: p.minStock?.toString() || '',
+            active: p.active,
+            imageUrl: p.imageUrl,
+            marginPct: p.marginPct !== undefined && p.marginPct !== null ? String(p.marginPct) : '',
+            expiryDate: p.expiryDate ? p.expiryDate.slice(0, 10) : '',
+          });
+          setCurrentStockEdit(String(p.currentStock ?? 0));
+        }
+      } catch (error) {
+        console.error('Erro ao carregar produto:', error);
+        toast({
+          title: 'Erro ao carregar produto',
+          description:
+            (error as any)?.message || 'Não foi possível obter os dados do produto.',
+          variant: 'destructive',
+        });
+        if (mounted) setProduct(null);
+      } finally {
+        if (mounted) setLoading(false);
+        console.info('[ProdutoEditar] Finalizou carregamento', { id, loadingEnded: true });
+      }
+    })();
+    return () => { mounted = false; };
+  }, [id]);
+
+  // Carregar categorias do client-local
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const data = await fetchCategories();
+        setCategories(data);
+      } catch (err: any) {
+        console.error('Erro ao carregar categorias:', err);
+        toast({
+          title: 'Erro ao carregar categorias',
+          description: err?.message || 'Falha ao obter categorias do servidor',
+          variant: 'destructive',
+        });
+      }
+    };
+    loadCategories();
+  }, []);
+
+  // Ajusta seleção de categoria quando categorias carregam
+  useEffect(() => {
+    if (!product) return;
+    const selectedCategoryId = product.category
+      ? (categories.find(c => c.name === product.category)?.id || '')
+      : '';
+    if (selectedCategoryId && formData.categoryId !== selectedCategoryId) {
+      setFormData(prev => ({ ...prev, categoryId: selectedCategoryId }));
+    }
+  }, [product, categories]);
+
+  if (loading) {
+    return (
+      <div>
+        <PageHeader title="Carregando produto..." />
+        <Button onClick={() => navigate('/erp/produtos')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Voltar
+        </Button>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -53,32 +154,100 @@ export default function ProdutoEditar() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Máscara de moeda com ponto: converte SEMPRE a partir de dígitos para centavos
+  // Exemplos: "1" -> "0.01", "199" -> "1.99", "1234" -> "12.34"
+  // Ignora ponto digitado previamente para evitar travar a digitação
+  const applyMoneyMask = (raw: string): string => {
+    if (!raw) return '';
+    const digits = raw.replace(/\D/g, '');
+    if (digits === '') return '';
+    if (digits.length <= 2) {
+      return `0.${digits.padStart(2, '0')}`;
+    }
+    const intPartNum = parseInt(digits.slice(0, -2), 10);
+    const intPart = Number.isNaN(intPartNum) ? '0' : String(intPartNum);
+    const decPart = digits.slice(-2);
+    return `${intPart}.${decPart}`;
+  };
+
+  const handleMoneyInputChange = (field: 'price' | 'cost', raw: string) => {
+    const formatted = applyMoneyMask(raw);
+    setFormData({ ...formData, [field]: formatted });
+  };
+
+  // Sugestão de preço a partir da margem (%)
+  const getSuggestedPrice = (): number | undefined => {
+    const cost = formData.cost ? parseFloat(formData.cost.replace(',', '.')) : undefined;
+    const margin = formData.marginPct ? parseFloat(formData.marginPct.replace(',', '.')) : undefined;
+    if (cost === undefined || isNaN(cost) || margin === undefined || isNaN(margin)) return undefined;
+    return cost * (1 + margin / 100);
+  };
+
+  const formatBRL = (value: number): string =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!id) return;
+    try {
+      const categoryName = formData.categoryId
+        ? categories.find(c => c.id === formData.categoryId)?.name
+        : undefined;
+      const unitAbbr = formData.unitOfMeasureId
+        ? unitsOfMeasure.find(u => u.id === formData.unitOfMeasureId)?.abbreviation
+        : undefined;
 
-    mockAPI.updateProduct(id, {
-      name: formData.name,
-      description: formData.description,
-      sku: formData.sku,
-      barcode: formData.barcode,
-      categoryId: formData.categoryId,
-      unitOfMeasureId: formData.unitOfMeasureId,
-      price: parseFloat(formData.price),
-      cost: parseFloat(formData.cost),
-      stock: parseInt(formData.stock),
-      minStock: formData.minStock ? parseInt(formData.minStock) : undefined,
-      active: formData.active,
-      imageUrl: formData.imageUrl,
-    });
+      const updated = await updateProduct(id, {
+        name: formData.name,
+        description: formData.description || undefined,
+        sku: formData.sku || undefined,
+        barcode: formData.barcode || undefined,
+        category: categoryName,
+        unit: unitAbbr,
+        price: parseFloat(formData.price.replace(',', '.')),
+        cost: formData.cost ? parseFloat(formData.cost.replace(',', '.')) : undefined,
+        minStock: formData.minStock ? parseInt(formData.minStock) : undefined,
+        active: formData.active,
+        imageUrl: formData.imageUrl,
+        marginPct: formData.marginPct ? parseFloat(formData.marginPct.replace(',', '.')) : undefined,
+        expiryDate: formData.expiryDate || undefined,
+      });
 
-    toast({
-      title: 'Produto atualizado!',
-      description: `${formData.name} foi atualizado com sucesso.`,
-    });
+      // Ajuste de estoque atual, caso o valor tenha sido alterado
+      const desiredStock = currentStockEdit.trim() === '' ? NaN : parseInt(currentStockEdit, 10);
+      if (!Number.isNaN(desiredStock)) {
+        const baseStock = product?.currentStock ?? 0;
+        if (desiredStock !== baseStock) {
+          const delta = desiredStock - baseStock;
+          await adjustStock({
+            productId: id,
+            delta,
+            reason: 'Ajuste Manual (Editar Produto)',
+            notes: `Ajuste aplicado na tela de edição. De ${baseStock} para ${desiredStock}.`,
+          });
+        }
+      }
 
-    navigate(`/erp/produtos/${id}`);
+      toast({
+        title: 'Produto atualizado!',
+        description: `${formData.name} foi atualizado com sucesso.`,
+      });
+
+      // Recarrega produto para refletir estoque atualizado antes de navegar
+      try {
+        const refreshed = await getProductById(id);
+        setProduct(refreshed);
+      } catch {}
+      navigate(`/erp/produtos/${id}`);
+    } catch (error: any) {
+      console.error('Erro ao atualizar produto:', error);
+      toast({
+        title: 'Erro ao atualizar produto',
+        description: error?.message || 'Tente novamente mais tarde.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -129,14 +298,13 @@ export default function ProdutoEditar() {
                 </div>
 
                 <div>
-                  <Label htmlFor="categoryId">Categoria *</Label>
+                  <Label htmlFor="category">Categoria</Label>
                   <Select
                     value={formData.categoryId}
                     onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((cat) => (
@@ -151,14 +319,13 @@ export default function ProdutoEditar() {
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="unitOfMeasureId">Unidade de Medida *</Label>
+                  <Label htmlFor="unitOfMeasure">Unidade de Medida</Label>
                   <Select
                     value={formData.unitOfMeasureId}
                     onValueChange={(value) => setFormData({ ...formData, unitOfMeasureId: value })}
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
                       {unitsOfMeasure.map((unit) => (
@@ -214,10 +381,11 @@ export default function ProdutoEditar() {
                   <Label htmlFor="price">Preço de Venda *</Label>
                   <Input
                     id="price"
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
+                    pattern={/^\d+(\.\d{0,2})?$/.source}
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    onChange={(e) => handleMoneyInputChange('price', e.target.value)}
                     required
                   />
                 </div>
@@ -226,23 +394,67 @@ export default function ProdutoEditar() {
                   <Label htmlFor="cost">Custo</Label>
                   <Input
                     id="cost"
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
+                    pattern={/^\d+(\.\d{0,2})?$/.source}
                     value={formData.cost}
-                    onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                    onChange={(e) => handleMoneyInputChange('cost', e.target.value)}
                   />
                 </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="stock">Estoque Atual</Label>
+                  <Label htmlFor="marginPct">Margem (%)</Label>
                   <Input
-                    id="stock"
+                    id="marginPct"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="ex.: 30"
+                    value={formData.marginPct}
+                    onChange={(e) => setFormData({ ...formData, marginPct: e.target.value })}
+                  />
+                  {(() => {
+                    const s = getSuggestedPrice();
+                    return s ? (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Preço sugerido: {formatBRL(s)}
+                      </p>
+                    ) : null;
+                  })()}
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="currentStock">Estoque Atual</Label>
+                  <Input
+                    id="currentStock"
                     type="number"
-                    value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    required
+                    value={currentStockEdit}
+                    onChange={(e) => setCurrentStockEdit(e.target.value)}
+                    min={0}
+                    step={1}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="minStock">Estoque Mínimo</Label>
+                  <Input
+                    id="minStock"
+                    type="number"
+                    value={formData.minStock}
+                    onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="expiryDate">Validade do Produto</Label>
+                  <Input
+                    id="expiryDate"
+                    type="date"
+                    value={formData.expiryDate}
+                    onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
                   />
                 </div>
 
@@ -256,6 +468,8 @@ export default function ProdutoEditar() {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
@@ -269,8 +483,6 @@ export default function ProdutoEditar() {
                   onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
                 />
               </div>
-            </CardContent>
-          </Card>
 
           <div className="flex gap-4">
             <Button type="submit">Salvar Alterações</Button>

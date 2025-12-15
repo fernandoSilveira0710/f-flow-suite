@@ -97,7 +97,7 @@ body:
     attributes:
       label: Target Users
       description: Who would benefit from this feature?
-      placeholder: e.g., Pet shop owners, Veterinarians, Administrators
+      placeholder: e.g., Comerciantes, Gerentes, Administradores
 
   - type: textarea
     id: business_value
