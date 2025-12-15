@@ -212,7 +212,9 @@ jobs:
           node -v
           npm -v
           Write-Host "--- sales-api.ts lines 160..200 ---"
-          Get-Content src/lib/sales-api.ts | Select-Object -Index 160..200
+          $content = Get-Content src/lib/sales-api.ts
+          $slice = $content[159..199]
+          $slice | ForEach-Object { Write-Host $_ }
 
       - name: Build ERP frontend (root)
         run: |
