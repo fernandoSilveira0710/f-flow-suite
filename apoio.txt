@@ -1,18 +1,18 @@
-13s
+12s
 Run npm test
 
 > f-flow-hub@0.1.0 test
 > jest
 
-[Nest] 2420  - 12/15/2025, 11:26:35 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
-[Nest] 2427  - 12/15/2025, 11:26:35 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
-[Nest] 2421  - 12/15/2025, 11:26:35 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
-PASS src/pets/pets.service.spec.ts (7.169 s)
-PASS src/customers/customers.service.spec.ts (7.099 s)
-[Nest] 2427  - 12/15/2025, 11:26:36 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
-[Nest] 2427  - 12/15/2025, 11:26:40 PM   ERROR [ExceptionsHandler] Failed to generate JWKS: error:068000E0:asn1 encoding routines::too small
+[Nest] 2550  - 12/15/2025, 11:43:05 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
+[Nest] 2551  - 12/15/2025, 11:43:05 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
+[Nest] 2549  - 12/15/2025, 11:43:05 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
+PASS src/customers/customers.service.spec.ts (6.412 s)
+PASS src/pets/pets.service.spec.ts (6.454 s)
+[Nest] 2549  - 12/15/2025, 11:43:06 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
+[Nest] 2549  - 12/15/2025, 11:43:09 PM   ERROR [ExceptionsHandler] Failed to generate JWKS: error:068000E0:asn1 encoding routines::too small
 Error: Failed to generate JWKS: error:068000E0:asn1 encoding routines::too small
-    at JwksController.getJwks (/home/runner/work/f-flow-suite/f-flow-suite/hub/src/auth/jwks.controller.ts:48:13)
+    at JwksController.getJwks (/home/runner/work/f-flow-suite/f-flow-suite/hub/src/auth/jwks.controller.ts:49:13)
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
 FAIL test/rls-integration.spec.ts
   ● Console
@@ -20,132 +20,132 @@ FAIL test/rls-integration.spec.ts
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId:
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: test-tenant-123
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Setting tenant context: test-tenant-123
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:50:17)
 
     console.log
       [PrismaTenantMiddleware] Set request.tenantId: test-tenant-123
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:58:17)
 
     console.log
       [PrismaTenantMiddleware] Tenant context set successfully
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:59:17)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: tenant-1
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Setting tenant context: tenant-1
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:50:17)
 
     console.log
       [PrismaTenantMiddleware] Set request.tenantId: tenant-1
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:58:17)
 
     console.log
       [PrismaTenantMiddleware] Tenant context set successfully
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:59:17)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: tenant-2
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Setting tenant context: tenant-2
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:50:17)
 
     console.log
       [PrismaTenantMiddleware] Set request.tenantId: tenant-2
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:58:17)
 
     console.log
       [PrismaTenantMiddleware] Tenant context set successfully
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:59:17)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: tenant-1
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Setting tenant context: tenant-1
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:50:17)
 
     console.log
       [PrismaTenantMiddleware] Set request.tenantId: tenant-1
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:58:17)
 
     console.log
       [PrismaTenantMiddleware] Tenant context set successfully
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:59:17)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: tenant-2
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Setting tenant context: tenant-2
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:50:17)
 
     console.log
       [PrismaTenantMiddleware] Set request.tenantId: tenant-2
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:58:17)
 
     console.log
       [PrismaTenantMiddleware] Tenant context set successfully
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:59:17)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: rls-test-tenant
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Setting tenant context: rls-test-tenant
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:50:17)
 
     console.log
       [PrismaTenantMiddleware] Set request.tenantId: rls-test-tenant
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:58:17)
 
     console.log
       [PrismaTenantMiddleware] Tenant context set successfully
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:59:17)
 
   ● RLS Integration Tests › Public Endpoints › should allow access to JWKS endpoint without x-tenant-id
 
@@ -168,73 +168,73 @@ FAIL test/rls-integration.spec.ts
       at localAssert (node_modules/supertest/lib/test.js:138:14)
       at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
 
-FAIL test/auth-integration.spec.ts (11.502 s)
+FAIL test/auth-integration.spec.ts (10.411 s)
   ● Console
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: POST, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: POST, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: POST, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
     console.log
       [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
 
-      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:37:13)
 
   ● Auth Integration (e2e) › Protected Routes - Tenants › should return 401 when no OIDC token is provided
 
@@ -500,9 +500,6 @@ FAIL test/auth-integration.spec.ts (11.502 s)
 Test Suites: 2 failed, 2 passed, 4 total
 Tests:       14 failed, 19 passed, 33 total
 Snapshots:   0 total
-Time:        12.303 s
+Time:        11.019 s
 Ran all test suites.
 Error: Process completed with exit code 1.
-0s
-0s
-1s
