@@ -183,6 +183,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Debug Node and sales-api excerpt (ERP)
+        run: |
+          node -v
+          npm -v
+          echo "--- sales-api.ts lines 160..200 ---"
+          sed -n '160,200p' src/lib/sales-api.ts
+
       - name: Build ERP (Vite)
         run: npm run build
 
