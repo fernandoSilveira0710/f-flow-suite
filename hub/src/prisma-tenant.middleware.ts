@@ -8,27 +8,38 @@ export class PrismaTenantMiddleware implements NestMiddleware {
 
   async use(req: Request, _res: Response, next: NextFunction) {
     // Excluir endpoints públicos da verificação de tenant
-    const publicEndpoints = [
+    const publicEndpoints = new Set<string>([
       '/.well-known/jwks.json',
-      '/health'
-    ];
+      '/health',
+      '/licenses/activate',
+      '/licenses/validate',
+    ]);
 
-    if (publicEndpoints.includes(req.path)) {
+    if (publicEndpoints.has(req.path)) {
       return next();
     }
 
-    const tenantId =
+    // Tentar extrair tenantId de múltiplas fontes: header, usuário (OIDC), query e path
+    let tenantId =
       (req.headers['x-tenant-id'] as string | undefined) ??
       (req as Request & { user?: { tenantId?: string } })?.user?.tenantId ??
       (req.query.tenantId as string | undefined) ??
       null;
 
+    // Extrair de path quando padrão for /tenants/:tenantId/...
+    if (!tenantId) {
+      const pathMatch = req.path.match(/^\/tenants\/([^\/]+)/);
+      if (pathMatch && pathMatch[1]) {
+        tenantId = pathMatch[1];
+      }
+    }
+
     console.log(`[PrismaTenantMiddleware] Path: ${req.path}, Method: ${req.method}, TenantId: ${tenantId}`);
 
     const rlsEnforced = process.env.RLS_ENFORCED === 'true';
 
-    // Se RLS está habilitado, exigir tenant válido
-    if (rlsEnforced) {
+    // Se RLS está habilitado, exigir tenantId para todas as rotas não públicas
+    if (rlsEnforced && !publicEndpoints.has(req.path)) {
       if (!tenantId || tenantId.trim() === '') {
         throw new ForbiddenException('Missing tenant');
       }

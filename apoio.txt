@@ -1,62 +1,508 @@
-🚀 INICIANDO PROCESSO DE LOGIN NO COMPONENTE
-login.tsx:66 📧 Email: appsuporte.silveira@gmail.com
-login.tsx:67 🔑 Senha fornecida: SIM
-login.tsx:80 ⏳ Estado de loading ativado
-login.tsx:83 🔐 Chamando função login do AuthContext...
-auth-context.tsx:237 🔐 INÍCIO DO LOGIN - Email: appsuporte.silveira@gmail.com
-auth-context.tsx:242 📡 ETAPA 1: Tentando autenticação no Hub...
-auth-context.tsx:250 🌐 Fazendo requisição para Hub: https://f-flow-suite.onrender.com/public/login
-auth-context.tsx:259 📡 Resposta do Hub - Status: 201 OK: true
-auth-context.tsx:277 ✅ Hub disponível e resposta OK - processando...
-auth-context.tsx:279 📋 Dados do usuário recebidos do Hub: {userId: 'f7468f8e-2876-4fe6-961f-faf765f4f3e6', email: 'appsuporte.silveira@gmail.com', displayName: 'Fernando Silveira', tenantId: 'b2e3ad73-7cb3-4814-b77a-57d2e62f07bc'}
-auth-context.tsx:293 🔄 Sincronizando dados com client-local...
-auth-context.tsx:308 🔄 Sincronização - Status: 201 OK: true
-auth-context.tsx:314 🎫 Verificando licenças no Hub...
-auth-context.tsx:317 🎫 URL de validação de licença: https://f-flow-suite.onrender.com/licenses/validate?tenantId=b2e3ad73-7cb3-4814-b77a-57d2e62f07bc
-auth-context.tsx:319 🎫 Resposta da licença - Status: 200 OK: true
-auth-context.tsx:323 🎫 Dados da licença: {valid: true, licensed: true, planKey: undefined, expiresAt: undefined}
-auth-context.tsx:332 ✅ Licença válida - fazendo login completo...
-auth-context.tsx:340 💾 Persistindo credenciais offline no client-local...
-protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: true, requireAuth: true, …}
-protected-route.tsx:137 ⏳ PROTECTED ROUTE - Mostrando loading...
-protected-route.tsx:34 🛡️ PROTECTED ROUTE useEffect - Verificando condições...
-auth-context.tsx:354 💾 Credenciais offline persistidas: {success: true, message: 'Credenciais persistidas', userId: 'b0d08609-fe8c-4e2b-8ef7-080ebf432c18'}
-auth-context.tsx:364 🔑 Ativando licença no client-local...
-auth-context.tsx:378 🔑 Licença ativada com sucesso: {success: true, message: 'Licensing not enforced in development mode'}
-auth-context.tsx:388 💾 Persistindo licença no client-local...
-auth-context.tsx:400 💾 Licença persistida com sucesso
-auth-context.tsx:407 🔄 Iniciando sincronização de planos após login...
-plan-sync.service.ts:31 🔄 Iniciando sincronização de planos após login... {tenantId: 'b2e3ad73-7cb3-4814-b77a-57d2e62f07bc', userId: 'f7468f8e-2876-4fe6-961f-faf765f4f3e6'}
-plan-sync.service.ts:41 ✅ Plano obtido do Hub: starter
-plan-sync.service.ts:54 ✅ Client-local sincronizado com sucesso
-plan-sync.service.ts:65 ✅ Cache do client-local atualizado com sucesso
-plan-sync.service.ts:74 🎉 Sincronização concluída com sucesso. Plano: starter
-auth-context.tsx:414 ✅ Sincronização de planos concluída: Sincronização concluída com sucesso. Plano: starter
-auth-context.tsx:438 🔄 Forçando atualização do cache de licença após login...
-auth-context.tsx:102 🔍 Verificando status da licença - DIRETO do client-local...
-auth-context.tsx:106 🏢 Tenant ID: b2e3ad73-7cb3-4814-b77a-57d2e62f07bc
-auth-context.tsx:129 📊 Status data from client-local: {valid: true, status: 'development', cached: true, planKey: 'starter', expiresAt: '2026-11-20T14:54:25.099Z', …}
-protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: true, requireAuth: true, …}
-protected-route.tsx:137 ⏳ PROTECTED ROUTE - Mostrando loading...
-auth-context.tsx:184 🔧 Install data from client-local: {isInstalled: true, hasLicense: false, planKey: 'development'}
-auth-context.tsx:213 ✅ Novo license status: {isValid: true, isInstalled: true, plan: 'max', expiresAt: '2026-11-20T14:54:25.099Z'}
-auth-context.tsx:441 🎉 LOGIN CONCLUÍDO COM SUCESSO!
-auth-context.tsx:674 🏁 Finalizando processo de login...
-login.tsx:85 🔐 Resultado do login: SUCESSO
-login.tsx:88 ✅ Login bem-sucedido - verificando se deve mostrar modal de planos...
-login.tsx:92 📋 Flag show_plans_modal: null
-login.tsx:99 🎯 Navegando para dashboard...
-login.tsx:114 🏁 Finalizando processo no componente - desativando loading
-protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
-protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo
-protected-route.tsx:34 🛡️ PROTECTED ROUTE useEffect - Verificando condições...
-protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
-protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo
-protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/configuracoes', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
-protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo
-protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/settings/organization', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
-protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo
-protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
-protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo
-protected-route.tsx:24 🛡️ PROTECTED ROUTE - Estado atual: {pathname: '/erp/dashboard', user: 'PRESENTE', licenseStatus: {…}, isLoading: false, requireAuth: true, …}
-protected-route.tsx:154 ✅ PROTECTED ROUTE - Todas as verificações passaram, renderizando conteúdo
+13s
+Run npm test
+
+> f-flow-hub@0.1.0 test
+> jest
+
+[Nest] 2420  - 12/15/2025, 11:26:35 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
+[Nest] 2427  - 12/15/2025, 11:26:35 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
+[Nest] 2421  - 12/15/2025, 11:26:35 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
+PASS src/pets/pets.service.spec.ts (7.169 s)
+PASS src/customers/customers.service.spec.ts (7.099 s)
+[Nest] 2427  - 12/15/2025, 11:26:36 PM     LOG [Env] Environment variables loaded from /home/runner/work/f-flow-suite/f-flow-suite/hub/.env
+[Nest] 2427  - 12/15/2025, 11:26:40 PM   ERROR [ExceptionsHandler] Failed to generate JWKS: error:068000E0:asn1 encoding routines::too small
+Error: Failed to generate JWKS: error:068000E0:asn1 encoding routines::too small
+    at JwksController.getJwks (/home/runner/work/f-flow-suite/f-flow-suite/hub/src/auth/jwks.controller.ts:48:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+FAIL test/rls-integration.spec.ts
+  ● Console
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId:
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: test-tenant-123
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Setting tenant context: test-tenant-123
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+
+    console.log
+      [PrismaTenantMiddleware] Set request.tenantId: test-tenant-123
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+
+    console.log
+      [PrismaTenantMiddleware] Tenant context set successfully
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: tenant-1
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Setting tenant context: tenant-1
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+
+    console.log
+      [PrismaTenantMiddleware] Set request.tenantId: tenant-1
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+
+    console.log
+      [PrismaTenantMiddleware] Tenant context set successfully
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: tenant-2
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Setting tenant context: tenant-2
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+
+    console.log
+      [PrismaTenantMiddleware] Set request.tenantId: tenant-2
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+
+    console.log
+      [PrismaTenantMiddleware] Tenant context set successfully
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: tenant-1
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Setting tenant context: tenant-1
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+
+    console.log
+      [PrismaTenantMiddleware] Set request.tenantId: tenant-1
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+
+    console.log
+      [PrismaTenantMiddleware] Tenant context set successfully
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: tenant-2
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Setting tenant context: tenant-2
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+
+    console.log
+      [PrismaTenantMiddleware] Set request.tenantId: tenant-2
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+
+    console.log
+      [PrismaTenantMiddleware] Tenant context set successfully
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: rls-test-tenant
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Setting tenant context: rls-test-tenant
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:39:17)
+
+    console.log
+      [PrismaTenantMiddleware] Set request.tenantId: rls-test-tenant
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:47:17)
+
+    console.log
+      [PrismaTenantMiddleware] Tenant context set successfully
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:48:17)
+
+  ● RLS Integration Tests › Public Endpoints › should allow access to JWKS endpoint without x-tenant-id
+
+    expected 200 "OK", got 500 "Internal Server Error"
+
+      87 |       const response = await request(app.getHttpServer())
+      88 |         .get('/.well-known/jwks.json')
+    > 89 |         .expect(200);
+         |          ^
+      90 |
+      91 |       expect(response.body).toHaveProperty('keys');
+      92 |       expect(Array.isArray(response.body.keys)).toBe(true);
+
+      at Object.<anonymous> (test/rls-integration.spec.ts:89:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:309:14)
+      at node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (node_modules/supertest/lib/test.js:195:23)
+      at localAssert (node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
+
+FAIL test/auth-integration.spec.ts (11.502 s)
+  ● Console
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: POST, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: POST, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: POST, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+    console.log
+      [PrismaTenantMiddleware] Path: /, Method: GET, TenantId: null
+
+      at MiddlewareHost.use (src/prisma-tenant.middleware.ts:26:13)
+
+  ● Auth Integration (e2e) › Protected Routes - Tenants › should return 401 when no OIDC token is provided
+
+    expected 401 "Unauthorized", got 403 "Forbidden"
+
+      88 |       const response = await request(app.getHttpServer())
+      89 |         .get('/tenants')
+    > 90 |         .expect(401);
+         |          ^
+      91 |
+      92 |       expect(response.body.message).toBe('Missing or invalid identity token');
+      93 |     });
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:90:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:309:14)
+      at node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (node_modules/supertest/lib/test.js:195:23)
+      at localAssert (node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
+
+  ● Auth Integration (e2e) › Protected Routes - Tenants › should return 401 when invalid OIDC token is provided
+
+    expected 401 "Unauthorized", got 403 "Forbidden"
+
+       97 |         .get('/tenants')
+       98 |         .set('Authorization', '***')
+    >  99 |         .expect(401);
+          |          ^
+      100 |
+      101 |       expect(response.body.message).toBe('Missing or invalid identity token');
+      102 |     });
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:99:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:309:14)
+      at node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (node_modules/supertest/lib/test.js:195:23)
+      at localAssert (node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
+
+  ● Auth Integration (e2e) › Protected Routes - Tenants › should return 403 when valid OIDC token but no license token
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Missing or invalid license token"
+    Received: "Missing tenant"
+
+      111 |         .expect(403);
+      112 |
+    > 113 |       expect(response.body.message).toBe('Missing or invalid license token');
+          |                                     ^
+      114 |
+      115 |       // Reset for other tests
+      116 |       process.env.OIDC_REQUIRED = 'true';
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:113:37)
+
+  ● Auth Integration (e2e) › Protected Routes - Tenants › should return 403 when valid OIDC token but invalid license token
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Missing or invalid license token"
+    Received: "Missing tenant"
+
+      125 |         .expect(403);
+      126 |
+    > 127 |       expect(response.body.message).toBe('Missing or invalid license token');
+          |                                     ^
+      128 |
+      129 |       process.env.OIDC_REQUIRED = 'true';
+      130 |     });
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:127:37)
+
+  ● Auth Integration (e2e) › Protected Routes - Tenants › should return 200 when both OIDC and license tokens are valid
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      139 |         .get('/tenants')
+      140 |         .set('X-License-Token', licenseToken)
+    > 141 |         .expect(200);
+          |          ^
+      142 |
+      143 |       // Reset for other tests
+      144 |       process.env.OIDC_REQUIRED = 'true';
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:141:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:309:14)
+      at node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (node_modules/supertest/lib/test.js:195:23)
+      at localAssert (node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
+
+  ● Auth Integration (e2e) › Protected Routes - Tenants › should work with Authorization header for backward compatibility
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      153 |         .get('/tenants')
+      154 |         .set('Authorization', `***
+    > 155 |         .expect(200);
+          |          ^
+      156 |
+      157 |       process.env.OIDC_REQUIRED = 'true';
+      158 |     });
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:155:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:309:14)
+      at node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (node_modules/supertest/lib/test.js:195:23)
+      at localAssert (node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
+
+  ● Auth Integration (e2e) › Protected Routes - Sync › should protect sync events endpoint
+
+    expected 401 "Unauthorized", got 403 "Forbidden"
+
+      164 |         .post('/tenants/test-tenant/sync/events')
+      165 |         .send({ events: [] })
+    > 166 |         .expect(401);
+          |          ^
+      167 |
+      168 |       expect(response.body.message).toBe('Missing or invalid identity token');
+      169 |     });
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:166:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:309:14)
+      at node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (node_modules/supertest/lib/test.js:195:23)
+      at localAssert (node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
+
+  ● Auth Integration (e2e) › Protected Routes - Sync › should protect sync commands endpoint
+
+    expected 401 "Unauthorized", got 403 "Forbidden"
+
+      172 |       const response = await request(app.getHttpServer())
+      173 |         .get('/tenants/test-tenant/sync/commands')
+    > 174 |         .expect(401);
+          |          ^
+      175 |
+      176 |       expect(response.body.message).toBe('Missing or invalid identity token');
+      177 |     });
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:174:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:309:14)
+      at node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (node_modules/supertest/lib/test.js:195:23)
+      at localAssert (node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
+
+  ● Auth Integration (e2e) › Protected Routes - Sync › should allow access with valid license when OIDC disabled
+
+    expected 201 "Created", got 403 "Forbidden"
+
+      186 |         .set('X-License-Token', licenseToken)
+      187 |         .send({ events: [] })
+    > 188 |         .expect(201);
+          |          ^
+      189 |
+      190 |       expect(response.body.accepted).toBe(0);
+      191 |
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:188:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:309:14)
+      at node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (node_modules/supertest/lib/test.js:195:23)
+      at localAssert (node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
+
+  ● Auth Integration (e2e) › Unprotected Routes › should allow access to license activation without OIDC token
+
+    expected 201 "Created", got 403 "Forbidden"
+
+      205 |         .post('/licenses/activate')
+      206 |         .send({ tenantId: 'test-tenant', deviceId: 'test-device' })
+    > 207 |         .expect(201);
+          |          ^
+      208 |
+      209 |       expect(response.body.licenseToken).toBeDefined();
+      210 |     });
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:207:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:309:14)
+      at node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (node_modules/supertest/lib/test.js:195:23)
+      at localAssert (node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
+
+  ● Auth Integration (e2e) › Environment Flag Tests › should bypass OIDC validation when OIDC_REQUIRED=false
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      218 |       await request(app.getHttpServer())
+      219 |         .get('/tenants')
+    > 220 |         .expect(200);
+          |          ^
+      221 |
+      222 |       // Reset
+      223 |       process.env.OIDC_REQUIRED = 'true';
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:220:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:309:14)
+      at node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (node_modules/supertest/lib/test.js:195:23)
+      at localAssert (node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
+
+  ● Auth Integration (e2e) › Environment Flag Tests › should bypass license validation when LICENSING_ENFORCED=false
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      231 |       await request(app.getHttpServer())
+      232 |         .get('/tenants')
+    > 233 |         .expect(200);
+          |          ^
+      234 |
+      235 |       // Reset
+      236 |       process.env.OIDC_REQUIRED = 'true';
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:233:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:309:14)
+      at node_modules/supertest/lib/test.js:365:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:342:13)
+      at Test.assert (node_modules/supertest/lib/test.js:195:23)
+      at localAssert (node_modules/supertest/lib/test.js:138:14)
+      at Server.<anonymous> (node_modules/supertest/lib/test.js:152:11)
+
+  ● Auth Integration (e2e) › Token Expiration › should reject expired license token
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "License token expired"
+    Received: "Missing tenant"
+
+      252 |         .expect(403);
+      253 |
+    > 254 |       expect(response.body.message).toBe('License token expired');
+          |                                     ^
+      255 |
+      256 |       process.env.OIDC_REQUIRED = 'true';
+      257 |     });
+
+      at Object.<anonymous> (test/auth-integration.spec.ts:254:37)
+
+Test Suites: 2 failed, 2 passed, 4 total
+Tests:       14 failed, 19 passed, 33 total
+Snapshots:   0 total
+Time:        12.303 s
+Ran all test suites.
+Error: Process completed with exit code 1.
+0s
+0s
+1s
