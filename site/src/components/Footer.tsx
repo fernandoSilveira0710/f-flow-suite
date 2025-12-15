@@ -7,11 +7,8 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Logo and Description */}
           <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">F</span>
-              </div>
-              <span className="text-xl font-bold text-white">2F Solutions</span>
+            <div className="flex items-center mb-4">
+              <img src="/brand/2F-large.png" alt="2F Solutions" className="h-24" />
             </div>
             <p className="text-gray-400 max-w-md">
               Sistema completo de gestão para comércios. 

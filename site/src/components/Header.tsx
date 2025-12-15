@@ -21,11 +21,8 @@ const Header = () => {
       <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" aria-label="Top">
         <div className="flex w-full items-center justify-between py-6">
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">F</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">2F Solutions</span>
+            <Link to="/" className="flex items-center">
+              <img src="/brand/2F-large.png" alt="2F Solutions" className="h-24 w-auto" />
             </Link>
           </div>
 
