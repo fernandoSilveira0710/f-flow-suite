@@ -1,18 +1,47 @@
 import { Injectable, NotFoundException, ConflictException, Logger, BadRequestException } from '@nestjs/common';
-// Import Prisma error classes defensively to detect validation errors
-// Using runtime/library path for Prisma v6 compatibility
-let PrismaClientValidationError: any;
-let PrismaClientKnownRequestError: any;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  PrismaClientValidationError = require('@prisma/client/runtime/library').PrismaClientValidationError;
-  PrismaClientKnownRequestError = require('@prisma/client/runtime/library').PrismaClientKnownRequestError;
-} catch {}
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EventValidatorService } from '../common/validation/event-validator.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
+
+type MinimalProduct = {
+  id: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  sku: string | null;
+  barcode: string | null;
+  salePrice: number;
+  costPrice: number | null;
+  category: string | null;
+  stockQty: number;
+  marginPct: number | null;
+  expiryDate: Date | null;
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  unit: string | null;
+  minStock: number | null;
+  maxStock: number | null;
+  trackStock: boolean | null;
+};
+
+function getErrorInfo(error: unknown): {
+  name?: string;
+  code?: string;
+  message?: string;
+  meta?: Record<string, unknown>;
+} {
+  const e = error as Record<string, unknown> | undefined;
+  return {
+    name: (e?.name as string) || undefined,
+    code: (e?.code as string) || undefined,
+    message: (e?.message as string) || undefined,
+    meta: (e?.meta as Record<string, unknown>) || undefined,
+  };
+}
 
 @Injectable()
 export class ProductsService {
@@ -94,33 +123,41 @@ export class ProductsService {
       try {
         await this.generateProductEvent(product, 'product.upserted.v1');
       } catch (e) {
-        // swallow any outbox errors
+        /* ignore errors (best-effort event) */
       }
 
       return this.mapToResponseDto(product);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Map Prisma client validation errors (e.g., invalid types) to 400
-      if (PrismaClientValidationError && error instanceof PrismaClientValidationError) {
-        this.logger.warn(`Validation error on product create: ${error?.message}`);
-        throw new BadRequestException('Payload inválido: verifique tipos numéricos e datas.');
+      {
+        const { name, message } = getErrorInfo(error);
+        if (name === 'PrismaClientValidationError') {
+          this.logger.warn(`Validation error on product create: ${message}`);
+          throw new BadRequestException('Payload inválido: verifique tipos numéricos e datas.');
+        }
       }
       // Map Prisma known request errors commonly caused by bad payload to 400
       {
-        const code = error?.code;
-        const cause = (error?.meta?.cause as string) || '';
+        const { code, meta, name, message } = getErrorInfo(error);
+        const cause = (meta?.cause as string) || '';
         const badRequestCodes = new Set(['P2007', 'P2011', 'P2012', 'P2023', 'P2009']);
-        if ((PrismaClientKnownRequestError && error instanceof PrismaClientKnownRequestError) || badRequestCodes.has(code)) {
-          this.logger.warn(`Known request validation error on product create (${code || 'unknown'}): ${error?.message}`);
+        if (name === 'PrismaClientKnownRequestError' || badRequestCodes.has(code || '')) {
+          this.logger.warn(`Known request validation error on product create (${code || 'unknown'}): ${message}`);
           throw new BadRequestException(cause ? `Payload inválido: ${cause}` : 'Payload inválido: verifique campos obrigatórios e tipos.');
         }
       }
       // Handle Prisma unique constraint errors gracefully
-      if (error?.code === 'P2002') {
-        const fields = Array.isArray(error?.meta?.target) ? error.meta.target.join(', ') : String(error?.meta?.target ?? 'unique field');
-        this.logger.warn(`Unique constraint violation on product create: ${fields}`);
-        throw new ConflictException(`Já existe um produto com valor duplicado em: ${fields}`);
+      {
+        const { code, meta } = getErrorInfo(error);
+        if (code === 'P2002') {
+          const target = meta?.target as unknown;
+          const fields = Array.isArray(target) ? (target as unknown[]).map(String).join(', ') : String(target ?? 'unique field');
+          this.logger.warn(`Unique constraint violation on product create: ${fields}`);
+          throw new ConflictException(`Já existe um produto com valor duplicado em: ${fields}`);
+        }
       }
-      const msg = String(error?.message || '').toLowerCase();
+      const { message } = getErrorInfo(error);
+      const msg = String(message || '').toLowerCase();
       const isMissingTable = error?.code === 'P2021' || msg.includes('no such table') || msg.includes('does not exist');
       const isMissingColumn =
         msg.includes('no such column') ||
@@ -200,7 +237,7 @@ export class ProductsService {
       if (isMissingColumn) {
         this.logger.warn('Esquema de Product desatualizado (coluna ausente). Inserindo via SQL em colunas antigas e retornando.');
         // Fallback para esquemas antigos: usa colunas "price" e "stock"
-        const id = (global as any).crypto?.randomUUID?.() || require('crypto').randomUUID();
+        const id = randomUUID();
         const nowIso = new Date().toISOString();
         await this.prisma.$executeRawUnsafe(
           `INSERT INTO "Product" ("id","name","description","price","stock","category","barcode","active","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?)`,
@@ -217,52 +254,7 @@ export class ProductsService {
         );
         // NÃO usar Prisma para selecionar campos inexistentes em esquemas antigos.
         // Em vez disso, construir objeto mínimo compatível com o DTO de resposta.
-        const product = {
-          id,
-          name: createProductDto.name,
-          description: createProductDto.description ?? null,
-          imageUrl: createProductDto.imageUrl ?? null,
-          sku: createProductDto.sku ?? null,
-          barcode: createProductDto.barcode ?? null,
-          salePrice: createProductDto.price,
-          costPrice: createProductDto.cost ?? null,
-          category: createProductDto.category ?? null,
-          stockQty: 0,
-          marginPct: createProductDto.marginPct ?? null,
-          expiryDate: createProductDto.expiryDate ? new Date(createProductDto.expiryDate) : null,
-          active: createProductDto.active ?? true,
-          createdAt: new Date(nowIso),
-          updatedAt: new Date(nowIso),
-          unit: createProductDto.unit ?? null,
-          minStock: createProductDto.minStock ?? null,
-          maxStock: createProductDto.maxStock ?? null,
-          trackStock: createProductDto.trackStock ?? true,
-        } as any;
-        try {
-          await this.generateProductEvent(product, 'product.upserted.v1');
-        } catch (e) {
-          // evento é best-effort
-        }
-        return this.mapToResponseDto(product);
-      }
-      // Tentativa robusta: tentar inserir via SQL no esquema moderno; se falhar por coluna ausente, tentar legado
-      try {
-        const id = (global as any).crypto?.randomUUID?.() || require('crypto').randomUUID();
-        const nowIso = new Date().toISOString();
-        await this.prisma.$executeRawUnsafe(
-          `INSERT INTO "Product" ("id","name","description","salePrice","costPrice","category","barcode","active","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?)`,
-          id,
-          createProductDto.name,
-          createProductDto.description ?? null,
-          Number(createProductDto.price),
-          createProductDto.cost !== undefined ? Number(createProductDto.cost) : null,
-          createProductDto.category ?? null,
-          createProductDto.barcode ?? null,
-          (createProductDto.active ?? true) ? 1 : 0,
-          nowIso,
-          nowIso,
-        );
-        const product = {
+        const product: MinimalProduct = {
           id,
           name: createProductDto.name,
           description: createProductDto.description ?? null,
@@ -282,22 +274,68 @@ export class ProductsService {
           minStock: createProductDto.minStock ?? null,
           maxStock: createProductDto.maxStock ?? null,
           trackStock: createProductDto.trackStock ?? true,
-        } as any;
+        };
         try {
           await this.generateProductEvent(product, 'product.upserted.v1');
-        } catch {}
+        } catch (e) {
+          /* ignore errors (best-effort event) */
+        }
         return this.mapToResponseDto(product);
-      } catch (e2: any) {
-        const msg2 = String(e2?.message || '').toLowerCase();
+      }
+      // Tentativa robusta: tentar inserir via SQL no esquema moderno; se falhar por coluna ausente, tentar legado
+      try {
+        const id = randomUUID();
+        const nowIso = new Date().toISOString();
+        await this.prisma.$executeRawUnsafe(
+          `INSERT INTO "Product" ("id","name","description","salePrice","costPrice","category","barcode","active","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?)`,
+          id,
+          createProductDto.name,
+          createProductDto.description ?? null,
+          Number(createProductDto.price),
+          createProductDto.cost !== undefined ? Number(createProductDto.cost) : null,
+          createProductDto.category ?? null,
+          createProductDto.barcode ?? null,
+          (createProductDto.active ?? true) ? 1 : 0,
+          nowIso,
+          nowIso,
+        );
+        const product: MinimalProduct = {
+          id,
+          name: createProductDto.name,
+          description: createProductDto.description ?? null,
+          imageUrl: createProductDto.imageUrl ?? null,
+          sku: createProductDto.sku ?? null,
+          barcode: createProductDto.barcode ?? null,
+          salePrice: Number(createProductDto.price),
+          costPrice: createProductDto.cost !== undefined ? Number(createProductDto.cost) : null,
+          category: createProductDto.category ?? null,
+          stockQty: 0,
+          marginPct: createProductDto.marginPct ?? null,
+          expiryDate: createProductDto.expiryDate ? new Date(createProductDto.expiryDate) : null,
+          active: createProductDto.active ?? true,
+          createdAt: new Date(nowIso),
+          updatedAt: new Date(nowIso),
+          unit: createProductDto.unit ?? null,
+          minStock: createProductDto.minStock ?? null,
+          maxStock: createProductDto.maxStock ?? null,
+          trackStock: createProductDto.trackStock ?? true,
+        };
+        try {
+          await this.generateProductEvent(product, 'product.upserted.v1');
+        } catch { /* ignore errors (best-effort event) */ }
+        return this.mapToResponseDto(product);
+      } catch (e2: unknown) {
+        const { message, code } = getErrorInfo(e2);
+        const msg2 = String(message || '').toLowerCase();
         const missingCol2 =
-          e2?.code === 'P2021' ||
+          code === 'P2021' ||
           msg2.includes('no such column') ||
           msg2.includes('unknown column') ||
           msg2.includes('has no column') ||
           msg2.includes('table has no column named');
         if (missingCol2) {
           this.logger.warn('Esquema moderno indisponível; inserindo via colunas antigas (price/stock).');
-          const id = (global as any).crypto?.randomUUID?.() || require('crypto').randomUUID();
+          const id = randomUUID();
           const nowIso = new Date().toISOString();
           await this.prisma.$executeRawUnsafe(
             `INSERT INTO "Product" ("id","name","description","price","stock","category","barcode","active","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?)`,
@@ -312,7 +350,7 @@ export class ProductsService {
             nowIso,
             nowIso,
           );
-          const product = {
+          const product: MinimalProduct = {
             id,
             name: createProductDto.name,
             description: createProductDto.description ?? null,
@@ -332,13 +370,13 @@ export class ProductsService {
             minStock: createProductDto.minStock ?? null,
             maxStock: createProductDto.maxStock ?? null,
             trackStock: createProductDto.trackStock ?? true,
-          } as any;
+          };
           try {
             await this.generateProductEvent(product, 'product.upserted.v1');
-          } catch {}
+          } catch { /* ignore errors (best-effort event) */ }
           return this.mapToResponseDto(product);
         }
-        this.logger.error('Unexpected error creating product (raw SQL path also failed)', e2);
+        this.logger.error('Unexpected error creating product (raw SQL path also failed)', e2 as Error);
       }
       // Se não foi tratado acima, aplicar heurística para mapear mensagens comuns de validação para 400
       const looksLikeValidation = (
@@ -347,10 +385,11 @@ export class ProductsService {
         msg.includes('invalid') && (msg.includes('value') || msg.includes('input'))
       );
       if (looksLikeValidation) {
-        this.logger.warn(`Heuristic validation mapping for product create: ${error?.message}`);
+        const { message: m } = getErrorInfo(error);
+        this.logger.warn(`Heuristic validation mapping for product create: ${m}`);
         throw new BadRequestException('Payload inválido: verifique campos obrigatórios e tipos.');
       }
-      this.logger.error('Unexpected error creating product', error);
+      this.logger.error('Unexpected error creating product', error as Error);
       throw error;
     }
   }
@@ -388,12 +427,13 @@ export class ProductsService {
         },
       });
       return products.map(product => this.mapToResponseDto(product));
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (isMissingTableError(error)) {
         this.logger.warn('Products table missing in local.db, returning empty list');
         return [];
       }
-      this.logger.warn(`Falling back to minimal product selection due to schema mismatch: ${error?.message}`);
+      const { message } = getErrorInfo(error);
+      this.logger.warn(`Falling back to minimal product selection due to schema mismatch: ${message}`);
       try {
         const products = await this.prisma.product.findMany({
           orderBy: { name: 'asc' },
@@ -414,7 +454,7 @@ export class ProductsService {
           },
         });
         return products.map(product => this.mapToResponseDto(product));
-      } catch (error2: any) {
+      } catch (error2: unknown) {
         if (isMissingTableError(error2)) {
           this.logger.warn('Products table missing in local.db (fallback), returning empty list');
           return [];
@@ -469,7 +509,7 @@ export class ProductsService {
 
     // Pre-validate fields to avoid runtime 500s
     if (updateProductDto.expiryDate !== undefined) {
-      const t = Date.parse(updateProductDto.expiryDate as any);
+      const t = Date.parse(updateProductDto.expiryDate as string);
       if (Number.isNaN(t)) {
         throw new BadRequestException('Campo expiryDate inválido. Use formato ISO (YYYY-MM-DD).');
       }
@@ -488,7 +528,7 @@ export class ProductsService {
       }
     }
     if (updateProductDto.marginPct !== undefined) {
-      const v = Number(updateProductDto.marginPct as any);
+      const v = Number(updateProductDto.marginPct as number);
       if (!Number.isFinite(v) || Number.isNaN(v)) {
         throw new BadRequestException('Campo marginPct inválido. Use número (ex: 15).');
       }
@@ -536,26 +576,33 @@ export class ProductsService {
           trackStock: true,
         },
       });
-    } catch (error: any) {
-      if (PrismaClientValidationError && error instanceof PrismaClientValidationError) {
-        this.logger.warn(`Validation error on product update ${id}: ${error?.message}`);
-        throw new BadRequestException('Payload inválido: verifique tipos numéricos e datas.');
+    } catch (error: unknown) {
+      {
+        const { name, message } = getErrorInfo(error);
+        if (name === 'PrismaClientValidationError') {
+          this.logger.warn(`Validation error on product update ${id}: ${message}`);
+          throw new BadRequestException('Payload inválido: verifique tipos numéricos e datas.');
+        }
       }
-      if (PrismaClientKnownRequestError && error instanceof PrismaClientKnownRequestError) {
-        const code = error?.code;
-        const cause = (error?.meta?.cause as string) || '';
+      {
+        const { code, meta, name, message } = getErrorInfo(error);
+        const cause = (meta?.cause as string) || '';
         const badRequestCodes = new Set(['P2007', 'P2011', 'P2012', 'P2023', 'P2009']);
-        if (badRequestCodes.has(code)) {
-          this.logger.warn(`Known request validation error on product update ${id} (${code}): ${error?.message}`);
+        if (name === 'PrismaClientKnownRequestError' || badRequestCodes.has(code || '')) {
+          this.logger.warn(`Known request validation error on product update ${id} (${code}): ${message}`);
           throw new BadRequestException(cause ? `Payload inválido: ${cause}` : 'Payload inválido: verifique campos obrigatórios e tipos.');
         }
       }
-      if (error?.code === 'P2002') {
-        const fields = Array.isArray(error?.meta?.target) ? error.meta.target.join(', ') : String(error?.meta?.target ?? 'unique field');
-        this.logger.warn(`Unique constraint violation on product update ${id}: ${fields}`);
-        throw new ConflictException(`Já existe um produto com valor duplicado em: ${fields}`);
+      {
+        const { code, meta } = getErrorInfo(error);
+        if (code === 'P2002') {
+          const target = meta?.target as unknown;
+          const fields = Array.isArray(target) ? (target as unknown[]).map(String).join(', ') : String(target ?? 'unique field');
+          this.logger.warn(`Unique constraint violation on product update ${id}: ${fields}`);
+          throw new ConflictException(`Já existe um produto com valor duplicado em: ${fields}`);
+        }
       }
-      this.logger.error(`Unexpected error updating product ${id}`, error);
+      this.logger.error(`Unexpected error updating product ${id}`, error as Error);
       throw error;
     }
 
@@ -640,7 +687,7 @@ export class ProductsService {
     };
   }
 
-  private async generateProductEvent(product: any, eventType: string): Promise<void> {
+  private async generateProductEvent(product: MinimalProduct, eventType: string): Promise<void> {
     const eventPayload = {
       id: product.id,
       sku: product.sku,
@@ -650,17 +697,17 @@ export class ProductsService {
       salePrice: product.salePrice,
       costPrice: product.costPrice,
       marginPct: product.marginPct,
-      expiryDate: product.expiryDate?.toISOString(),
+      expiryDate: product.expiryDate ? product.expiryDate.toISOString() : undefined,
       category: product.category,
       barcode: product.barcode,
       unit: product.unit,
       minStock: product.minStock,
       maxStock: product.maxStock,
       stockQty: product.stockQty,
-      trackStock: product.trackStock,
+      trackStock: product.trackStock ?? true,
       active: product.active,
-      createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
-      updatedAt: product.updatedAt?.toISOString(),
+      createdAt: product.createdAt ? product.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: product.updatedAt ? product.updatedAt.toISOString() : undefined,
     };
 
     // Store event in OutboxEvent table for synchronization
@@ -672,20 +719,21 @@ export class ProductsService {
           processed: false,
         },
       });
-    } catch (error: any) {
-      const msg = String(error?.message || '').toLowerCase();
-      const isMissingTable = error?.code === 'P2021' || msg.includes('no such table') || msg.includes('does not exist');
+    } catch (error: unknown) {
+      const { message, code } = getErrorInfo(error);
+      const msg = String(message || '').toLowerCase();
+      const isMissingTable = code === 'P2021' || msg.includes('no such table') || msg.includes('does not exist');
       const isMissingColumn = msg.includes('no such column') || msg.includes('unknown column') || msg.includes('has no column');
       if (isMissingTable || isMissingColumn) {
-        this.logger.warn(`OutboxEvent indisponível (${error?.code || 'schema mismatch'}). Evento não persistido (best-effort).`);
+        this.logger.warn(`OutboxEvent indisponível (${code || 'schema mismatch'}). Evento não persistido (best-effort).`);
         return; // não falha a requisição
       }
-      this.logger.warn(`Falha ao persistir evento ${eventType}: ${error?.message}`);
+      this.logger.warn(`Falha ao persistir evento ${eventType}: ${message}`);
       return; // qualquer erro na outbox não deve quebrar a chamada
     }
   }
 
-  private mapToResponseDto(product: any): ProductResponseDto {
+  private mapToResponseDto(product: MinimalProduct): ProductResponseDto {
     return {
       id: product.id,
       name: product.name,
@@ -701,8 +749,8 @@ export class ProductsService {
       unit: product.unit,
       minStock: product.minStock,
       maxStock: product.maxStock,
-      trackStock: product.trackStock ?? true, // Default value for required field
-      active: product.active ?? true, // Default value for required field
+      trackStock: product.trackStock ?? true,
+      active: product.active ?? true,
       currentStock: product.stockQty || 0,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,

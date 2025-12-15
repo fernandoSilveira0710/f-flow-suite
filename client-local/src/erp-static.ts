@@ -49,7 +49,7 @@ function sendFile(res: http.ServerResponse, filePath: string, injectRuntime?: st
         res.writeHead(200, { 'Content-Type': type });
         res.end(html);
         return;
-      } catch {}
+      } catch { /* ignore errors, fallback to raw file below */ }
     }
 
     const stream = fs.createReadStream(filePath);
@@ -80,8 +80,9 @@ export async function startErpStaticServer(opts: Options = {}) {
     return new Promise((resolve) => {
       const tester = net
         .createServer()
-        .once('error', (err: any) => {
-          if (err && (err.code === 'EADDRINUSE' || err.code === 'EACCES')) {
+        .once('error', (err: unknown) => {
+          const code = (err as NodeJS.ErrnoException)?.code;
+          if (code === 'EADDRINUSE' || code === 'EACCES') {
             resolve(false);
           } else {
             resolve(false);
