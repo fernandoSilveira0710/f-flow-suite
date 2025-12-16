@@ -7,7 +7,7 @@ concurrency:
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ "**" ]
     paths:
       - 'hub/**'
       - 'client-local/**'
@@ -24,7 +24,7 @@ on:
       - 'desktop/package-lock.json'
       - '.github/workflows/ci.yml'
   pull_request:
-    branches: [ main ]
+    branches: [ "**" ]
     paths:
       - 'hub/**'
       - 'client-local/**'
@@ -173,6 +173,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show commit and file hash (ERP)
+        run: |
+          git rev-parse HEAD
+          git show -s --format='%h %ci %s' HEAD
+          echo "--- sales-api.ts sha256 ---"
+          (sha256sum src/lib/sales-api.ts || shasum -a 256 src/lib/sales-api.ts)
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -209,16 +218,22 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
 
-      - name: Debug Node and sales-api excerpt
+      - name: Debug Node, commit, and sales-api excerpt
         shell: pwsh
         run: |
           node -v
           npm -v
+          git rev-parse HEAD
+          git show -s --format='%h %ci %s' HEAD
+          Write-Host "--- sales-api.ts SHA256 ---"
+          Get-FileHash -Algorithm SHA256 -LiteralPath src/lib/sales-api.ts
           Write-Host "--- sales-api.ts lines 160..200 ---"
           $content = Get-Content src/lib/sales-api.ts
           $slice = $content[159..199]
