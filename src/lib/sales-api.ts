@@ -192,10 +192,10 @@ export const getSalesReport = async (filters?: SaleFilters): Promise<{
     const salesByPaymentMethod: Record<string, number> = {};
     const salesByOperator: Record<string, number> = {};
 
-    sales.forEach((sale) => {
+    for (const sale of sales) {
       salesByPaymentMethod[sale.paymentMethod] = (salesByPaymentMethod[sale.paymentMethod] || 0) + sale.total;
       salesByOperator[sale.operator] = (salesByOperator[sale.operator] || 0) + sale.total;
-    });
+    }
 
     return { totalSales, totalRevenue, averageTicket, salesByPaymentMethod, salesByOperator };
   } catch (error) {
