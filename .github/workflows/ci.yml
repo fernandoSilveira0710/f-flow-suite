@@ -199,9 +199,15 @@ jobs:
           npm -v
           echo "--- sales-api.ts lines 160..200 ---"
           sed -n '160,200p' src/lib/sales-api.ts
+      - name: Debug sales-api hex (ERP)
+        run: |
+          echo "--- sales-api.ts UTF-8 hex (lines 160..200) ---"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/lib/sales-api.ts','utf8');const lines=s.split('\n');for(let i=160;i<=200;i++){const l=lines[i-1]??'';const hex=Array.from(l).map(c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join(' ');console.log(String(i).padStart(4,' ')+': '+hex);}"
 
       - name: Build ERP (Vite)
-        run: npm run build
+        run: |
+          npx update-browserslist-db@latest || true
+          npm run build
 
       - name: Upload ERP build artifacts
         uses: actions/upload-artifact@v4
@@ -238,10 +244,16 @@ jobs:
           $content = Get-Content src/lib/sales-api.ts
           $slice = $content[159..199]
           $slice | ForEach-Object { Write-Host $_ }
+      - name: Debug sales-api hex (Windows)
+        shell: pwsh
+        run: |
+          Write-Host "--- sales-api.ts UTF-8 hex (lines 160..200) ---"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/lib/sales-api.ts','utf8');const lines=s.split('\n');for(let i=160;i<=200;i++){const l=lines[i-1]??'';const hex=Array.from(l).map(c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join(' ');console.log(String(i).padStart(4,' ')+': '+hex);}"
 
       - name: Build ERP frontend (root)
         run: |
           npm ci
+          npx update-browserslist-db@latest || true
           npm run build
 
       - name: Prepare client-local
