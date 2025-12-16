@@ -14,8 +14,11 @@ Thank you to all the people who have contributed to F-Flow Suite! 🎉
 ## Contributors
 
 ### Code Contributors
-<!-- This section will be automatically updated by GitHub Actions -->
 
+- **Fernando Silveira** - fernandosilveira1993.dev@gmail.com
+- **GitHub Action** - action@github.com
+- **Luiz Fernando da Silveira** - suporte.ti1993@hotmail.com
+- **gpt-engineer-app[bot]** - 159125892+gpt-engineer-app[bot]@users.noreply.github.com
 ### Documentation Contributors
 <!-- Contributors who have improved documentation -->
 
@@ -101,10 +104,10 @@ Welcome to our new contributors! Every contribution matters.
 ## Contribution Statistics
 
 <!-- These will be updated automatically -->
-- Total Contributors: 1
-- Total Commits: TBD
-- Total Issues Closed: TBD
-- Total Pull Requests Merged: TBD
+- Total Contributors: 4
+- Total Commits: 374
+- Total Issues Closed: 30
+- Total Pull Requests Merged: 28
 
 ## Special Thanks
 
@@ -143,4 +146,4 @@ This file is automatically updated by GitHub Actions to include:
 - Contribution statistics
 - Recent activity highlights
 
-Last updated: <!-- This will be updated automatically -->
+Last updated: 2025-12-16 03:26:29 UTC
