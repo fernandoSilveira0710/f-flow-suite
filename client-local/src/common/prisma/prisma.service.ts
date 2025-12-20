@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
 import * as path from 'path';
 import { existsSync } from 'fs';
 
@@ -41,7 +42,7 @@ function getPrismaClientClass(): new (...args: unknown[]) => unknown {
 const PrismaClientRef = getPrismaClientClass();
 
 @Injectable()
-export class PrismaService extends PrismaClientRef implements OnModuleInit {
+export class PrismaService extends (PrismaClientRef as new (options?: any) => PrismaClient) implements OnModuleInit {
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
@@ -75,3 +76,4 @@ export class PrismaService extends PrismaClientRef implements OnModuleInit {
     this.logger.log('Prisma connected');
   }
 }
+

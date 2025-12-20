@@ -17,15 +17,15 @@ type MinimalProduct = {
   costPrice: number | null;
   category: string | null;
   stockQty: number;
-  marginPct: number | null;
-  expiryDate: Date | null;
+  marginPct?: number | null;
+  expiryDate?: Date | null;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
-  unit: string | null;
-  minStock: number | null;
-  maxStock: number | null;
-  trackStock: boolean | null;
+  unit?: string | null;
+  minStock?: number | null;
+  maxStock?: number | null;
+  trackStock?: boolean | null;
 };
 
 function getErrorInfo(error: unknown): {
@@ -88,7 +88,7 @@ export class ProductsService {
           sku: createProductDto.sku,
           barcode: createProductDto.barcode,
           // Prisma DECIMAL pode falhar com number em alguns ambientes; forçar Number
-          salePrice: createProductDto.price !== undefined ? Number(createProductDto.price) : undefined,
+          salePrice: Number(createProductDto.price),
           costPrice: createProductDto.cost !== undefined ? Number(createProductDto.cost) : undefined,
           category: createProductDto.category,
           active: createProductDto.active ?? true,
@@ -737,18 +737,18 @@ export class ProductsService {
     return {
       id: product.id,
       name: product.name,
-      description: product.description,
-      imageUrl: product.imageUrl,
-      sku: product.sku,
-      barcode: product.barcode,
+      description: product.description ?? undefined,
+      imageUrl: product.imageUrl ?? undefined,
+      sku: product.sku ?? undefined,
+      barcode: product.barcode ?? undefined,
       price: product.salePrice,
-      cost: product.costPrice,
-      marginPct: product.marginPct,
-      expiryDate: product.expiryDate,
-      category: product.category,
-      unit: product.unit,
-      minStock: product.minStock,
-      maxStock: product.maxStock,
+      cost: product.costPrice ?? undefined,
+      marginPct: product.marginPct ?? undefined,
+      expiryDate: product.expiryDate ?? undefined,
+      category: product.category ?? undefined,
+      unit: product.unit ?? undefined,
+      minStock: product.minStock ?? undefined,
+      maxStock: product.maxStock ?? undefined,
       trackStock: product.trackStock ?? true,
       active: product.active ?? true,
       currentStock: product.stockQty || 0,

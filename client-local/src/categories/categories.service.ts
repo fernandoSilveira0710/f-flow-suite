@@ -19,7 +19,20 @@ export class CategoriesService {
     });
 
     if (existingCategory) {
-      throw new ConflictException(`Category with name '${createCategoryDto.name}' already exists`);
+      if (existingCategory.active) {
+        throw new ConflictException(`Category with name '${createCategoryDto.name}' already exists`);
+      } else {
+        // Reactivate soft-deleted category
+        const reactivatedCategory = await this.prisma.category.update({
+          where: { id: existingCategory.id },
+          data: {
+            active: createCategoryDto.active ?? true,
+            description: createCategoryDto.description ?? existingCategory.description,
+          },
+        });
+        this.logger.log(`Category reactivated: ${reactivatedCategory.id}`);
+        return this.mapToResponseDto(reactivatedCategory);
+      }
     }
 
     const category = await this.prisma.category.create({
