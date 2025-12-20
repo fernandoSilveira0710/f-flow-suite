@@ -13,18 +13,18 @@ type MinimalProduct = {
   imageUrl: string | null;
   sku: string | null;
   barcode: string | null;
-  salePrice: number;
-  costPrice: number | null;
+  salePrice: any;
+  costPrice: any;
   category: string | null;
   stockQty: number;
-  marginPct?: number | null;
+  marginPct?: any;
   expiryDate?: Date | null;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
   unit?: string | null;
-  minStock?: number | null;
-  maxStock?: number | null;
+  minStock?: any;
+  maxStock?: any;
   trackStock?: boolean | null;
 };
 
@@ -156,9 +156,9 @@ export class ProductsService {
           throw new ConflictException(`Já existe um produto com valor duplicado em: ${fields}`);
         }
       }
-      const { message } = getErrorInfo(error);
+      const { message, code } = getErrorInfo(error);
       const msg = String(message || '').toLowerCase();
-      const isMissingTable = error?.code === 'P2021' || msg.includes('no such table') || msg.includes('does not exist');
+      const isMissingTable = code === 'P2021' || msg.includes('no such table') || msg.includes('does not exist');
       const isMissingColumn =
         msg.includes('no such column') ||
         msg.includes('unknown column') ||
@@ -627,6 +627,8 @@ export class ProductsService {
         imageUrl: true,
         createdAt: true,
         updatedAt: true,
+        description: true,
+        stockQty: true,
       }
     });
 
@@ -723,7 +725,11 @@ export class ProductsService {
       const { message, code } = getErrorInfo(error);
       const msg = String(message || '').toLowerCase();
       const isMissingTable = code === 'P2021' || msg.includes('no such table') || msg.includes('does not exist');
-      const isMissingColumn = msg.includes('no such column') || msg.includes('unknown column') || msg.includes('has no column');
+      const isMissingColumn =
+        msg.includes('no such column') ||
+        msg.includes('unknown column') ||
+        msg.includes('has no column') ||
+        msg.includes('table has no column named');
       if (isMissingTable || isMissingColumn) {
         this.logger.warn(`OutboxEvent indisponível (${code || 'schema mismatch'}). Evento não persistido (best-effort).`);
         return; // não falha a requisição
@@ -741,14 +747,14 @@ export class ProductsService {
       imageUrl: product.imageUrl ?? undefined,
       sku: product.sku ?? undefined,
       barcode: product.barcode ?? undefined,
-      price: product.salePrice,
-      cost: product.costPrice ?? undefined,
-      marginPct: product.marginPct ?? undefined,
+      price: Number(product.salePrice),
+      cost: product.costPrice !== null && product.costPrice !== undefined ? Number(product.costPrice) : undefined,
+      marginPct: product.marginPct !== null && product.marginPct !== undefined ? Number(product.marginPct) : undefined,
       expiryDate: product.expiryDate ?? undefined,
       category: product.category ?? undefined,
       unit: product.unit ?? undefined,
-      minStock: product.minStock ?? undefined,
-      maxStock: product.maxStock ?? undefined,
+      minStock: product.minStock !== null && product.minStock !== undefined ? Number(product.minStock) : undefined,
+      maxStock: product.maxStock !== null && product.maxStock !== undefined ? Number(product.maxStock) : undefined,
       trackStock: product.trackStock ?? true,
       active: product.active ?? true,
       currentStock: product.stockQty || 0,
