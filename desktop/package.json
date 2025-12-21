@@ -1,6 +1,6 @@
 {
   "name": "fflow-desktop",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "private": true,
   "main": "dist/main.js",
   "description": "F-Flow Suite Desktop (ERP + API em Electron)",

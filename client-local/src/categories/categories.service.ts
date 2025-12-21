@@ -4,6 +4,21 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CategoryResponseDto } from './dto/category-response.dto';
 
+function getErrorInfo(error: unknown): {
+  name?: string;
+  code?: string;
+  message?: string;
+  meta?: Record<string, unknown>;
+} {
+  const e = error as Record<string, unknown> | undefined;
+  return {
+    name: (e?.name as string) || undefined,
+    code: (e?.code as string) || undefined,
+    message: (e?.message as string) || undefined,
+    meta: (e?.meta as Record<string, unknown>) || undefined,
+  };
+}
+
 @Injectable()
 export class CategoriesService {
   private readonly logger = new Logger(CategoriesService.name);
@@ -13,38 +28,70 @@ export class CategoriesService {
   ) {}
 
   async create(createCategoryDto: CreateCategoryDto): Promise<CategoryResponseDto> {
-    // Check if category name already exists
-    const existingCategory = await this.prisma.category.findUnique({
-      where: { name: createCategoryDto.name },
-    });
+    try {
+      // Check if category name already exists
+      const existingCategory = await this.prisma.category.findUnique({
+        where: { name: createCategoryDto.name },
+      });
 
-    if (existingCategory) {
-      if (existingCategory.active) {
-        throw new ConflictException(`Category with name '${createCategoryDto.name}' already exists`);
-      } else {
-        // Reactivate soft-deleted category
-        const reactivatedCategory = await this.prisma.category.update({
-          where: { id: existingCategory.id },
+      if (existingCategory) {
+        if (existingCategory.active) {
+          throw new ConflictException(`Category with name '${createCategoryDto.name}' already exists`);
+        } else {
+          // Reactivate soft-deleted category
+          const reactivatedCategory = await this.prisma.category.update({
+            where: { id: existingCategory.id },
+            data: {
+              active: createCategoryDto.active ?? true,
+              description: createCategoryDto.description ?? existingCategory.description,
+            },
+          });
+          this.logger.log(`Category reactivated: ${reactivatedCategory.id}`);
+          return this.mapToResponseDto(reactivatedCategory);
+        }
+      }
+
+      const category = await this.prisma.category.create({
+        data: {
+          name: createCategoryDto.name,
+          description: createCategoryDto.description,
+          active: createCategoryDto.active ?? true,
+        },
+      });
+
+      this.logger.log(`Category created: ${category.id}`);
+      return this.mapToResponseDto(category);
+    } catch (error: unknown) {
+      const { message, code } = getErrorInfo(error);
+      const msg = String(message || '').toLowerCase();
+      const isMissingTable = code === 'P2021' || msg.includes('no such table') || msg.includes('does not exist');
+
+      if (isMissingTable) {
+        this.logger.warn('Tabela Category ausente em local.db. Criando tabela e tentando novamente.');
+        await this.prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "Category" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "name" TEXT NOT NULL,
+            "description" TEXT,
+            "active" BOOLEAN NOT NULL DEFAULT 1,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+        await this.prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "Category_name_key" ON "Category"("name");`);
+
+        // Retry creation directly (table is new, so no conflict possible)
+        const category = await this.prisma.category.create({
           data: {
+            name: createCategoryDto.name,
+            description: createCategoryDto.description,
             active: createCategoryDto.active ?? true,
-            description: createCategoryDto.description ?? existingCategory.description,
           },
         });
-        this.logger.log(`Category reactivated: ${reactivatedCategory.id}`);
-        return this.mapToResponseDto(reactivatedCategory);
+        return this.mapToResponseDto(category);
       }
+      throw error;
     }
-
-    const category = await this.prisma.category.create({
-      data: {
-        name: createCategoryDto.name,
-        description: createCategoryDto.description,
-        active: createCategoryDto.active ?? true,
-      },
-    });
-
-    this.logger.log(`Category created: ${category.id}`);
-    return this.mapToResponseDto(category);
   }
 
   async findAll(active?: string): Promise<CategoryResponseDto[]> {

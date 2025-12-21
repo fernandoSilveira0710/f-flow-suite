@@ -202,7 +202,11 @@ export class LicensingController {
   }) {
     try {
       // Persistir dados de licença localmente para uso offline futuro
-      await this.licensingService.updateLicenseCacheFromHub(body.tenantId);
+      if (body.licenseData) {
+        await this.licensingService.saveLicenseCache(body.tenantId, body.licenseData);
+      } else {
+        await this.licensingService.updateLicenseCacheFromHub(body.tenantId);
+      }
       
       this.logger.log(`Licença persistida localmente para tenant ${body.tenantId}`);
       

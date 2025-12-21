@@ -55,9 +55,13 @@ export class ProductsService {
   async create(createProductDto: CreateProductDto): Promise<ProductResponseDto> {
     // Pre-validate fields that commonly trigger Prisma runtime errors
     if (createProductDto.expiryDate !== undefined) {
-      const t = Date.parse(createProductDto.expiryDate);
+      const t = Date.parse(createProductDto.expiryDate as string);
       if (Number.isNaN(t)) {
         throw new BadRequestException('Campo expiryDate inválido. Use formato ISO (YYYY-MM-DD).');
+      }
+      const year = new Date(t).getFullYear();
+      if (year > 3000) {
+        throw new BadRequestException('Ano de validade inválido (ano > 3000).');
       }
     }
     // Pre-validate numeric fields to avoid NaN/Infinity reaching Prisma/SQL
@@ -128,6 +132,17 @@ export class ProductsService {
 
       return this.mapToResponseDto(product);
     } catch (error: unknown) {
+      // Handle Prisma unique constraint errors gracefully (Moved up to prioritize over generic KnownRequestError)
+      {
+        const { code, meta } = getErrorInfo(error);
+        if (code === 'P2002') {
+          const target = meta?.target as unknown;
+          const fields = Array.isArray(target) ? (target as unknown[]).map(String).join(', ') : String(target ?? 'unique field');
+          this.logger.warn(`Unique constraint violation on product create: ${fields}`);
+          throw new ConflictException(`Já existe um produto com valor duplicado em: ${fields}`);
+        }
+      }
+
       // Map Prisma client validation errors (e.g., invalid types) to 400
       {
         const { name, message } = getErrorInfo(error);
@@ -141,21 +156,13 @@ export class ProductsService {
         const { code, meta, name, message } = getErrorInfo(error);
         const cause = (meta?.cause as string) || '';
         const badRequestCodes = new Set(['P2007', 'P2011', 'P2012', 'P2023', 'P2009']);
-        if (name === 'PrismaClientKnownRequestError' || badRequestCodes.has(code || '')) {
+        // Only handle if NOT P2002 (though P2002 is already handled above)
+        if ((name === 'PrismaClientKnownRequestError' && code !== 'P2002') || badRequestCodes.has(code || '')) {
           this.logger.warn(`Known request validation error on product create (${code || 'unknown'}): ${message}`);
           throw new BadRequestException(cause ? `Payload inválido: ${cause}` : 'Payload inválido: verifique campos obrigatórios e tipos.');
         }
       }
-      // Handle Prisma unique constraint errors gracefully
-      {
-        const { code, meta } = getErrorInfo(error);
-        if (code === 'P2002') {
-          const target = meta?.target as unknown;
-          const fields = Array.isArray(target) ? (target as unknown[]).map(String).join(', ') : String(target ?? 'unique field');
-          this.logger.warn(`Unique constraint violation on product create: ${fields}`);
-          throw new ConflictException(`Já existe um produto com valor duplicado em: ${fields}`);
-        }
-      }
+      
       const { message, code } = getErrorInfo(error);
       const msg = String(message || '').toLowerCase();
       const isMissingTable = code === 'P2021' || msg.includes('no such table') || msg.includes('does not exist');
@@ -512,6 +519,10 @@ export class ProductsService {
       const t = Date.parse(updateProductDto.expiryDate as string);
       if (Number.isNaN(t)) {
         throw new BadRequestException('Campo expiryDate inválido. Use formato ISO (YYYY-MM-DD).');
+      }
+      const year = new Date(t).getFullYear();
+      if (year > 3000) {
+        throw new BadRequestException('Ano de validade inválido (ano > 3000).');
       }
     }
     // Pre-validate numeric fields on update as well

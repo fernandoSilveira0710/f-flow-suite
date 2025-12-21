@@ -17,6 +17,13 @@ export interface BootstrapConfig {
 }
 
 function resolvePaths(): { dataDir: string; logDir: string } {
+  if (process.env.FFLOW_DATA_DIR) {
+    return {
+      dataDir: process.env.FFLOW_DATA_DIR,
+      logDir: process.env.FFLOW_LOG_DIR || join(process.env.FFLOW_DATA_DIR, '..', 'logs'),
+    };
+  }
+
   const isWindows = platform() === 'win32';
   const home = homedir();
   
@@ -394,3 +401,4 @@ export function getBootstrapConfig(): BootstrapConfig {
     host,
   };
 }
+
