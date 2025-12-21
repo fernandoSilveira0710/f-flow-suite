@@ -67,14 +67,16 @@ describe('AutoUpdateService', () => {
   describe('checkForUpdates', () => {
     it('should return update info when newer version is available', async () => {
       const current = service.getCurrentVersion();
+      const [major, minor, patch] = current.split('.').map((n) => Number(n));
+      const newerVersion = `${major}.${minor}.${(patch || 0) + 1}`;
       const mockRelease = {
-        tag_name: 'v2.0.0',
-        name: 'Version 2.0.0',
+        tag_name: `v${newerVersion}`,
+        name: `Version ${newerVersion}`,
         body: 'Release notes',
         assets: [
           {
             name: 'f-flow-client-win-x64.exe',
-            browser_download_url: 'https://github.com/owner/repo/releases/download/v2.0.0/f-flow-client-win-x64.exe',
+            browser_download_url: `https://github.com/owner/repo/releases/download/v${newerVersion}/f-flow-client-win-x64.exe`,
           },
         ],
       };
@@ -84,7 +86,7 @@ describe('AutoUpdateService', () => {
       const updateInfo = await service.checkForUpdates();
 
       expect(updateInfo.available).toBe(true);
-      expect(updateInfo.latestVersion).toBe('2.0.0');
+      expect(updateInfo.latestVersion).toBe(newerVersion);
       expect(updateInfo.currentVersion).toBe(current);
       expect(updateInfo.releaseNotes).toBe('Release notes');
     });
