@@ -29,6 +29,11 @@ export class PublicController {
     return this.publicService.getPlans();
   }
 
+  @Get('has-users')
+  async hasUsers() {
+    return this.publicService.hasUsers();
+  }
+
   @Post('contact')
   async contact(@Body() dto: ContactDto) {
     return this.publicService.contact(dto);

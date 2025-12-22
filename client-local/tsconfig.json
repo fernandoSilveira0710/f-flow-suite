@@ -10,7 +10,7 @@
     "strictPropertyInitialization": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": ["node", "jest"],
+    "types": ["node"],
     "outDir": "dist",
     "sourceMap": true,
     "baseUrl": "./",
@@ -19,5 +19,5 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "src/**/*.spec.ts", "src/**/*.test.ts"]
 }

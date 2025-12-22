@@ -163,7 +163,9 @@ const getCurrentUserEmail = (): string => {
       const auth = JSON.parse(authRaw || '{}');
       return auth?.email || 'unknown';
     }
-  } catch {}
+  } catch (e) {
+    void e;
+  }
   return 'unknown';
 };
 
@@ -231,7 +233,7 @@ const DEFAULT_ROLES: Role[] = [
       // Relatórios (em desenvolvimento)
       'reports:read',
       // Configurações (submenus)
-      'settings:organization', 'settings:users', 'settings:roles', 'settings:billing', 'settings:licenses', 'settings:units', 'settings:categories', 'settings:payments', 'settings:import-export',
+      'settings:organization', 'settings:users', 'settings:roles', 'settings:billing', 'settings:licenses', 'settings:units', 'settings:categories', 'settings:payments', 'settings:import-export', 'settings:data',
     ],
   },
   {
@@ -303,6 +305,7 @@ export const ALL_PERMISSIONS = [
   { id: 'settings:categories', nome: 'Categorias', grupo: 'Configurações' },
   { id: 'settings:payments', nome: 'Métodos de Pagamento', grupo: 'Configurações' },
   { id: 'settings:import-export', nome: 'Importar/Exportar', grupo: 'Configurações' },
+  { id: 'settings:data', nome: 'Dados (limpar base)', grupo: 'Configurações' },
 ];
 
 // API Functions
@@ -919,9 +922,12 @@ export const getCurrentPermissions = (): string[] => {
     // Garantir baseline: se o papel 'admin' existir mas sem permissões, usar DEFAULT_ROLES
     const defaultAdmin = DEFAULT_ROLES.find(r => r.id === 'admin');
     const adminRole = roles.find(r => r.id === 'admin');
-    const safeAdminPerms = (adminRole && Array.isArray(adminRole.permissions) && adminRole.permissions.length > 0)
-      ? adminRole.permissions
-      : (defaultAdmin?.permissions || []);
+    const safeAdminPerms = Array.from(
+      new Set([
+        ...((defaultAdmin?.permissions || []) as string[]),
+        ...(adminRole && Array.isArray(adminRole.permissions) ? adminRole.permissions : []),
+      ])
+    );
 
     // 1) Priorizar roleId vindo do auth_user (login) se existir
     const roleFromAuth = (() => {
@@ -931,8 +937,7 @@ export const getCurrentPermissions = (): string[] => {
     })();
     if (roleFromAuth) {
       const perms = roleFromAuth.permissions || [];
-      // Se for admin com lista vazia, aplicar baseline
-      if (roleFromAuth.id === 'admin' && perms.length === 0) return safeAdminPerms;
+      if (roleFromAuth.id === 'admin') return Array.from(new Set([...safeAdminPerms, ...perms]));
       return perms;
     }
 
@@ -942,7 +947,7 @@ export const getCurrentPermissions = (): string[] => {
     const role = roles.find(r => r.id === (current?.roleId || 'admin'));
     if (role) {
       const perms = role.permissions || [];
-      if (role.id === 'admin' && perms.length === 0) return safeAdminPerms;
+      if (role.id === 'admin') return Array.from(new Set([...safeAdminPerms, ...perms]));
       return perms;
     }
 

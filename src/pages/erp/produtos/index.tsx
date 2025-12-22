@@ -185,7 +185,9 @@ export default function ProdutosIndex() {
           const parsed = JSON.parse(jsonText);
           serverMsg = parsed?.message || parsed?.error;
         }
-      } catch {}
+      } catch {
+        serverMsg = undefined;
+      }
 
       const isConflict = message.includes('409') || message.toLowerCase().includes('conflict');
       toast({
@@ -501,10 +503,11 @@ export default function ProdutosIndex() {
             const pagesToShow = 5;
             const half = Math.floor(pagesToShow / 2);
             let startPage = Math.max(1, currentPage - half);
-            let endPage = Math.min(totalPages, startPage + pagesToShow - 1);
-            if (endPage - startPage < pagesToShow - 1) {
-              startPage = Math.max(1, endPage - pagesToShow + 1);
+            const endPageCandidate = Math.min(totalPages, startPage + pagesToShow - 1);
+            if (endPageCandidate - startPage < pagesToShow - 1) {
+              startPage = Math.max(1, endPageCandidate - pagesToShow + 1);
             }
+            const endPage = Math.min(totalPages, startPage + pagesToShow - 1);
             const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
 
             return (

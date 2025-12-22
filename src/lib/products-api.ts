@@ -111,6 +111,10 @@ const apiCall = async <T>(
     if (err?.name === 'AbortError') {
       throw new ApiError('Tempo limite excedido ao chamar a API. Verifique o serviço Client Local (porta 8081).', 0);
     }
+    const msg = String(err?.message || '');
+    if (err instanceof TypeError || msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('network')) {
+      throw new ApiError('Não foi possível conectar ao Client Local (porta 8081). Verifique se o serviço está rodando.', 0);
+    }
     throw err;
   } finally {
     clearTimeout(timer);
@@ -122,7 +126,9 @@ const apiCall = async <T>(
     let parsedBody: any = undefined;
     try {
       bodyText = await response.text();
-    } catch {}
+    } catch (e) {
+      void e;
+    }
     if (bodyText) {
       try {
         parsedBody = JSON.parse(bodyText);

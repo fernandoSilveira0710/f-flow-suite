@@ -46,6 +46,7 @@ export const ENDPOINTS = {
   HUB_LOGIN: `${API_URLS.HUB}/public/login`,
   HUB_REGISTER: `${API_URLS.HUB}/public/register`,
   HUB_PLANS: `${API_URLS.HUB}/public/plans`,
+  HUB_PUBLIC_HAS_USERS: `${API_URLS.HUB}/public/has-users`,
   HUB_HEALTH: `${API_URLS.HUB}/health`,
   HUB_LICENSES_VALIDATE: `${API_URLS.HUB}/licenses/validate`,
   HUB_SUBSCRIPTION: `${API_URLS.HUB}/subscriptions`,
@@ -70,6 +71,7 @@ export const ENDPOINTS = {
   CLIENT_AUTH_PERSIST: `${API_URLS.CLIENT_LOCAL}/auth/persist`,
   CLIENT_AUTH_OFFLINE_LOGIN: `${API_URLS.CLIENT_LOCAL}/auth/offline-login`,
   CLIENT_AUTH_OFFLINE_PIN_LOGIN: `${API_URLS.CLIENT_LOCAL}/auth/offline-pin-login`,
+  CLIENT_MAINTENANCE_RESET_DATABASE: `${API_URLS.CLIENT_LOCAL}/maintenance/reset-database`,
   CLIENT_PLANS_SUBSCRIPTION: (tenantId: string) => `${API_URLS.CLIENT_LOCAL}/plans/tenants/${tenantId}/subscription`,
   CLIENT_PLANS_INVOICES: (tenantId: string) => `${API_URLS.CLIENT_LOCAL}/plans/tenants/${tenantId}/invoices`,
 

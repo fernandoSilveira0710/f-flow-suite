@@ -62,6 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const hasInitCheckRef = useRef(false);
 
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
   // Pequena utilidade para fetch com timeout explícito
   const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 10000) => {
     const controller = new AbortController();
@@ -73,6 +75,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timeout);
     }
   };
+
+  const waitForClientLocal = useCallback(
+    async (maxWaitMs = 6000): Promise<boolean> => {
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < maxWaitMs) {
+        try {
+          const res = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/health?t=${Date.now()}`, { method: 'GET' }, 1500);
+          if (res.ok) return true;
+        } catch (e) {
+          void e;
+        }
+        await sleep(250);
+      }
+      return false;
+    },
+    [fetchWithTimeout],
+  );
+
+  const postJsonBestEffort = useCallback(
+    async (
+      url: string,
+      payload: unknown,
+      { attempts = 3, timeoutMs = 5000, waitMs = 6000 }: { attempts?: number; timeoutMs?: number; waitMs?: number } = {},
+    ): Promise<boolean> => {
+      const ready = await waitForClientLocal(waitMs);
+      if (!ready) return false;
+
+      for (let i = 0; i < attempts; i++) {
+        try {
+          const res = await fetchWithTimeout(
+            url,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            },
+            timeoutMs,
+          );
+          if (res.ok) return true;
+          if (res.status >= 500) {
+            await sleep(300 * (i + 1));
+            continue;
+          }
+          return false;
+        } catch (e) {
+          void e;
+          await sleep(300 * (i + 1));
+        }
+      }
+      return false;
+    },
+    [fetchWithTimeout, waitForClientLocal],
+  );
 
   // Verificar se há usuário logado no localStorage ao inicializar
   useEffect(() => {
@@ -103,125 +158,119 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const checkLicenseStatus = useCallback(async () => {
-    console.log('🔍 Verificando status da licença - DIRETO do client-local...');
-    
-    try {
-      const tenantId = localStorage.getItem('tenant_id');
-      console.log('🏢 Tenant ID:', tenantId);
-      
-      // Não limpar imediatamente para evitar flicker; atualize ao final
-      
-      // Consulta direta ao client-local (8081). Evita HTML do ERP em produção.
-      let statusResponse: Response = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`, {
-        method: 'GET',
-        cache: 'no-cache',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          ...(tenantId && { 'x-tenant-id': tenantId })
-        }
-      }, 10000);
-      
-      if (!statusResponse.ok) {
-        throw new Error(`Status request failed: ${statusResponse.status}`);
-      }
-      
-      const statusData = await parseJsonSafe(statusResponse, '/licensing/status');
-      console.log('📊 Status data from client-local:', statusData);
+    console.log('🔍 Verificando status da licença...');
 
-      // Atualizar timestamps e calcular dias offline restantes
-      try {
-        const updatedAt = statusData.updatedAt || null;
-        const lastChecked = statusData.lastChecked || null;
-        setLicenseCacheUpdatedAt(updatedAt);
-        setLicenseCacheLastChecked(lastChecked);
-        const ts = updatedAt || lastChecked;
-        if (ts) {
-          const last = new Date(ts).getTime();
-          const days = Math.floor((Date.now() - last) / (24 * 60 * 60 * 1000));
-          setOfflineDaysLeft(Math.max(0, OFFLINE_MAX_DAYS - days));
-        } else {
-          setOfflineDaysLeft(null);
-        }
-      } catch (e) {
-        console.warn('⚠️ Falha ao calcular dias offline restantes', e);
-      }
-      
-      let installResponse: Response;
-      try {
-        installResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/install-status?t=${Date.now()}`, {
-          method: 'GET',
-          cache: 'no-cache',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            ...(tenantId && { 'x-tenant-id': tenantId })
-          }
-        }, 6000);
-      } catch (e) {
-        console.warn('Falha via proxy /licensing/install-status; tentando direto no client-local', e);
-        installResponse = await fetchWithTimeout(`${API_URLS.CLIENT_LOCAL}/licensing/install-status?t=${Date.now()}`, {
-          method: 'GET',
-          cache: 'no-cache',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            ...(tenantId && { 'x-tenant-id': tenantId })
-          }
-        }, 8000);
-      }
-      
-      if (!installResponse.ok) {
-        throw new Error(`Install status request failed: ${installResponse.status}`);
-      }
-      
-      const installData = await parseJsonSafe(installResponse, '/licensing/install-status');
-      console.log('🔧 Install data from client-local:', installData);
-      
-      // Normalizar planos e escolher o mais "alto" entre Hub e client-local
-      const normalizePlan = (raw?: string): 'starter' | 'pro' | 'max' | undefined => {
-        if (!raw) return undefined;
-        const s = String(raw).toLowerCase();
-        const map: Record<string, 'starter' | 'pro' | 'max'> = {
-          starter: 'starter', basico: 'starter', básico: 'starter', basic: 'starter',
-          pro: 'pro', profissional: 'pro',
-          max: 'max', enterprise: 'max', development: 'max'
-        };
-        return map[s] || (['starter','pro','max'].includes(s) ? (s as 'starter'|'pro'|'max') : undefined);
+    const tenantId = localStorage.getItem('tenant_id') || localStorage.getItem('2f.tenantId');
+    console.log('🏢 Tenant ID:', tenantId);
+
+    const normalizePlan = (raw?: string): 'starter' | 'pro' | 'max' | undefined => {
+      if (!raw) return undefined;
+      const s = String(raw).toLowerCase();
+      const map: Record<string, 'starter' | 'pro' | 'max'> = {
+        starter: 'starter', basico: 'starter', básico: 'starter', basic: 'starter',
+        pro: 'pro', profissional: 'pro',
+        max: 'max', enterprise: 'max', development: 'max',
       };
-      // Sempre priorizar o plano do Hub como fonte da verdade.
-      const hubPlan = normalizePlan(statusData.planKey);
-      const localPlan = normalizePlan(installData.planKey);
-      const chosenPlan = hubPlan || localPlan;
+      return map[s] || (['starter', 'pro', 'max'].includes(s) ? (s as 'starter' | 'pro' | 'max') : undefined);
+    };
 
-      const newLicenseStatus = {
-        isValid: Boolean(statusData.valid),
-        // Considera instalado se qualquer fonte indicar instalação
-        isInstalled: Boolean(installData.isInstalled) || Boolean(statusData.canStart),
-        // Escolhe o plano mais permissivo entre Hub e client-local para ambiente de desenvolvimento
-        plan: chosenPlan,
-        expiresAt: installData.expiresAt || statusData.expiresAt
-      } as LicenseStatus;
-      
-      console.log('✅ Novo license status:', newLicenseStatus);
-      setLicenseStatus(newLicenseStatus);
-      
-    } catch (error) {
-      console.error('❌ Erro ao verificar status da licença:', error);
-      setLicenseStatus({
-        isValid: false,
-        isInstalled: false
-      });
+    const headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      ...(tenantId && { 'x-tenant-id': tenantId }),
+    } as const;
+
+    let hubLicenseData: any | null = null;
+    try {
+      const hubOk = await checkHubConnectivity().catch(() => false);
+      if (hubOk && tenantId) {
+        const hubRes = await fetchWithTimeout(
+          `${ENDPOINTS.HUB_LICENSES_VALIDATE}?tenantId=${encodeURIComponent(tenantId)}&t=${Date.now()}`,
+          { method: 'GET' },
+          7000,
+        );
+        if (hubRes.ok) {
+          hubLicenseData = await parseJsonSafe(hubRes, 'hub /licenses/validate');
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Falha ao consultar licença do Hub', e);
     }
+
+    let statusData: any | null = null;
+    try {
+      const statusRes = await fetchWithTimeout(
+        `${API_URLS.CLIENT_LOCAL}/licensing/status?t=${Date.now()}`,
+        { method: 'GET', cache: 'no-cache', headers },
+        8000,
+      );
+      if (statusRes.ok) {
+        statusData = await parseJsonSafe(statusRes, '/licensing/status');
+
+        try {
+          const updatedAt = statusData.updatedAt || null;
+          const lastChecked = statusData.lastChecked || null;
+          setLicenseCacheUpdatedAt(updatedAt);
+          setLicenseCacheLastChecked(lastChecked);
+          const ts = updatedAt || lastChecked;
+          if (ts) {
+            const last = new Date(ts).getTime();
+            const days = Math.floor((Date.now() - last) / (24 * 60 * 60 * 1000));
+            setOfflineDaysLeft(Math.max(0, OFFLINE_MAX_DAYS - days));
+          } else {
+            setOfflineDaysLeft(null);
+          }
+        } catch (e) {
+          console.warn('⚠️ Falha ao calcular dias offline restantes', e);
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Falha ao consultar /licensing/status no client-local', e);
+    }
+
+    let installData: any | null = null;
+    try {
+      const installRes = await fetchWithTimeout(
+        `${API_URLS.CLIENT_LOCAL}/licensing/install-status?t=${Date.now()}`,
+        { method: 'GET', cache: 'no-cache', headers },
+        8000,
+      );
+      if (installRes.ok) {
+        installData = await parseJsonSafe(installRes, '/licensing/install-status');
+      }
+    } catch (e) {
+      console.warn('⚠️ Falha ao consultar /licensing/install-status no client-local', e);
+    }
+
+    if (!hubLicenseData && !statusData && !installData) {
+      console.warn('⚠️ Não foi possível obter status de licença (Hub e client-local indisponíveis)');
+      return;
+    }
+
+    const hubPlan = normalizePlan(hubLicenseData?.license?.planKey || hubLicenseData?.planKey);
+    const localPlan = normalizePlan(statusData?.planKey || installData?.planKey);
+    const chosenPlan = hubPlan || localPlan;
+
+    const hubExpiresAt = hubLicenseData?.license?.expiresAt || hubLicenseData?.expiresAt;
+    const chosenExpiresAt = hubExpiresAt || installData?.expiresAt || statusData?.expiresAt;
+
+    setLicenseStatus((prev) => {
+      const nextValid = hubLicenseData ? Boolean(hubLicenseData?.valid) : statusData ? Boolean(statusData?.valid) : (prev?.isValid ?? true);
+      const nextInstalled =
+        Boolean(installData?.isInstalled) ||
+        Boolean(statusData?.canStart) ||
+        Boolean(prev?.isInstalled);
+
+      return {
+        isValid: nextValid,
+        isInstalled: nextInstalled,
+        plan: chosenPlan || prev?.plan,
+        expiresAt: chosenExpiresAt || prev?.expiresAt,
+      };
+    });
   }, []);
 
   const refreshLicenseStatus = useCallback(async (forceUpdate: boolean = false) => {
@@ -294,20 +343,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Sincronizar dados com client-local
         console.log('🔄 Sincronizando dados com client-local...');
         try {
-          const syncResponse = await fetch(ENDPOINTS.CLIENT_USERS_SYNC, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+          const ok = await postJsonBestEffort(
+            ENDPOINTS.CLIENT_USERS_SYNC,
+            {
               hubUserId: result.user.id,
               email: result.user.email,
               displayName: result.user.displayName,
               tenantId: result.user.tenant.id,
               active: true,
-            }),
-          });
-          console.log('🔄 Sincronização - Status:', syncResponse.status, 'OK:', syncResponse.ok);
+            },
+            { attempts: 3, timeoutMs: 5000, waitMs: 7000 },
+          );
+          console.log('🔄 Sincronização - OK:', ok);
         } catch (syncError) {
           console.warn('⚠️ Erro na sincronização com client-local:', syncError);
         }
@@ -340,22 +387,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // Persistir credenciais para uso offline
                 try {
                   console.log('💾 Persistindo credenciais offline no client-local...');
-                  const persistAuthRes = await fetch(ENDPOINTS.CLIENT_AUTH_PERSIST, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                  const ok = await postJsonBestEffort(
+                    ENDPOINTS.CLIENT_AUTH_PERSIST,
+                    {
                       email: result.user.email,
                       password: password,
                       tenantId: result.user.tenant.id,
                       displayName: result.user.displayName,
                       hubUserId: result.user.id,
-                    }),
-                  });
-                  if (persistAuthRes.ok) {
-                    const persistJson = await persistAuthRes.json();
-                    console.log('💾 Credenciais offline persistidas:', persistJson);
+                    },
+                    { attempts: 3, timeoutMs: 5000, waitMs: 7000 },
+                  );
+                  if (ok) {
+                    console.log('💾 Credenciais offline persistidas');
                   } else {
-                    console.warn('⚠️ Falha ao persistir credenciais offline:', persistAuthRes.status);
+                    console.warn('⚠️ Falha ao persistir credenciais offline');
                   }
                 } catch (persistErr) {
                   console.warn('⚠️ Erro ao persistir credenciais offline:', persistErr);
@@ -364,22 +410,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // Ativar licença no client-local para gerar e persistir JWT token
                 try {
                   console.log('🔑 Ativando licença no client-local...');
-                  const activateResponse = await fetch(ENDPOINTS.CLIENT_LICENSING_ACTIVATE, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
+                  const ok = await postJsonBestEffort(
+                    ENDPOINTS.CLIENT_LICENSING_ACTIVATE,
+                    {
                       tenantId: result.user.tenant.id,
-                      deviceId: 'web-client', // ou gerar um deviceId único
-                    }),
-                  });
-                  
-                  if (activateResponse.ok) {
-                    const activateResult = await activateResponse.json();
-                    console.log('🔑 Licença ativada com sucesso:', activateResult);
+                      deviceId: 'web-client',
+                    },
+                    { attempts: 3, timeoutMs: 7000, waitMs: 8000 },
+                  );
+                  if (ok) {
+                    console.log('🔑 Licença ativada com sucesso');
                   } else {
-                    console.warn('⚠️ Erro na ativação da licença:', activateResponse.status);
+                    console.warn('⚠️ Falha ao ativar licença no client-local');
                   }
                 } catch (activateError) {
                   console.warn('⚠️ Erro ao ativar licença:', activateError);
@@ -388,18 +430,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // Persistir licença no client-local para uso offline futuro
                 try {
                   console.log('💾 Persistindo licença no client-local...');
-                  await fetch(ENDPOINTS.CLIENT_LICENSING_PERSIST, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
+                  const ok = await postJsonBestEffort(
+                    ENDPOINTS.CLIENT_LICENSING_PERSIST,
+                    {
                       tenantId: result.user.tenant.id,
                       userId: result.user.id,
-                      licenseData: licenseData
-                    }),
-                  });
-                  console.log('💾 Licença persistida com sucesso');
+                      licenseData: licenseData,
+                    },
+                    { attempts: 3, timeoutMs: 7000, waitMs: 8000 },
+                  );
+                  if (ok) {
+                    console.log('💾 Licença persistida com sucesso');
+                  } else {
+                    console.warn('⚠️ Falha ao persistir licença localmente');
+                  }
                 } catch (persistError) {
                   console.warn('⚠️ Erro ao persistir licença localmente:', persistError);
                 }
@@ -864,11 +908,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const ct = response.headers.get('content-type') || '';
       if (response.ok && ct.includes('application/json')) {
         const data = await response.json();
-        return !data.hasUsers;
+        if (data.hasUsers) return false;
       }
+
+      const hubOk = await checkHubConnectivity().catch(() => false);
+      if (hubOk) {
+        try {
+          const hubRes = await fetchWithTimeout(
+            `${ENDPOINTS.HUB_PUBLIC_HAS_USERS}?t=${Date.now()}`,
+            { method: 'GET' },
+            5000,
+          );
+          if (hubRes.ok) {
+            const hubData = await parseJsonSafe(hubRes, 'hub /public/has-users');
+            if (hubData?.hasUsers) return false;
+          }
+        } catch (e) {
+          console.warn('isFirstInstallation: falha ao consultar Hub /public/has-users', e);
+        }
+      }
+
       console.warn('isFirstInstallation: resposta não-JSON ou não-OK para /users/has-users', ct, response.status);
-      return true; // Se não conseguir verificar, assume primeira instalação
+      return true;
     } catch (error) {
+      try {
+        const hubOk = await checkHubConnectivity().catch(() => false);
+        if (hubOk) {
+          const hubRes = await fetchWithTimeout(
+            `${ENDPOINTS.HUB_PUBLIC_HAS_USERS}?t=${Date.now()}`,
+            { method: 'GET' },
+            5000,
+          );
+          if (hubRes.ok) {
+            const hubData = await parseJsonSafe(hubRes, 'hub /public/has-users');
+            if (hubData?.hasUsers) return false;
+          }
+        }
+      } catch (e) {
+        console.warn('isFirstInstallation: fallback Hub check failed', e);
+      }
       console.error('Erro ao verificar primeira instalação:', error);
       return true;
     }
@@ -977,9 +1055,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     healthPollStartedRef.current = true;
 
     let intervalId: number | undefined;
-    let firstTimeoutId: number | undefined;
-
-    firstTimeoutId = window.setTimeout(() => {
+    const firstTimeoutId = window.setTimeout(() => {
       checkHubConnectivity();
       intervalId = window.setInterval(() => {
         checkHubConnectivity();

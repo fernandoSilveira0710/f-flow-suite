@@ -13,12 +13,14 @@ import {
   Scissors,
   Package,
   Tags,
+  Database,
   
   Upload,
   Wallet,
   LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getCurrentPermissions } from '@/lib/settings-api';
 
 type MenuItem = {
   label: string;
@@ -32,8 +34,9 @@ type MenuItem = {
 
 export default function SettingsLayout() {
   const location = useLocation();
-  const { currentPlan, entitlements } = useEntitlements();
+  const { currentPlan } = useEntitlements();
   const hideSidebar = location.pathname.startsWith('/erp/settings/switch-account');
+  const perms = getCurrentPermissions();
 
   const menuItems: MenuItem[] = [
     {
@@ -105,6 +108,16 @@ export default function SettingsLayout() {
       path: '/erp/settings/import-export',
       requiresPlan: null,
     },
+    ...(perms.includes('settings:data')
+      ? [
+          {
+            label: 'Dados',
+            icon: Database,
+            path: '/erp/settings/dados',
+            requiresPlan: null,
+          } as const,
+        ]
+      : []),
   ];
 
   const planNames = {

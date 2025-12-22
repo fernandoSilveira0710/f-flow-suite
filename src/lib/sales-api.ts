@@ -21,7 +21,7 @@ export interface SaleFilters {
   paymentMethod?: string;
 }
 
-export interface SaleDetail extends Sale {}
+export type SaleDetail = Sale;
 
 // Helper: normalize payment filter values to compare against sale.paymentMethod
 const paymentMatches = (paymentMethod: string, filter: string) => {

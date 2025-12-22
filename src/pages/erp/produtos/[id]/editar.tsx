@@ -238,7 +238,9 @@ export default function ProdutoEditar() {
       try {
         const refreshed = await getProductById(id);
         setProduct(refreshed);
-      } catch {}
+      } catch (e) {
+        void e;
+      }
       navigate(`/erp/produtos/${id}`);
     } catch (error: any) {
       console.error('Erro ao atualizar produto:', error);

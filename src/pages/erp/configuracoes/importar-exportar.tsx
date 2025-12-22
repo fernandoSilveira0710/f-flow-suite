@@ -14,9 +14,10 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { exportData } from '@/lib/settings-api';
-import { createProduct, getProducts, updateProduct, ProductResponse } from '@/lib/products-api';
+import { ApiError, createProduct, getProducts, updateProduct, ProductResponse } from '@/lib/products-api';
 import { adjustStock } from '@/lib/stock-api';
 import { fetchCategories, createCategory, Category } from '@/lib/categories-api';
+import { API_URLS } from '@/lib/env';
 
 type EntityType = 'products' | 'customers';
 
@@ -242,7 +243,7 @@ export default function ImportarExportarPage() {
     }
     
     // Tenta formatos comuns BR (DD/MM/YYYY)
-    const parts = s.split(/[\/\-\.]/);
+    const parts = s.split(/[-./]/);
     if (parts.length === 3) {
       // Assume dia/mes/ano se primeiro numero > 12 ou ano for ultimo
       const p1 = parseInt(parts[0]);
@@ -275,11 +276,120 @@ export default function ImportarExportarPage() {
       return;
     }
 
+    const isNetworkError = (e: any) => {
+      const msg = String(e?.message || '');
+      return (
+        e?.status === 0 ||
+        msg.toLowerCase().includes('failed to fetch') ||
+        msg.toLowerCase().includes('não foi possível conectar') ||
+        msg.toLowerCase().includes('porta 8081') ||
+        msg.toLowerCase().includes('tempo limite') ||
+        msg.toLowerCase().includes('network') ||
+        msg.toLowerCase().includes('err_connection_refused')
+      );
+    };
+
+    const asPlainError = (err: unknown) => {
+      const e: any = err;
+      const out: Record<string, unknown> = {
+        name: e?.name,
+        message: e?.message,
+      };
+      if (typeof e?.status === 'number') out.status = e.status;
+      if (e instanceof ApiError) {
+        out.status = e.status;
+        out.body = e.body;
+      } else if (e?.body !== undefined) {
+        out.body = e.body;
+      }
+      if (typeof e?.stack === 'string') out.stack = e.stack;
+      return out;
+    };
+
+    const logImportFailure = (args: {
+      excelRowNumber?: number;
+      phase: string;
+      error: unknown;
+      payload?: unknown;
+      fieldKey?: string;
+      fieldHeader?: string;
+      row?: any[];
+      colIdx?: Record<string, number | undefined>;
+      extra?: Record<string, unknown>;
+    }) => {
+      const title = args.excelRowNumber
+        ? `[IMPORT] Linha ${args.excelRowNumber} - ${args.phase}`
+        : `[IMPORT] ${args.phase}`;
+      console.groupCollapsed(title);
+      console.log('Erro:', args.error);
+      console.log('Detalhes:', asPlainError(args.error));
+      if (args.fieldKey || args.fieldHeader) {
+        console.log('Campo:', { fieldKey: args.fieldKey, header: args.fieldHeader });
+      }
+      if (args.payload !== undefined) console.log('Payload:', args.payload);
+      if (args.row && args.colIdx) {
+        const snapshot: Record<string, unknown> = {};
+        Object.keys(args.colIdx).forEach((k) => {
+          const idx = args.colIdx?.[k];
+          snapshot[k] = idx !== undefined ? args.row?.[idx] : undefined;
+        });
+        console.log('Linha (mapeada):', snapshot);
+        console.log('Linha (raw):', args.row);
+      } else if (args.row) {
+        console.log('Linha (raw):', args.row);
+      }
+      if (args.extra) console.log('Extra:', args.extra);
+      console.groupEnd();
+    };
+
+    const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+    const withRetry = async <T,>(
+      fn: () => Promise<T>,
+      opts?: { retries?: number; delayMs?: number }
+    ): Promise<T> => {
+      const retries = opts?.retries ?? 2;
+      const delayMs = opts?.delayMs ?? 700;
+
+      let lastErr: unknown;
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          return await fn();
+        } catch (err) {
+          lastErr = err;
+          if (!isNetworkError(err) || attempt === retries) throw err;
+          await sleep(delayMs * (attempt + 1));
+        }
+      }
+      throw lastErr instanceof Error ? lastErr : new Error('Falha inesperada ao tentar novamente');
+    };
+
     setImporting(true);
+
+    let clientLocalOnline = false;
+    const healthController = new AbortController();
+    const healthTimer = setTimeout(() => healthController.abort(), 2000);
+    try {
+      const healthRes = await fetch(`${API_URLS.CLIENT_LOCAL}/health?t=${Date.now()}`, { method: 'GET', signal: healthController.signal });
+      clientLocalOnline = healthRes.ok;
+    } catch (e) {
+      clientLocalOnline = false;
+      void e;
+    } finally {
+      clearTimeout(healthTimer);
+    }
+
+    if (!clientLocalOnline) {
+      setImporting(false);
+      toast.error('Client Local indisponível (porta 8081). Inicie o serviço antes de importar.');
+      return;
+    }
+
     setProgressOpen(true);
     setProgressState({ total: rowsAll.length, current: 0, success: 0, errors: 0, logs: [] });
     const errors: { row: number; column?: string; message: string }[] = [];
     let success = 0;
+    let fatalNetworkError = false;
 
     // Prepara índices das colunas mapeadas
     const colIdx: Record<string, number | undefined> = {};
@@ -292,21 +402,23 @@ export default function ImportarExportarPage() {
     // Carregar categorias existentes para verificação/criação
     let existingCategories: Category[] = [];
     try {
-      existingCategories = await fetchCategories();
+      existingCategories = await withRetry(() => fetchCategories());
     } catch (e) {
+      logImportFailure({ phase: 'Carregar categorias', error: e });
       console.warn('Erro ao carregar categorias para importação:', e);
     }
 
     // Carregar produtos existentes para verificar duplicidade (Barcode)
     const productMap = new Map<string, ProductResponse>();
     try {
-      const allProducts = await getProducts();
+      const allProducts = await withRetry(() => getProducts());
       allProducts.forEach((p) => {
         if (p.barcode) {
           productMap.set(p.barcode, p);
         }
       });
     } catch (e) {
+      logImportFailure({ phase: 'Carregar produtos existentes', error: e });
       console.warn('Erro ao carregar produtos existentes:', e);
     }
 
@@ -337,10 +449,21 @@ export default function ImportarExportarPage() {
             categoryName = match.name;
           } else {
             try {
-              const newCat = await createCategory({ name: categoryName, active: true });
+              const newCat = await withRetry(() => createCategory({ name: categoryName, active: true }));
               existingCategories.push(newCat);
               categoryName = newCat.name;
             } catch (e) {
+              if (isNetworkError(e)) throw e;
+              logImportFailure({
+                excelRowNumber,
+                phase: 'Criar categoria automática',
+                error: e,
+                payload: { name: categoryName, active: true },
+                fieldKey: 'category',
+                fieldHeader: mapping['category'],
+                row,
+                colIdx,
+              });
               console.warn(`Falha ao criar categoria automática: ${categoryName}`, e);
             }
           }
@@ -375,10 +498,34 @@ export default function ImportarExportarPage() {
 
         if (payload.barcode && productMap.has(payload.barcode)) {
           const existing = productMap.get(payload.barcode)!;
-          targetProduct = await updateProduct(existing.id, payload);
+          try {
+            targetProduct = await withRetry(() => updateProduct(existing.id, payload));
+          } catch (e) {
+            logImportFailure({
+              excelRowNumber,
+              phase: 'Atualizar produto (PATCH /products/:id)',
+              error: e,
+              payload: { id: existing.id, ...payload },
+              row,
+              colIdx,
+            });
+            throw e;
+          }
           isUpdate = true;
         } else {
-          targetProduct = await createProduct(payload);
+          try {
+            targetProduct = await withRetry(() => createProduct(payload));
+          } catch (e) {
+            logImportFailure({
+              excelRowNumber,
+              phase: 'Criar produto (POST /products)',
+              error: e,
+              payload,
+              row,
+              colIdx,
+            });
+            throw e;
+          }
           if (targetProduct.barcode) {
             productMap.set(targetProduct.barcode, targetProduct);
           }
@@ -393,17 +540,34 @@ export default function ImportarExportarPage() {
 
           if (delta !== 0) {
             try {
-              await adjustStock({
-                productId: targetProduct.id,
-                delta,
-                reason: isUpdate ? 'IMPORT_UPDATE' : 'INITIAL_IMPORT',
-              });
+              await withRetry(() =>
+                adjustStock({
+                  productId: targetProduct.id,
+                  delta,
+                  reason: isUpdate ? 'IMPORT_UPDATE' : 'INITIAL_IMPORT',
+                })
+              );
               // Atualiza o mapa local para refletir o novo estoque
               targetProduct.currentStock = fileStock;
               if (targetProduct.barcode) {
                 productMap.set(targetProduct.barcode, targetProduct);
               }
             } catch (e: any) {
+              if (isNetworkError(e)) throw e;
+              logImportFailure({
+                excelRowNumber,
+                phase: 'Ajustar estoque (POST /inventory/adjust)',
+                error: e,
+                payload: {
+                  productId: targetProduct.id,
+                  delta,
+                  reason: isUpdate ? 'IMPORT_UPDATE' : 'INITIAL_IMPORT',
+                },
+                fieldKey: 'stock',
+                fieldHeader: mapping['stock'],
+                row,
+                colIdx,
+              });
               errors.push({
                 row: excelRowNumber,
                 column: mapping['stock'],
@@ -425,7 +589,19 @@ export default function ImportarExportarPage() {
           return next;
         });
       } catch (e: any) {
+        logImportFailure({
+          excelRowNumber,
+          phase: 'Processar linha',
+          error: e,
+          row,
+          colIdx,
+          extra: { mapping, headers },
+        });
         let msg = e?.message || 'Falha ao criar produto';
+        if (isNetworkError(e)) {
+          msg = 'Sem conexão com o Client Local (porta 8081). Importação interrompida.';
+          fatalNetworkError = true;
+        }
         // Melhorar clareza para erros 500 genéricos
         if (msg.toLowerCase().includes('internal server error') || msg.includes('500')) {
           msg = 'Erro interno (verifique se as datas e números estão no formato correto)';
@@ -443,6 +619,7 @@ export default function ImportarExportarPage() {
       }
       // Garente que o React tenha chance de pintar o progresso
       await new Promise(r => setTimeout(r, 0));
+      if (fatalNetworkError) break;
     }
 
     setResultSummary({ success, errors });

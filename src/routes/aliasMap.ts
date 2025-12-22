@@ -18,6 +18,7 @@ export const SETTINGS_ALIASES: Record<string, string> = {
   '/erp/configuracoes/categorias': '/erp/settings/categories',
   '/erp/configuracoes/notificacoes': '/erp/settings/organization',
   '/erp/configuracoes/importar-exportar': '/erp/settings/import-export',
+  '/erp/configuracoes/dados': '/erp/settings/dados',
 };
 
 /**
@@ -37,4 +38,5 @@ export const SETTINGS_LABELS: Record<string, string> = {
   categories: 'Categorias',
   notifications: 'Notificações',
   'import-export': 'Importar/Exportar',
+  dados: 'Dados',
 };

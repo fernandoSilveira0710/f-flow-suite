@@ -169,7 +169,9 @@ export default function StockMovementsPage() {
           if (current) {
             delta = qtd - (current.currentStock ?? 0);
           }
-        } catch {}
+        } catch (e) {
+          void e;
+        }
       }
 
       await adjustStock({

@@ -165,6 +165,16 @@ export class PublicService {
     return this.plansService.findAllPlans(true); // Only active plans for public endpoint
   }
 
+  async hasUsers() {
+    try {
+      const count = await this.prisma.user.count();
+      return { hasUsers: count > 0 };
+    } catch (error) {
+      this.logger.warn('Failed to check existing users:', (error as any)?.message || error);
+      return { hasUsers: false };
+    }
+  }
+
   async resetPassword(dto: ResetPasswordDto) {
     if (process.env.NODE_ENV !== 'development') {
       throw new ForbiddenException('Password reset not allowed in current environment');
