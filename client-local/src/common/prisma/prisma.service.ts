@@ -1,8 +1,11 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
 import * as path from 'path';
+import { existsSync } from 'fs';
 
-function getPrismaClientClass(): any {
-  const exeDir = (process as any).pkg ? path.dirname(process.execPath) : process.cwd();
+function getPrismaClientClass(): new (...args: unknown[]) => unknown {
+  const isPackaged = Boolean((process as unknown as { pkg?: unknown }).pkg);
+  const exeDir = isPackaged ? path.dirname(process.execPath) : process.cwd();
   const appDir = process.env.LOCAL_DATA_DIR || exeDir;
 
   // Ensure engine path is set when running from installed folder
@@ -12,11 +15,10 @@ function getPrismaClientClass(): any {
   ];
   if (!process.env.PRISMA_QUERY_ENGINE_LIBRARY) {
     for (const candidate of engineCandidates) {
-      try {
-        require('fs').accessSync(candidate);
+      if (existsSync(candidate)) {
         process.env.PRISMA_QUERY_ENGINE_LIBRARY = candidate;
         break;
-      } catch {}
+      }
     }
   }
   if (!process.env.PRISMA_CLIENT_ENGINE_TYPE) {
@@ -24,10 +26,9 @@ function getPrismaClientClass(): any {
   }
 
   // Prefer loading generated client from external folder when packaged
-  if ((process as any).pkg) {
-    const fs = require('fs');
+  if (isPackaged) {
     const externalClient = path.join(exeDir, 'prisma-client', 'index.js');
-    if (fs.existsSync(externalClient)) {
+    if (existsSync(externalClient)) {
       const { PrismaClient } = require(externalClient);
       return PrismaClient;
     }
@@ -41,7 +42,7 @@ function getPrismaClientClass(): any {
 const PrismaClientRef = getPrismaClientClass();
 
 @Injectable()
-export class PrismaService extends PrismaClientRef implements OnModuleInit {
+export class PrismaService extends (PrismaClientRef as new (options?: any) => PrismaClient) implements OnModuleInit {
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
@@ -53,17 +54,20 @@ export class PrismaService extends PrismaClientRef implements OnModuleInit {
       ],
     });
 
-    // Cast to any to support event listeners across Prisma versions
-    (this as any).$on('query', (e: any) => {
-      this.logger.debug(`Prisma query: ${e.query} | params: ${e.params}`);
+    // Use unknown typing for cross-version event payloads
+    (this as unknown as { $on: (evt: string, cb: (e: unknown) => void) => void }).$on('query', (e: unknown) => {
+      const qe = e as { query?: string; params?: string };
+      this.logger.debug(`Prisma query: ${qe.query ?? ''} | params: ${qe.params ?? ''}`);
     });
 
-    (this as any).$on('error', (e: any) => {
-      this.logger.error(`Prisma error: ${e.message}`, e.stack);
+    (this as unknown as { $on: (evt: string, cb: (e: unknown) => void) => void }).$on('error', (e: unknown) => {
+      const er = e as { message?: string; stack?: string };
+      this.logger.error(`Prisma error: ${er.message ?? ''}`, er.stack ?? '');
     });
 
-    (this as any).$on('warn', (e: any) => {
-      this.logger.warn(`Prisma warn: ${e.message}`);
+    (this as unknown as { $on: (evt: string, cb: (e: unknown) => void) => void }).$on('warn', (e: unknown) => {
+      const wr = e as { message?: string };
+      this.logger.warn(`Prisma warn: ${wr.message ?? ''}`);
     });
   }
 
@@ -72,3 +76,4 @@ export class PrismaService extends PrismaClientRef implements OnModuleInit {
     this.logger.log('Prisma connected');
   }
 }
+

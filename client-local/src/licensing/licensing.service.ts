@@ -534,7 +534,17 @@ export class LicensingService implements OnModuleInit {
         params: { tenantId, deviceId: this.deviceId }
       });
 
-      const licenseData = response.data;
+      await this.saveLicenseCache(tenantId, response.data);
+
+      this.logger.log(`Cache de licença atualizado para tenant ${tenantId}`);
+    } catch (error) {
+      this.logger.error(`Erro ao atualizar cache de licença para tenant ${tenantId}`, error);
+      throw error;
+    }
+  }
+
+  async saveLicenseCache(tenantId: string, licenseData: any): Promise<void> {
+    try {
       const license = licenseData.license || {};
 
       // Atualiza ou cria o registro no cache
@@ -563,11 +573,9 @@ export class LicensingService implements OnModuleInit {
           lastChecked: new Date()
         }
       });
-
-      this.logger.log(`Cache de licença atualizado para tenant ${tenantId}`);
     } catch (error) {
-      this.logger.error(`Erro ao atualizar cache de licença para tenant ${tenantId}`, error);
-      throw error;
+       this.logger.error(`Erro ao salvar cache de licença para tenant ${tenantId}`, error);
+       throw error;
     }
   }
 

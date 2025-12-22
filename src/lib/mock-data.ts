@@ -124,7 +124,7 @@ const loadProductsFromStorage = (): Product[] => {
 };
 
 // Inicializar produtos com dados do localStorage
-let currentProducts = loadProductsFromStorage();
+const currentProducts = loadProductsFromStorage();
 
 export const mockAPI = {
   // Products

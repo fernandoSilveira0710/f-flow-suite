@@ -81,16 +81,44 @@ const API_BASE_URL = API_URLS.CLIENT_LOCAL;
 
 // API Helper function
 const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    ...options,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tenant-Id': getTenantId(),
+        ...options?.headers,
+      },
+      ...options,
+    });
+  } catch (e: any) {
+    const msg = String(e?.message || '');
+    if (e instanceof TypeError || msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('network')) {
+      throw new Error('Não foi possível conectar ao Client Local (porta 8081). Verifique se o serviço está rodando.');
+    }
+    throw e;
+  }
 
   if (!response.ok) {
-    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    let bodyText = '';
+    let parsed: any = undefined;
+    try {
+      bodyText = await response.text();
+    } catch (e) {
+      void e;
+    }
+    if (bodyText) {
+      try {
+        parsed = JSON.parse(bodyText);
+      } catch {
+        parsed = bodyText;
+      }
+    }
+    const message = `API Error: ${response.status} ${response.statusText}${bodyText ? ` - ${typeof parsed === 'string' ? parsed : JSON.stringify(parsed)}` : ''}`;
+    const err: any = new Error(message);
+    err.status = response.status;
+    err.body = parsed ?? bodyText;
+    throw err as Error;
   }
 
   return response.json();

@@ -103,11 +103,14 @@ export async function apiClientLocal<T = any>(
       try {
         const errorBody = await response.json();
         errorMessage = errorBody?.message || errorMessage;
-      } catch (_) {
+      } catch (e) {
+        void e;
         try {
           const text = await response.text();
           if (text) errorMessage = text;
-        } catch {}
+        } catch (e2) {
+          void e2;
+        }
       }
       throw new Error(errorMessage);
     }
@@ -173,11 +176,14 @@ export async function apiClient<T = any>(
       try {
         const errorBody = await response.json();
         errorMessage = errorBody?.message || errorMessage;
-      } catch (_) {
+      } catch (e) {
+        void e;
         try {
           const text = await response.text();
           if (text) errorMessage = text;
-        } catch {}
+        } catch (e2) {
+          void e2;
+        }
       }
       throw new Error(errorMessage);
     }

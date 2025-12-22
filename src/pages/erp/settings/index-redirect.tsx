@@ -17,6 +17,7 @@ export default function SettingsIndexRedirect() {
       { perm: 'settings:categories', path: '/erp/settings/categories' },
       { perm: 'settings:payments', path: '/erp/settings/payments' },
       { perm: 'settings:import-export', path: '/erp/settings/import-export' },
+      { perm: 'settings:data', path: '/erp/settings/dados' },
     ];
 
     const firstAllowed = candidates.find((c) => perms.includes(c.perm));

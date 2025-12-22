@@ -259,7 +259,7 @@ export default function PlanoPage() {
       const contentType = response.headers.get('content-type') || '';
       if (response.status === 304 || response.status === 204 || !contentType.includes('application/json')) {
         let preview = '';
-        try { preview = await response.text(); } catch {}
+        try { preview = await response.text(); } catch (e) { void e; }
         console.info('ℹ️ Assinatura sem corpo/304 ou não-JSON; usando fallback.', { url, contentType, preview: preview?.slice(0, 200) });
         await doFallbackFromValidate();
         return;
@@ -346,7 +346,9 @@ export default function PlanoPage() {
         localStorage.setItem('selectedPlan', mappedPlanInfo.plano);
         try {
           window.dispatchEvent(new CustomEvent('planChanged', { detail: { planKey: mappedPlanInfo.plano } }));
-        } catch {}
+        } catch (e) {
+          void e;
+        }
         console.log('✅ Plano sincronizado com client-local e localStorage');
       } catch (e) {
         console.warn('⚠️ Falha ao sincronizar plano com client-local/localStorage', e);
@@ -492,7 +494,7 @@ export default function PlanoPage() {
           // Atualizar plano local
           await handlePlanUpdate(mappedPlan);
 
-+          toast.success('Plano selecionado e assinatura criada com sucesso');
+          toast.success('Plano selecionado e assinatura criada com sucesso');
           await loadPlanFromHub(); // Recarregar informações
           await loadInvoices(); // Recarregar faturas
           return;
@@ -508,7 +510,7 @@ export default function PlanoPage() {
       try {
         await handlePlanUpdate(mappedPlan);
 
-+        toast.success('Plano atualizado localmente (Hub indisponível)');
+        toast.success('Plano atualizado localmente (Hub indisponível)');
         await loadPlanFromHub();
       } catch (localError) {
         console.error('Erro ao atualizar plano localmente:', localError);

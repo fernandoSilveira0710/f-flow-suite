@@ -41,6 +41,7 @@ export default function Login() {
   useEffect(() => {
     const licenseExpiredOffline = localStorage.getItem('license_expired_offline');
     const userNotFound = localStorage.getItem('user_not_found');
+    const dbCleared = localStorage.getItem('db_cleared');
     
     if (licenseExpiredOffline === 'true') {
       setLicenseWarning('Sua licença expirou e o sistema está offline. Conecte-se à internet para renovar.');
@@ -48,6 +49,9 @@ export default function Login() {
     } else if (userNotFound === 'true') {
       setLicenseWarning('Usuário não encontrado no sistema. Cadastre-se no site institucional.');
       localStorage.removeItem('user_not_found');
+    } else if (dbCleared === 'true') {
+      setLicenseWarning('A base de dados local (SQLite do client-local) foi limpa. Faça login novamente.');
+      localStorage.removeItem('db_cleared');
     } else if (user && licenseStatus && !licenseStatus.isValid) {
       setLicenseWarning('Sua licença está vencida ou inválida. Renove para continuar usando o sistema.');
     }

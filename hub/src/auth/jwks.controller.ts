@@ -11,7 +11,8 @@ export class JwksController {
       let publicKeyPem = process.env.LICENSE_PUBLIC_KEY_PEM;
 
       // Fallback to file if env var not set
-      if (!publicKeyPem) {
+      // Se a env não estiver definida ou não parecer um PEM, tentar fallback para arquivo
+      if (!publicKeyPem || !/^-----BEGIN PUBLIC KEY-----/.test(publicKeyPem.trim())) {
         const keyPathEnv = process.env.LICENSE_PUBLIC_KEY_PATH;
         const candidatePaths = [
           keyPathEnv && join(process.cwd(), keyPathEnv),
@@ -26,7 +27,7 @@ export class JwksController {
         }
       }
       
-      if (!publicKeyPem) {
+      if (!publicKeyPem || !/^-----BEGIN PUBLIC KEY-----/.test(publicKeyPem.trim())) {
         throw new Error('LICENSE_PUBLIC_KEY_PEM not configured');
       }
 

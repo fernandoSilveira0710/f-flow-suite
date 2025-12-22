@@ -14,10 +14,30 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { exportData } from '@/lib/settings-api';
-import { createProduct } from '@/lib/products-api';
+import { ApiError, createProduct, getProducts, updateProduct, ProductResponse } from '@/lib/products-api';
 import { adjustStock } from '@/lib/stock-api';
+import { fetchCategories, createCategory, Category } from '@/lib/categories-api';
+import { API_URLS } from '@/lib/env';
 
 type EntityType = 'products' | 'customers';
+
+const normalizeUnit = (input: string): string => {
+  const n = input.trim().toLowerCase();
+  if (!n) return '';
+  // Mapping to standard ABBREVIATIONS as per mock-data.ts (un, kg, g, L, ml, m, cm)
+  if (['un', 'uni', 'unid', 'unidade', 'und'].includes(n)) return 'un';
+  if (['kg', 'kilo', 'quilo', 'kilograma', 'quilograma'].includes(n)) return 'kg';
+  if (['g', 'gr', 'grama', 'gramas'].includes(n)) return 'g';
+  if (['l', 'lt', 'litro', 'litros'].includes(n)) return 'L';
+  if (['ml', 'mili', 'mililitro', 'mililitros'].includes(n)) return 'ml';
+  if (['m', 'mt', 'metro', 'metros'].includes(n)) return 'm';
+  if (['cm', 'cent', 'centimetro', 'centimetros'].includes(n)) return 'cm';
+  if (['mm', 'mil', 'milimetro', 'milimetros'].includes(n)) return 'mm';
+  if (['sc', 'saco', 'sacos'].includes(n)) return 'sc';
+  if (['cl', 'colher'].includes(n)) return 'cl';
+  if (['pt', 'pote',].includes(n)) return 'pt';
+  return input; // Fallback: use as is
+};
 
 export default function ImportarExportarPage() {
   const [importing, setImporting] = useState(false);
@@ -42,7 +62,7 @@ export default function ImportarExportarPage() {
     current: number; // 1-based
     success: number;
     errors: number;
-    logs: { row: number; status: 'success' | 'error'; message?: string }[];
+    logs: { row: number; status: 'success' | 'error' | 'update'; message?: string }[];
   }>({ total: 0, current: 0, success: 0, errors: 0, logs: [] });
 
   const handleExport = async (type: EntityType) => {
@@ -195,6 +215,51 @@ export default function ImportarExportarPage() {
     return undefined;
   };
 
+  const parseDateISO = (v: any): string | undefined => {
+    if (v === undefined || v === null) return undefined;
+
+    // Detecção de data serial do Excel (ex: 45726 -> ~2025)
+    // Faixa razoável: 10000 (1927) a 90000 (2146)
+    const asNum = Number(v);
+    if (!isNaN(asNum) && asNum > 10000 && asNum < 90000) {
+      // Excel epoch: Dec 30 1899
+      const excelEpoch = new Date(1899, 11, 30);
+      const millis = excelEpoch.getTime() + asNum * 86400000;
+      const d = new Date(millis);
+      // Ajuste de fuso horário pode ser necessário dependendo de como o Excel foi lido,
+      // mas UTC geralmente é seguro para data (ISO).
+      return d.toISOString();
+    }
+
+    const s = String(v).trim();
+    if (!s) return undefined;
+    
+    // Tenta validar se já é ISO
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      // Bloqueia anos absurdos (ex: 45726 interpretado como ano)
+      if (d.getFullYear() > 2500) return undefined;
+      return d.toISOString();
+    }
+    
+    // Tenta formatos comuns BR (DD/MM/YYYY)
+    const parts = s.split(/[-./]/);
+    if (parts.length === 3) {
+      // Assume dia/mes/ano se primeiro numero > 12 ou ano for ultimo
+      const p1 = parseInt(parts[0]);
+      const p2 = parseInt(parts[1]);
+      const p3 = parseInt(parts[2]);
+      
+      if (p3 > 1000) {
+        // DD/MM/YYYY
+        const d2 = new Date(p3, p2 - 1, p1);
+        if (!isNaN(d2.getTime())) return d2.toISOString();
+      }
+    }
+    
+    return undefined;
+  };
+
   const getColumnIndex = (headerName?: string): number | undefined => {
     if (!headerName) return undefined;
     const idx = headers.findIndex(h => h === headerName);
@@ -211,26 +276,150 @@ export default function ImportarExportarPage() {
       return;
     }
 
+    const isNetworkError = (e: any) => {
+      const msg = String(e?.message || '');
+      return (
+        e?.status === 0 ||
+        msg.toLowerCase().includes('failed to fetch') ||
+        msg.toLowerCase().includes('não foi possível conectar') ||
+        msg.toLowerCase().includes('porta 8081') ||
+        msg.toLowerCase().includes('tempo limite') ||
+        msg.toLowerCase().includes('network') ||
+        msg.toLowerCase().includes('err_connection_refused')
+      );
+    };
+
+    const asPlainError = (err: unknown) => {
+      const e: any = err;
+      const out: Record<string, unknown> = {
+        name: e?.name,
+        message: e?.message,
+      };
+      if (typeof e?.status === 'number') out.status = e.status;
+      if (e instanceof ApiError) {
+        out.status = e.status;
+        out.body = e.body;
+      } else if (e?.body !== undefined) {
+        out.body = e.body;
+      }
+      if (typeof e?.stack === 'string') out.stack = e.stack;
+      return out;
+    };
+
+    const logImportFailure = (args: {
+      excelRowNumber?: number;
+      phase: string;
+      error: unknown;
+      payload?: unknown;
+      fieldKey?: string;
+      fieldHeader?: string;
+      row?: any[];
+      colIdx?: Record<string, number | undefined>;
+      extra?: Record<string, unknown>;
+    }) => {
+      const title = args.excelRowNumber
+        ? `[IMPORT] Linha ${args.excelRowNumber} - ${args.phase}`
+        : `[IMPORT] ${args.phase}`;
+      console.groupCollapsed(title);
+      console.log('Erro:', args.error);
+      console.log('Detalhes:', asPlainError(args.error));
+      if (args.fieldKey || args.fieldHeader) {
+        console.log('Campo:', { fieldKey: args.fieldKey, header: args.fieldHeader });
+      }
+      if (args.payload !== undefined) console.log('Payload:', args.payload);
+      if (args.row && args.colIdx) {
+        const snapshot: Record<string, unknown> = {};
+        Object.keys(args.colIdx).forEach((k) => {
+          const idx = args.colIdx?.[k];
+          snapshot[k] = idx !== undefined ? args.row?.[idx] : undefined;
+        });
+        console.log('Linha (mapeada):', snapshot);
+        console.log('Linha (raw):', args.row);
+      } else if (args.row) {
+        console.log('Linha (raw):', args.row);
+      }
+      if (args.extra) console.log('Extra:', args.extra);
+      console.groupEnd();
+    };
+
+    const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+    const withRetry = async <T,>(
+      fn: () => Promise<T>,
+      opts?: { retries?: number; delayMs?: number }
+    ): Promise<T> => {
+      const retries = opts?.retries ?? 2;
+      const delayMs = opts?.delayMs ?? 700;
+
+      let lastErr: unknown;
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          return await fn();
+        } catch (err) {
+          lastErr = err;
+          if (!isNetworkError(err) || attempt === retries) throw err;
+          await sleep(delayMs * (attempt + 1));
+        }
+      }
+      throw lastErr instanceof Error ? lastErr : new Error('Falha inesperada ao tentar novamente');
+    };
+
     setImporting(true);
+
+    let clientLocalOnline = false;
+    const healthController = new AbortController();
+    const healthTimer = setTimeout(() => healthController.abort(), 2000);
+    try {
+      const healthRes = await fetch(`${API_URLS.CLIENT_LOCAL}/health?t=${Date.now()}`, { method: 'GET', signal: healthController.signal });
+      clientLocalOnline = healthRes.ok;
+    } catch (e) {
+      clientLocalOnline = false;
+      void e;
+    } finally {
+      clearTimeout(healthTimer);
+    }
+
+    if (!clientLocalOnline) {
+      setImporting(false);
+      toast.error('Client Local indisponível (porta 8081). Inicie o serviço antes de importar.');
+      return;
+    }
+
     setProgressOpen(true);
     setProgressState({ total: rowsAll.length, current: 0, success: 0, errors: 0, logs: [] });
     const errors: { row: number; column?: string; message: string }[] = [];
     let success = 0;
+    let fatalNetworkError = false;
 
     // Prepara índices das colunas mapeadas
     const colIdx: Record<string, number | undefined> = {};
     Object.keys(mapping).forEach(key => { colIdx[key] = getColumnIndex(mapping[key]); });
 
-    // Validação de obrigatórios
-    if (colIdx['name'] === undefined) {
-      toast.error('Campo obrigatório "Nome" não mapeado.');
-      setImporting(false);
-      return;
+    // REMOVIDO: Validação de obrigatórios (usuário pediu para permitir criação mesmo sem campos obrigatórios)
+    // if (colIdx['name'] === undefined) { ... }
+    // if (colIdx['price'] === undefined) { ... }
+
+    // Carregar categorias existentes para verificação/criação
+    let existingCategories: Category[] = [];
+    try {
+      existingCategories = await withRetry(() => fetchCategories());
+    } catch (e) {
+      logImportFailure({ phase: 'Carregar categorias', error: e });
+      console.warn('Erro ao carregar categorias para importação:', e);
     }
-    if (colIdx['price'] === undefined) {
-      toast.error('Campo obrigatório "Preço" não mapeado.');
-      setImporting(false);
-      return;
+
+    // Carregar produtos existentes para verificar duplicidade (Barcode)
+    const productMap = new Map<string, ProductResponse>();
+    try {
+      const allProducts = await withRetry(() => getProducts());
+      allProducts.forEach((p) => {
+        if (p.barcode) {
+          productMap.set(p.barcode, p);
+        }
+      });
+    } catch (e) {
+      logImportFailure({ phase: 'Carregar produtos existentes', error: e });
+      console.warn('Erro ao carregar produtos existentes:', e);
     }
 
     for (let i = 0; i < rowsAll.length; i++) {
@@ -238,16 +427,52 @@ export default function ImportarExportarPage() {
       const excelRowNumber = i + 2; // +1 cabeçalho, +1 index base 0
       try {
         const getVal = (key: string) => colIdx[key] !== undefined ? row[colIdx[key] as number] : undefined;
-        const name = String(getVal('name') ?? '').trim();
+        
+        // Tratamento de Nome (obrigatório no backend, opcional na importação via default)
+        let name = String(getVal('name') ?? '').trim();
         if (!name) {
-          errors.push({ row: excelRowNumber, column: mapping['name'], message: 'Nome obrigatório vazio' });
-          continue;
+          name = `Produto Importado (Linha ${excelRowNumber})`;
+          // Opcional: Adicionar aviso no log, mas mantendo como sucesso
         }
 
-        const price = parseNumber(getVal('price'));
+        // Tratamento de Preço (obrigatório no backend, opcional na importação via default)
+        let price = parseNumber(getVal('price'));
         if (price === undefined) {
-          errors.push({ row: excelRowNumber, column: mapping['price'], message: 'Preço inválido ou vazio' });
-          continue;
+          price = 0;
+        }
+
+        // Tratamento de Categoria (Check & Create)
+        let categoryName = String(getVal('category') ?? '').trim();
+        if (categoryName) {
+          const match = existingCategories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+          if (match) {
+            categoryName = match.name;
+          } else {
+            try {
+              const newCat = await withRetry(() => createCategory({ name: categoryName, active: true }));
+              existingCategories.push(newCat);
+              categoryName = newCat.name;
+            } catch (e) {
+              if (isNetworkError(e)) throw e;
+              logImportFailure({
+                excelRowNumber,
+                phase: 'Criar categoria automática',
+                error: e,
+                payload: { name: categoryName, active: true },
+                fieldKey: 'category',
+                fieldHeader: mapping['category'],
+                row,
+                colIdx,
+              });
+              console.warn(`Falha ao criar categoria automática: ${categoryName}`, e);
+            }
+          }
+        }
+
+        // Tratamento de Unidade (Normalização)
+        let unitStr = String(getVal('unit') ?? '').trim();
+        if (unitStr) {
+          unitStr = normalizeUnit(unitStr);
         }
 
         const payload = {
@@ -257,30 +482,98 @@ export default function ImportarExportarPage() {
           barcode: String(getVal('barcode') ?? '').trim() || undefined,
           price,
           cost: parseNumber(getVal('cost')),
-          category: String(getVal('category') ?? '').trim() || undefined,
-          unit: String(getVal('unit') ?? '').trim() || undefined,
+          category: categoryName || undefined,
+          unit: unitStr || undefined,
           minStock: parseInteger(getVal('minStock')),
           maxStock: parseInteger(getVal('maxStock')),
           trackStock: parseBoolean(getVal('trackStock')) ?? true,
           active: parseBoolean(getVal('active')) ?? true,
           marginPct: parseNumber(getVal('marginPct')),
-          expiryDate: (() => {
-            const v = getVal('expiryDate');
-            const s = v !== undefined && v !== null ? String(v).trim() : '';
-            return s ? s : undefined;
-          })(),
+          expiryDate: parseDateISO(getVal('expiryDate')),
         } as Parameters<typeof createProduct>[0];
 
-        // Cria o produto
-        const created = await createProduct(payload);
+        // Lógica de Criar ou Atualizar (Upsert via Barcode)
+        let targetProduct: ProductResponse;
+        let isUpdate = false;
 
-        // Ajuste de estoque inicial
-        const initialStock = parseInteger(getVal('stock')) || 0;
-        if ((payload.trackStock ?? true) && initialStock > 0) {
+        if (payload.barcode && productMap.has(payload.barcode)) {
+          const existing = productMap.get(payload.barcode)!;
           try {
-            await adjustStock({ productId: created.id, delta: initialStock, reason: 'INITIAL_IMPORT' });
-          } catch (e: any) {
-            errors.push({ row: excelRowNumber, column: mapping['stock'], message: `Falha ao ajustar estoque: ${e?.message || 'erro desconhecido'}` });
+            targetProduct = await withRetry(() => updateProduct(existing.id, payload));
+          } catch (e) {
+            logImportFailure({
+              excelRowNumber,
+              phase: 'Atualizar produto (PATCH /products/:id)',
+              error: e,
+              payload: { id: existing.id, ...payload },
+              row,
+              colIdx,
+            });
+            throw e;
+          }
+          isUpdate = true;
+        } else {
+          try {
+            targetProduct = await withRetry(() => createProduct(payload));
+          } catch (e) {
+            logImportFailure({
+              excelRowNumber,
+              phase: 'Criar produto (POST /products)',
+              error: e,
+              payload,
+              row,
+              colIdx,
+            });
+            throw e;
+          }
+          if (targetProduct.barcode) {
+            productMap.set(targetProduct.barcode, targetProduct);
+          }
+        }
+
+        // Ajuste de estoque (Sobrescreve/Define o valor final)
+        const fileStock = parseInteger(getVal('stock'));
+        
+        if (fileStock !== undefined && (payload.trackStock ?? true)) {
+          const currentStock = targetProduct.currentStock || 0;
+          const delta = fileStock - currentStock;
+
+          if (delta !== 0) {
+            try {
+              await withRetry(() =>
+                adjustStock({
+                  productId: targetProduct.id,
+                  delta,
+                  reason: isUpdate ? 'IMPORT_UPDATE' : 'INITIAL_IMPORT',
+                })
+              );
+              // Atualiza o mapa local para refletir o novo estoque
+              targetProduct.currentStock = fileStock;
+              if (targetProduct.barcode) {
+                productMap.set(targetProduct.barcode, targetProduct);
+              }
+            } catch (e: any) {
+              if (isNetworkError(e)) throw e;
+              logImportFailure({
+                excelRowNumber,
+                phase: 'Ajustar estoque (POST /inventory/adjust)',
+                error: e,
+                payload: {
+                  productId: targetProduct.id,
+                  delta,
+                  reason: isUpdate ? 'IMPORT_UPDATE' : 'INITIAL_IMPORT',
+                },
+                fieldKey: 'stock',
+                fieldHeader: mapping['stock'],
+                row,
+                colIdx,
+              });
+              errors.push({
+                row: excelRowNumber,
+                column: mapping['stock'],
+                message: `Falha ao ajustar estoque: ${e?.message || 'erro desconhecido'}`,
+              });
+            }
           }
         }
 
@@ -291,12 +584,28 @@ export default function ImportarExportarPage() {
             ...prev,
             current: i + 1,
             success: prev.success + 1,
-            logs: [...prev.logs, { row: excelRowNumber, status: 'success' as const }].slice(-80),
+            logs: [...prev.logs, { row: excelRowNumber, status: isUpdate ? 'update' : 'success' }].slice(-80),
           };
           return next;
         });
       } catch (e: any) {
-        const msg = e?.message || 'Falha ao criar produto';
+        logImportFailure({
+          excelRowNumber,
+          phase: 'Processar linha',
+          error: e,
+          row,
+          colIdx,
+          extra: { mapping, headers },
+        });
+        let msg = e?.message || 'Falha ao criar produto';
+        if (isNetworkError(e)) {
+          msg = 'Sem conexão com o Client Local (porta 8081). Importação interrompida.';
+          fatalNetworkError = true;
+        }
+        // Melhorar clareza para erros 500 genéricos
+        if (msg.toLowerCase().includes('internal server error') || msg.includes('500')) {
+          msg = 'Erro interno (verifique se as datas e números estão no formato correto)';
+        }
         errors.push({ row: excelRowNumber, message: msg });
         setProgressState(prev => {
           const next = {
@@ -310,6 +619,7 @@ export default function ImportarExportarPage() {
       }
       // Garente que o React tenha chance de pintar o progresso
       await new Promise(r => setTimeout(r, 0));
+      if (fatalNetworkError) break;
     }
 
     setResultSummary({ success, errors });
@@ -491,8 +801,20 @@ export default function ImportarExportarPage() {
                 {progressState.logs.map((l, idx) => (
                   <div key={idx} className="flex gap-3">
                     <span>Linha {l.row}</span>
-                    <span className={l.status === 'success' ? 'text-green-600' : 'text-red-600'}>
-                      {l.status === 'success' ? 'Sucesso' : `Erro: ${l.message || ''}`}
+                    <span
+                      className={
+                        l.status === 'success'
+                          ? 'text-green-600'
+                          : l.status === 'update'
+                          ? 'text-yellow-600'
+                          : 'text-red-600'
+                      }
+                    >
+                      {l.status === 'success'
+                        ? 'Sucesso'
+                        : l.status === 'update'
+                        ? 'Atualizado'
+                        : `Erro: ${l.message || ''}`}
                     </span>
                   </div>
                 ))}

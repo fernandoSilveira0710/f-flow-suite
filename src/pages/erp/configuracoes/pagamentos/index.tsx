@@ -64,7 +64,9 @@ export default function PaymentsIndex() {
           const parsed = JSON.parse(jsonText);
           serverMsg = parsed?.message || parsed?.error;
         }
-      } catch {}
+      } catch (e) {
+        void e;
+      }
       toast({
         title: 'Erro ao excluir método',
         description: serverMsg || 'Ocorreu um erro inesperado ao excluir o método de pagamento.',

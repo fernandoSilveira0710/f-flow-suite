@@ -1,10 +1,16 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react-swc'
 import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['**/node_modules/**', 'hub/**', 'client-local/**', 'desktop/**', 'site/**', 'dist/**'],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -20,13 +26,13 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
-        configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
             proxyReq.setHeader('Host', 'localhost:3001');
             console.log('Proxy request:', req.method, req.url, '-> http://localhost:3001' + req.url);
           });
 
-          proxy.on('proxyRes', (proxyRes, req, res) => {
+          proxy.on('proxyRes', (proxyRes, req) => {
             proxyRes.headers['Access-Control-Allow-Origin'] = 'http://localhost:8080';
             proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
             proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
@@ -49,13 +55,13 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
-        configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
             proxyReq.setHeader('Host', 'localhost:3001');
             console.log('Proxy request:', req.method, req.url, '-> http://localhost:3001' + req.url);
           });
 
-          proxy.on('proxyRes', (proxyRes, req, res) => {
+          proxy.on('proxyRes', (proxyRes, req) => {
             proxyRes.headers['Access-Control-Allow-Origin'] = 'http://localhost:8080';
             proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
             proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
@@ -78,13 +84,13 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
-        configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
             proxyReq.setHeader('Host', 'localhost:3001');
             console.log('Proxy request:', req.method, req.url, '-> http://localhost:3001' + req.url);
           });
 
-          proxy.on('proxyRes', (proxyRes, req, res) => {
+          proxy.on('proxyRes', (proxyRes, req) => {
             proxyRes.headers['Access-Control-Allow-Origin'] = 'http://localhost:8080';
             proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
             proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
@@ -107,13 +113,13 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
-        configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
             proxyReq.setHeader('Host', 'localhost:3001');
             console.log('Proxy request:', req.method, req.url, '-> http://localhost:3001' + req.url);
           });
 
-          proxy.on('proxyRes', (proxyRes, req, res) => {
+          proxy.on('proxyRes', (proxyRes, req) => {
             proxyRes.headers['Access-Control-Allow-Origin'] = 'http://localhost:8080';
             proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
             proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
@@ -136,14 +142,14 @@ export default defineConfig({
         target: 'http://localhost:8081',
         changeOrigin: true,
         secure: false,
-        configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
             // Definir headers necessários para CORS
             proxyReq.setHeader('Host', 'localhost:8081');
             console.log('Proxy request:', req.method, req.url, '-> http://localhost:8081' + req.url);
           });
           
-          proxy.on('proxyRes', (proxyRes, req, res) => {
+          proxy.on('proxyRes', (proxyRes, req) => {
             // Garantir que os headers CORS estejam presentes na resposta
             proxyRes.headers['Access-Control-Allow-Origin'] = 'http://localhost:8080';
             proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
